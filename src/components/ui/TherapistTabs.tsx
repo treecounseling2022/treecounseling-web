@@ -22,7 +22,7 @@ type Props = {
 };
 
 const TABS = [
-  { id: "letter", label: "給個案的信" },
+  { id: "letter", label: "給來訪者的信" },
   { id: "profile", label: "資歷" },
   { id: "services", label: "服務與收費" },
 ] as const;
@@ -52,59 +52,71 @@ export default function TherapistTabs({ detail, memberEducation }: Props) {
         ))}
       </div>
 
-      {/* Tab: 給個案的信 */}
+      {/* Tab: 給來訪者的信 */}
       {active === "letter" && (
-        <div className="bg-soft border border-sand/20 p-8 md:p-10 relative">
-          <div className="absolute top-6 right-6 w-12 h-12 rounded-full border border-sand/30 flex items-center justify-center text-[8px] font-garamond text-sand/50 tracking-widest uppercase rotate-12 select-none">
-            Tree Studio
+        detail.letter ? (
+          <div className="bg-soft border border-sand/20 p-8 md:p-10 relative">
+            <div className="absolute top-6 right-6 w-12 h-12 rounded-full border border-sand/30 flex items-center justify-center text-[8px] font-garamond text-sand/50 tracking-widest uppercase rotate-12 select-none">
+              Tree Studio
+            </div>
+            <h3 className="font-serif text-deep text-lg mb-6 pb-2 border-b border-sand/10">
+              給來訪者的一封信
+            </h3>
+            <div className="font-sans text-muted text-sm leading-relaxed whitespace-pre-line">
+              {detail.letter}
+            </div>
           </div>
-          <h3 className="font-serif text-deep text-lg mb-6 pb-2 border-b border-sand/10">
-            給個案的一封信
-          </h3>
-          <div className="font-sans text-muted text-sm leading-relaxed whitespace-pre-line">
-            {detail.letter}
-          </div>
-        </div>
+        ) : (
+          <p className="font-sans text-sm text-muted/40 py-8 text-center">尚未填寫</p>
+        )
       )}
 
       {/* Tab: 資歷 */}
       {active === "profile" && (
         <div className="space-y-8">
           {/* 擅長議題 & 諮商取向 */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
-            <Section title="擅長議題">
-              <ul className="space-y-2">
-                {detail.specialties.map((item) => (
-                  <li key={item} className="font-sans text-muted text-sm flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 bg-sand/60 rounded-full flex-shrink-0" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </Section>
-            <Section title="諮商取向">
-              <ul className="space-y-2">
-                {detail.approaches.map((item) => (
-                  <li key={item} className="font-sans text-muted text-sm flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 bg-forest/40 rounded-full flex-shrink-0" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </Section>
-          </div>
+          {(detail.specialties.length > 0 || detail.approaches.length > 0) && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+              {detail.specialties.length > 0 && (
+                <Section title="擅長議題">
+                  <ul className="space-y-2">
+                    {detail.specialties.map((item) => (
+                      <li key={item} className="font-sans text-muted text-sm flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 bg-sand/60 rounded-full flex-shrink-0" />
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </Section>
+              )}
+              {detail.approaches.length > 0 && (
+                <Section title="諮商取向">
+                  <ul className="space-y-2">
+                    {detail.approaches.map((item) => (
+                      <li key={item} className="font-sans text-muted text-sm flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 bg-forest/40 rounded-full flex-shrink-0" />
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </Section>
+              )}
+            </div>
+          )}
 
           {/* 學歷背景 */}
-          <Section title="學歷背景">
-            <ul className="space-y-2">
-              {memberEducation.map((edu, idx) => (
-                <li key={idx} className="font-sans text-muted text-sm flex gap-2">
-                  <span className="text-sand/50 flex-shrink-0">—</span>
-                  <span>{edu}</span>
-                </li>
-              ))}
-            </ul>
-          </Section>
+          {memberEducation.length > 0 && (
+            <Section title="學歷背景">
+              <ul className="space-y-2">
+                {memberEducation.map((edu, idx) => (
+                  <li key={idx} className="font-sans text-muted text-sm flex gap-2">
+                    <span className="text-sand/50 flex-shrink-0">—</span>
+                    <span>{edu}</span>
+                  </li>
+                ))}
+              </ul>
+            </Section>
+          )}
 
           {/* 證照 */}
           {detail.licenses && detail.licenses.length > 0 && (

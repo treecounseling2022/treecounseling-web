@@ -1,9 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { getAuthInfo, isAdminLevel } from "@/lib/auth-role";
 
 export const metadata: Metadata = {
   title: "後台管理 - 樹心理工作室",
   robots: { index: false, follow: false },
+};
+
+const ROLE_LABEL: Record<string, string> = {
+  director: "所長",
+  admin: "行政",
+  therapist: "心理師",
 };
 
 export default async function AdminLayout({
@@ -11,33 +18,59 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  let user: { email?: string | null } | null = null;
-
-  if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    try {
-      const { createClient } = await import("@/lib/supabase/server");
-      const supabase = await createClient();
-      const { data } = await supabase.auth.getUser();
-      user = data.user;
-    } catch {
-      // Supabase not reachable — render without nav
-    }
-  }
+  const auth = await getAuthInfo();
 
   return (
     <div className="min-h-screen bg-[#f8f7f4]">
-      {user && (
+      {auth && (
         <header className="bg-deep text-paper h-12 flex items-center px-6 gap-6">
           <span className="font-serif text-sm mr-4">樹心理後台</span>
           <nav className="flex items-center gap-5 text-xs font-sans text-paper/70">
-            <Link href="/admin" className="hover:text-paper transition-colors">儀表板</Link>
-            <Link href="/admin/therapists" className="hover:text-paper transition-colors">心理師資料</Link>
-            <Link href="/admin/articles" className="hover:text-paper transition-colors">文章管理</Link>
+            {isAdminLevel(auth.role) ? (
+              <>
+                <Link href="/admin" className="hover:text-paper transition-colors">
+                  儀表板
+                </Link>
+                <Link
+                  href="/admin/members"
+                  className="hover:text-paper transition-colors"
+                >
+                  成員資料
+                </Link>
+                <Link
+                  href="/admin/articles"
+                  className="hover:text-paper transition-colors"
+                >
+                  文章管理
+                </Link>
+                <Link
+                  href="/admin/invite"
+                  className="hover:text-paper transition-colors"
+                >
+                  邀請成員
+                </Link>
+              </>
+            ) : auth.profileId ? (
+              <Link
+                href={`/admin/members/${auth.profileId}`}
+                className="hover:text-paper transition-colors"
+              >
+                我的資料
+              </Link>
+            ) : (
+              <span className="text-paper/40">帳號尚未連結至成員資料</span>
+            )}
           </nav>
           <div className="ml-auto flex items-center gap-4 text-xs font-sans text-paper/50">
-            <span>{user.email}</span>
+            <span className="text-paper/30">
+              {ROLE_LABEL[auth.role] ?? auth.role}
+            </span>
+            <span>{auth.email}</span>
             <form action="/api/admin/logout" method="POST">
-              <button type="submit" className="hover:text-paper transition-colors cursor-pointer">
+              <button
+                type="submit"
+                className="hover:text-paper transition-colors cursor-pointer"
+              >
                 登出
               </button>
             </form>

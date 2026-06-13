@@ -7,6 +7,8 @@ import FadeIn from "@/components/ui/FadeIn";
 import TherapistTabs, { type TherapistDetail } from "@/components/ui/TherapistTabs";
 import { TEAM } from "@/lib/data";
 
+export const dynamic = "force-dynamic";
+
 interface Props {
   params: Promise<{ id: string }>;
 }
@@ -19,77 +21,14 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
-  const member = TEAM.find((m) => m.id === id);
-  if (!member) return {};
-
+  const db = await getProfileFromDB(id);
+  if (!db?.name) return {};
   return {
-    title: `${member.name} ${member.nameEn !== member.name ? member.nameEn : ""} - ${member.title}`,
-    description: member.bio,
+    title: [db.name, db.name_en !== db.name ? db.name_en : null, db.title].filter(Boolean).join(" — "),
+    description: db.bio ?? undefined,
   };
 }
 
-const THERAPIST_DETAILS: Record<string, TherapistDetail> = {
-  tanky: {
-    letter: `你好，我是國章。
-
-在日常的繁忙與壓力中，我們有時會覺得自己像是被卡在岩石縫隙中的樹苗，呼吸被壓縮得極其微弱。在與個案工作的過程中，我最常看見的是生命在逆境中的堅韌。
-
-輔導對我而言，不是一個由上而下的指導過程，而是一段平等的陪伴。在諮商室這個安全、保密的空間裡，我們將一起去整理那些繁雜的情緒，理解困擾背後的意義，並在岩石的縫隙中，尋找土壤與光線，長出屬於你自己的獨特年輪。無論你正面臨焦慮、憂鬱、還是生活中的各種抉擇，我都願意與你一起，在對話中找回內在的力量。`,
-    specialties: ["憂鬱與焦慮情緒調適", "強迫行為與囤積行為諮商", "多元性別 (LGBTQIA+) 議題", "生涯發展與學習困擾", "人際與親密關係"],
-    approaches: ["認知行為治療 (CBT)", "接納承諾治療 (ACT)", "存在主義取向心理諮商"],
-    licenses: [],
-    associations: [],
-    experience: [],
-    training: [],
-    publications: [],
-    services: [],
-  },
-  veronica: {
-    letter: `你好，我是 Veronica。
-
-生命是由無數個關係交織而成的。在這些關係中，我們有時會迷失了自己，忘記了如何傾聽內心深處那溫暖且真實的聲音。
-
-我深信，每個人都擁有自我療癒的潛能。在我們的諮商旅程中，我會提供一個溫柔、沒有評判的空間，像是一片安靜的森林，讓你能夠卸下疲憊與防備，好好安頓自己。我們將一起探索你的內心世界、親密關係，以及在家庭或教養中的挑戰，協助你重新建立與自己、與他人的連結。`,
-    specialties: ["自我探索與個人成長", "親密關係與伴侶諮商", "親子互動與親職教養諮商", "工作與生活壓力調適"],
-    approaches: ["人本主義心理治療", "情緒取向伴侶諮商 (EFT)", "薩提爾家族治療模式"],
-    licenses: [],
-    associations: [],
-    experience: [],
-    training: [],
-    publications: [],
-    services: [],
-  },
-  joyce: {
-    letter: `你好，我是文靜（Joyce）。
-
-在迷惘與焦慮的陰影下，我們常常會懷疑自己的價值，或者在人際的互動中感到疲憊不堪。這些掙扎，其實都是心靈在向我們發出渴望被理解的訊號。
-
-在諮商中，我注重的是「此時此刻」的真實相遇。我希望能陪你一起慢下來，去感覺、去理解那些被壓抑的情緒。我們將在對話中梳理那些糾纏不清的思緒，看見你身上的資源與特質，陪伴你度過自我探索的混亂期，走向更加自在與統整的自己。`,
-    specialties: ["人際關係與情感依附", "自我探索與認同發展", "情緒困擾與壓力管理", "性別認同與多元文化"],
-    approaches: ["焦點解決短期治療 (SFBT)", "敘事治療 (Narrative Therapy)", "關係動力取向諮商"],
-    licenses: [],
-    associations: [],
-    experience: [],
-    training: [],
-    publications: [],
-    services: [],
-  },
-  mfok: {
-    letter: `你好，我是 M Fok。
-
-不論你正經歷著多大的風雨，或者在社會、關係的邊緣感到孤單，我都希望能為你提供一個可以安心棲息的角落。
-
-我擁有在多元文化與跨國背景下工作的經驗。在輔導中，我會以極大的接納與專業，陪你一同面對生命中的創傷、深刻的情緒困擾、以及自我認同的挑戰。在這裡，你不需要去迎合任何人的期待，只需要呈現你最真實的樣子，我們將一起尋求重建心靈和諧的方法。`,
-    specialties: ["創傷經歷與創傷後壓力調適", "深刻情緒困擾 (抑鬱、強迫等)", "LGBTQIA+ 及性別認同諮商", "跨文化適應與生涯規劃"],
-    approaches: ["創傷知情心理治療", "精神動力取向諮商", "正念與認知治療"],
-    licenses: [],
-    associations: [],
-    experience: [],
-    training: [],
-    publications: [],
-    services: [],
-  },
-};
 
 // Social media icons as inline SVG
 function InstagramIcon() {
@@ -118,14 +57,33 @@ function ThreadsIcon() {
   );
 }
 
-async function getProfileFromDB(id: string): Promise<Partial<TherapistDetail> | null> {
+type DBProfile = {
+  name?: string;
+  name_en?: string;
+  bio?: string;
+  photo_url?: string;
+  title?: string;
+  client_letter?: string;
+  specialties?: string[];
+  orientations?: string[];
+  education?: string[];
+  socials?: { instagram?: string; facebook?: string; threads?: string; xiaohongshu?: string };
+  licenses?: string[];
+  associations?: string[];
+  experience?: { role: string; org: string; period: string }[];
+  training?: string[];
+  publications?: { title: string; year?: string; note?: string }[];
+  services?: { name: string; fee: string; duration?: string; note?: string }[];
+};
+
+async function getProfileFromDB(id: string): Promise<DBProfile | null> {
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL) return null;
   try {
     const { createClient } = await import("@/lib/supabase/server");
     const supabase = await createClient();
     const { data } = await supabase
       .from("therapist_profiles")
-      .select("licenses, associations, experience, training, publications, services")
+      .select("name, name_en, bio, photo_url, title, client_letter, specialties, orientations, education, socials, licenses, associations, experience, training, publications, services")
       .eq("id", id)
       .single();
     return data ?? null;
@@ -141,28 +99,33 @@ export default async function TherapistPage({ params }: Props) {
     notFound();
   }
 
-  const staticDetail = THERAPIST_DETAILS[id] ?? {
-    letter: `你好，我是 ${member.name}。\n\n我們每個人都有感到疲倦與無助的時刻，我希望能提供一個安全的空間，陪伴你重新整理自己，在對話中看見新的方向。`,
-    specialties: ["自我探索", "壓力調適"],
-    approaches: ["折衷心理諮商"],
-  };
-
   const dbProfile = await getProfileFromDB(id);
 
-  // Merge: DB data overrides static optional fields; letter/specialties/approaches stay static
+  const displayName   = dbProfile?.name      || "";
+  const displayNameEn = dbProfile?.name_en   || "";
+  const displayTitle  = dbProfile?.title     || "";
+  const displayPhoto  = dbProfile?.photo_url || "";
+  const displayBio    = dbProfile?.bio       || "";
+
   const detail: TherapistDetail = {
-    ...staticDetail,
-    ...(dbProfile ?? {}),
+    letter: dbProfile?.client_letter || "",
+    specialties: dbProfile?.specialties ?? [],
+    approaches: dbProfile?.orientations ?? [],
+    licenses: dbProfile?.licenses ?? [],
+    associations: dbProfile?.associations ?? [],
+    experience: dbProfile?.experience ?? [],
+    training: dbProfile?.training ?? [],
+    publications: dbProfile?.publications ?? [],
+    services: dbProfile?.services ?? [],
   };
 
+  const education = dbProfile?.education ?? [];
+
+  const dbSocials = dbProfile?.socials ?? {};
   const socialLinks = [
-    member.instagram && { href: member.instagram, label: "Instagram", Icon: InstagramIcon },
-    ("facebook" in member) && member.facebook && { href: member.facebook as string, label: "Facebook", Icon: FacebookIcon },
-    ("threads" in member) && (member as { threads?: string }).threads && {
-      href: (member as { threads?: string }).threads as string,
-      label: "Threads",
-      Icon: ThreadsIcon,
-    },
+    dbSocials.instagram && { href: dbSocials.instagram, label: "Instagram", Icon: InstagramIcon },
+    dbSocials.facebook  && { href: dbSocials.facebook,  label: "Facebook",  Icon: FacebookIcon  },
+    dbSocials.threads   && { href: dbSocials.threads,   label: "Threads",   Icon: ThreadsIcon   },
   ].filter(Boolean) as { href: string; label: string; Icon: () => React.ReactElement }[];
 
   return (
@@ -184,23 +147,27 @@ export default async function TherapistPage({ params }: Props) {
             <div className="md:col-span-4 space-y-6">
               <FadeIn direction="left">
                 <div className="relative aspect-[3/4] w-full overflow-hidden bg-sand/10 border border-sand/10">
-                  <Image
-                    src={member.photo}
-                    alt={member.name}
-                    fill
-                    className="object-cover object-top"
-                    sizes="(max-width: 768px) 100vw, 30vw"
-                    unoptimized
-                  />
+                  {displayPhoto ? (
+                    <Image
+                      src={displayPhoto}
+                      alt={displayName}
+                      fill
+                      className="object-cover object-top"
+                      sizes="(max-width: 768px) 100vw, 30vw"
+                      unoptimized
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-sand/10" />
+                  )}
                 </div>
               </FadeIn>
 
               <FadeIn direction="left" delay={100} className="space-y-5 pt-2">
                 {/* 姓名 + 頭銜 */}
                 <div>
-                  <h1 className="font-serif text-deep text-3xl mb-1">{member.name}</h1>
-                  <p className="font-garamond text-muted text-lg">{member.nameEn}</p>
-                  <p className="font-sans text-xs text-sand tracking-wider mt-1">{member.title}</p>
+                  <h1 className="font-serif text-deep text-3xl mb-1">{displayName}</h1>
+                  <p className="font-garamond text-muted text-lg">{displayNameEn}</p>
+                  <p className="font-sans text-xs text-sand tracking-wider mt-1">{displayTitle}</p>
                 </div>
 
                 {/* 社交媒體 */}
@@ -227,7 +194,7 @@ export default async function TherapistPage({ params }: Props) {
                     href={`/booking?therapist=${member.id}`}
                     className="w-full inline-flex items-center justify-center py-3 bg-forest text-paper text-xs font-sans tracking-wide hover:bg-deep transition-colors cursor-pointer"
                   >
-                    預約 {member.name} 諮詢
+                    預約 {displayName} 諮詢
                   </Link>
                 </div>
               </FadeIn>
@@ -237,7 +204,7 @@ export default async function TherapistPage({ params }: Props) {
             <FadeIn direction="right" delay={150} className="md:col-span-8">
               <TherapistTabs
                 detail={detail}
-                memberEducation={member.education}
+                memberEducation={education}
               />
             </FadeIn>
           </div>
