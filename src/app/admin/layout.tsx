@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
   title: "後台管理 - 樹心理工作室",
@@ -13,10 +11,19 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  let user: { email?: string | null } | null = null;
 
-  // login page handles its own rendering
+  if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    try {
+      const { createClient } = await import("@/lib/supabase/server");
+      const supabase = await createClient();
+      const { data } = await supabase.auth.getUser();
+      user = data.user;
+    } catch {
+      // Supabase not reachable — render without nav
+    }
+  }
+
   return (
     <div className="min-h-screen bg-[#f8f7f4]">
       {user && (
