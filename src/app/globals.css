@@ -1,26 +1,223 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* Brand Colors */
+  --color-forest:    #3a4a3a;
+  --color-deep:      #1f2a24;
+  --color-sand:      #c9b88a;
+  --color-paper:     #f5f1ea;
+  --color-soft:      #faf8f4;
+  --color-muted:     #6b7c6b;
+
+  /* Semantic */
+  --color-background: var(--color-paper);
+  --color-foreground: var(--color-deep);
+
+  /* Typography */
+  --font-serif:   var(--font-noto-serif-tc), "Hiragino Mincho Pro", "MS Mincho", serif;
+  --font-garamond: var(--font-eb-garamond), "Georgia", serif;
+  --font-sans:    var(--font-noto-sans-tc), "Helvetica Neue", Arial, sans-serif;
+
+  /* Spacing */
+  --spacing-section: 6rem;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+:root {
+  --background: #fcfaf7;
+  --foreground: #1f2a24;
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  background: var(--background);
+  background-color: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
+
+/* Headings use serif */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-serif);
+}
+
+/* Selection */
+::selection {
+  background: #c9b88a40;
+  color: var(--foreground);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-soft);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-sand);
+  border-radius: 0;
+}
+
+/* 植物微幅擺動與年輪生長動畫 */
+@keyframes plantSway {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(1.5deg); }
+}
+
+@keyframes plantGrow {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes ringGrow {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes floatWarm {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+@keyframes cloudFloat {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(8px, -4px); }
+}
+
+@keyframes sumiInkBleed {
+  0% {
+    transform: scale(0.1);
+    opacity: 0;
+    filter: blur(5px);
+  }
+  20% {
+    opacity: 0.15;
+    filter: blur(2px);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+    filter: blur(0px);
+  }
+}
+
+.animate-sumi-bleed {
+  animation: sumiInkBleed 30s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-plant-grow {
+  animation: plantGrow 3s cubic-bezier(0.34, 1.3, 0.64, 1) forwards;
+}
+
+.animate-plant-sway {
+  animation: plantSway 6s ease-in-out infinite;
+}
+
+.animate-float-warm {
+  animation: floatWarm 5s ease-in-out infinite;
+}
+
+.animate-cloud-float {
+  animation: cloudFloat 15s ease-in-out infinite;
+}
+
+.animate-ring-draw {
+  stroke-dasharray: 1000;
+  stroke-dashoffset: 1000;
+  animation: ringGrow 2.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+/* 撥開雲霧轉場動畫 */
+@keyframes mistClearLeft {
+  0% { transform: translateX(0) scale(1); opacity: 0.98; }
+  20% { transform: translateX(0) scale(1); opacity: 0.98; }
+  100% { transform: translateX(-110%) scale(1.08); opacity: 0; }
+}
+
+@keyframes mistClearRight {
+  0% { transform: translateX(0) scale(1); opacity: 0.98; }
+  20% { transform: translateX(0) scale(1); opacity: 0.98; }
+  100% { transform: translateX(110%) scale(1.08); opacity: 0; }
+}
+
+@keyframes mistClearCenter {
+  0% { transform: scale(1) translateY(0); opacity: 0.85; }
+  15% { transform: scale(1) translateY(0); opacity: 0.85; }
+  100% { transform: scale(1.3) translateY(-20px); opacity: 0; }
+}
+
+.animate-mist-left {
+  animation: mistClearLeft 2.2s cubic-bezier(0.33, 1, 0.68, 1) forwards;
+}
+
+.animate-mist-right {
+  animation: mistClearRight 2.2s cubic-bezier(0.33, 1, 0.68, 1) forwards;
+}
+
+.animate-mist-center {
+  animation: mistClearCenter 1.8s cubic-bezier(0.33, 1, 0.68, 1) forwards;
+}
+
+/* 葉片微顫動畫與植物生長微動效 */
+@keyframes leafFlutter {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  33% { transform: rotate(2deg) scale(1.03); }
+  66% { transform: rotate(-1.5deg) scale(0.98); }
+}
+
+.animate-leaf-flutter {
+  animation: leafFlutter 6s ease-in-out infinite;
+}
+
+/* 絲滑展開下劃線 (日式信箋風格) */
+.link-underline {
+  position: relative;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.link-underline::after {
+  content: "";
+  position: absolute;
+  width: 100%;
+  transform: scaleX(0);
+  height: 1px;
+  bottom: 0;
+  left: 0;
+  background-color: currentColor;
+  transform-origin: bottom right;
+  transition: transform 0.5s cubic-bezier(0.25, 1, 0.5, 1);
+  opacity: 0.6;
+}
+
+.link-underline:hover::after {
+  transform: scaleX(1);
+  transform-origin: bottom left;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  html {
+    scroll-behavior: auto;
+  }
+  .animate-plant-sway, .animate-float-warm, .animate-ring-draw {
+    animation: none !important;
+  }
+}
+
