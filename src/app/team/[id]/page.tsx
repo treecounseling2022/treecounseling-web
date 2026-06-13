@@ -118,6 +118,22 @@ function ThreadsIcon() {
   );
 }
 
+async function getProfileFromDB(id: string): Promise<Partial<TherapistDetail> | null> {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) return null;
+  try {
+    const { createClient } = await import("@/lib/supabase/server");
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from("therapist_profiles")
+      .select("licenses, associations, experience, training, publications, services")
+      .eq("id", id)
+      .single();
+    return data ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export default async function TherapistPage({ params }: Props) {
   const { id } = await params;
   const member = TEAM.find((m) => m.id === id);
@@ -125,10 +141,18 @@ export default async function TherapistPage({ params }: Props) {
     notFound();
   }
 
-  const detail = THERAPIST_DETAILS[id] ?? {
+  const staticDetail = THERAPIST_DETAILS[id] ?? {
     letter: `你好，我是 ${member.name}。\n\n我們每個人都有感到疲倦與無助的時刻，我希望能提供一個安全的空間，陪伴你重新整理自己，在對話中看見新的方向。`,
     specialties: ["自我探索", "壓力調適"],
     approaches: ["折衷心理諮商"],
+  };
+
+  const dbProfile = await getProfileFromDB(id);
+
+  // Merge: DB data overrides static optional fields; letter/specialties/approaches stay static
+  const detail: TherapistDetail = {
+    ...staticDetail,
+    ...(dbProfile ?? {}),
   };
 
   const socialLinks = [
