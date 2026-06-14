@@ -1,0 +1,228 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+
+type Therapist = { id: string; name: string };
+
+type EmergencyContact = { name: string; phone: string; relationship: string };
+
+type ClientData = {
+  id?: string;
+  full_name: string;
+  name_en: string;
+  dob: string;
+  gender: string;
+  phone: string;
+  email: string;
+  emergency_contact: EmergencyContact;
+  assigned_therapist_id: string;
+  referral_source: string;
+  intake_notes: string;
+  admin_notes: string;
+};
+
+const GENDER_OPTIONS = [
+  { value: "", label: "（未填寫）" },
+  { value: "male", label: "男" },
+  { value: "female", label: "女" },
+  { value: "other", label: "其他" },
+  { value: "prefer_not_to_say", label: "不願透露" },
+];
+
+export default function ClientEditor({
+  initialData,
+  therapists,
+}: {
+  initialData: Partial<ClientData> & { id?: string };
+  therapists: Therapist[];
+}) {
+  const router = useRouter();
+  const isNew = !initialData.id;
+
+  const [form, setForm] = useState<ClientData>({
+    full_name: initialData.full_name ?? "",
+    name_en: initialData.name_en ?? "",
+    dob: initialData.dob ?? "",
+    gender: initialData.gender ?? "",
+    phone: initialData.phone ?? "",
+    email: initialData.email ?? "",
+    emergency_contact: initialData.emergency_contact ?? { name: "", phone: "", relationship: "" },
+    assigned_therapist_id: initialData.assigned_therapist_id ?? "",
+    referral_source: initialData.referral_source ?? "",
+    intake_notes: initialData.intake_notes ?? "",
+    admin_notes: initialData.admin_notes ?? "",
+  });
+
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
+  const [saved, setSaved] = useState(false);
+
+  function setField<K extends keyof ClientData>(key: K, value: ClientData[K]) {
+    setForm((f) => ({ ...f, [key]: value }));
+    setSaved(false);
+  }
+
+  function setEc(key: keyof EmergencyContact, value: string) {
+    setForm((f) => ({
+      ...f,
+      emergency_contact: { ...f.emergency_contact, [key]: value },
+    }));
+    setSaved(false);
+  }
+
+  async function save() {
+    if (!form.full_name.trim()) { setErr("請填寫姓名"); return; }
+    setSaving(true);
+    setErr("");
+    try {
+      const payload = {
+        ...form,
+        assigned_therapist_id: form.assigned_therapist_id || null,
+        dob: form.dob || null,
+        gender: form.gender || null,
+      };
+      const url = isNew ? "/api/admin/clients" : `/api/admin/clients/${initialData.id}`;
+      const res = await fetch(url, {
+        method: isNew ? "POST" : "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      if (!res.ok) { setErr(json.error ?? "發生錯誤"); return; }
+      if (isNew) {
+        router.push(`/admin/clients/${json.id}`);
+      } else {
+        setSaved(true);
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function archive() {
+    if (!confirm("確定要封存此個案？封存後個案將不會出現在列表中。")) return;
+    const res = await fetch(`/api/admin/clients/${initialData.id}`, { method: "DELETE" });
+    if (res.ok) router.push("/admin/clients");
+  }
+
+  const inputCls = "w-full border border-sand/30 px-3 py-2 font-sans text-sm text-deep focus:outline-none focus:border-forest/50";
+  const labelCls = "font-sans text-[11px] text-muted block mb-1";
+  const sectionCls = "space-y-4 pt-6 border-t border-sand/20";
+
+  return (
+    <div className="space-y-6">
+      {/* 基本資料 */}
+      <div className="space-y-4">
+        <h2 className="font-serif text-deep text-base">基本資料</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className={labelCls}>姓名 *</label>
+            <input value={form.full_name} onChange={(e) => setField("full_name", e.target.value)} className={inputCls} placeholder="中文姓名" />
+          </div>
+          <div>
+            <label className={labelCls}>英文姓名</label>
+            <input value={form.name_en} onChange={(e) => setField("name_en", e.target.value)} className={inputCls} placeholder="English Name" />
+          </div>
+          <div>
+            <label className={labelCls}>出生日期</label>
+            <input type="date" value={form.dob} onChange={(e) => setField("dob", e.target.value)} className={inputCls} />
+          </div>
+          <div>
+            <label className={labelCls}>性別</label>
+            <select value={form.gender} onChange={(e) => setField("gender", e.target.value)} className={inputCls}>
+              {GENDER_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* 聯絡方式 */}
+      <div className={sectionCls}>
+        <h2 className="font-serif text-deep text-base">聯絡方式</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className={labelCls}>電話</label>
+            <input value={form.phone} onChange={(e) => setField("phone", e.target.value)} className={inputCls} placeholder="+853 xxxx xxxx" />
+          </div>
+          <div>
+            <label className={labelCls}>Email</label>
+            <input type="email" value={form.email} onChange={(e) => setField("email", e.target.value)} className={inputCls} />
+          </div>
+        </div>
+        <div>
+          <p className={labelCls}>緊急聯絡人</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <input value={form.emergency_contact.name} onChange={(e) => setEc("name", e.target.value)} className={inputCls} placeholder="姓名" />
+            <input value={form.emergency_contact.phone} onChange={(e) => setEc("phone", e.target.value)} className={inputCls} placeholder="電話" />
+            <input value={form.emergency_contact.relationship} onChange={(e) => setEc("relationship", e.target.value)} className={inputCls} placeholder="關係（如：母親）" />
+          </div>
+        </div>
+      </div>
+
+      {/* 派案資訊 */}
+      <div className={sectionCls}>
+        <h2 className="font-serif text-deep text-base">派案資訊</h2>
+        <div>
+          <label className={labelCls}>負責心理師</label>
+          <select value={form.assigned_therapist_id} onChange={(e) => setField("assigned_therapist_id", e.target.value)} className={inputCls}>
+            <option value="">（未指派）</option>
+            {therapists.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className={labelCls}>轉介來源</label>
+          <input value={form.referral_source} onChange={(e) => setField("referral_source", e.target.value)} className={inputCls} placeholder="例：朋友介紹、網路搜尋" />
+        </div>
+        <div>
+          <label className={labelCls}>初次申請說明（個案填寫）</label>
+          <textarea
+            value={form.intake_notes}
+            onChange={(e) => setField("intake_notes", e.target.value)}
+            rows={4}
+            className={inputCls + " resize-none"}
+            placeholder="個案提供的背景資訊…"
+          />
+        </div>
+      </div>
+
+      {/* 行政備註 */}
+      <div className={sectionCls}>
+        <h2 className="font-serif text-deep text-base">行政備註</h2>
+        <p className="font-sans text-[11px] text-muted/70">此備註僅行政可見，心理師無法看到。</p>
+        <textarea
+          value={form.admin_notes}
+          onChange={(e) => setField("admin_notes", e.target.value)}
+          rows={3}
+          className={inputCls + " resize-none"}
+          placeholder="內部備註…"
+        />
+      </div>
+
+      {/* Actions */}
+      {err && <p className="font-sans text-xs text-red-500">{err}</p>}
+      {saved && <p className="font-sans text-xs text-forest">已儲存</p>}
+
+      <div className="flex items-center gap-3 pt-2">
+        <button
+          onClick={save}
+          disabled={saving}
+          className="font-sans text-sm px-6 py-2 bg-deep text-paper hover:bg-forest disabled:opacity-40 transition-colors"
+        >
+          {saving ? "儲存中…" : isNew ? "建立個案" : "儲存變更"}
+        </button>
+        <a href="/admin/clients" className="font-sans text-xs text-muted hover:text-deep transition-colors">
+          返回列表
+        </a>
+        {!isNew && (
+          <button
+            onClick={archive}
+            className="ml-auto font-sans text-xs text-red-400 hover:text-red-600 transition-colors"
+          >
+            封存個案
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}

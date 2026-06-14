@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
@@ -34,9 +34,31 @@ type ProfileData = {
   services: ServiceItem[];
 };
 
+type TierRow = { threshold: number; rate: number };
+
+type RateData = {
+  id?: string;
+  commission_type: "percentage" | "tiered" | "flat_per_session" | "event" | "";
+  commission_rate: string;
+  flat_amount: string;
+  free_sessions: string;
+  tier_config: TierRow[];
+  notes: string;
+};
+
+const EMPTY_RATE: RateData = {
+  commission_type: "",
+  commission_rate: "",
+  flat_amount: "",
+  free_sessions: "0",
+  tier_config: [],
+  notes: "",
+};
+
 type Props = {
   therapistId: string;
   initialData: ProfileData;
+  userRole?: string;
 };
 
 function useDragList<T>(items: T[], onChange: (items: T[]) => void) {
@@ -55,7 +77,7 @@ function useDragList<T>(items: T[], onChange: (items: T[]) => void) {
   return { onDragStart, onDragOver, onDragEnd };
 }
 
-export default function TherapistProfileEditor({ therapistId, initialData }: Props) {
+export default function TherapistProfileEditor({ therapistId, initialData, userRole }: Props) {
   const [data, setData] = useState<ProfileData>(initialData);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -63,6 +85,35 @@ export default function TherapistProfileEditor({ therapistId, initialData }: Pro
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Commission rate state
+  const isAdmin = userRole === "director" || userRole === "admin";
+  const [rate, setRate] = useState<RateData>(EMPTY_RATE);
+  const [rateSaving, setRateSaving] = useState(false);
+  const [rateSaved, setRateSaved] = useState(false);
+  const [rateError, setRateError] = useState("");
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    fetch(`/api/admin/salary/rates/${therapistId}`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => {
+        if (!d) return;
+        setRate({
+          id: d.id,
+          commission_type: d.commission_type ?? "",
+          commission_rate: d.commission_rate != null ? String(Math.round(d.commission_rate * 100)) : "",
+          flat_amount: d.flat_amount != null ? String(d.flat_amount) : "",
+          free_sessions: String(d.free_sessions ?? 0),
+          tier_config: (d.tier_config ?? []).map((t: { threshold: number; rate: number }) => ({
+            threshold: t.threshold,
+            rate: Math.round(t.rate * 100),
+          })),
+          notes: d.notes ?? "",
+        });
+      })
+      .catch(() => {});
+  }, [therapistId, isAdmin]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -78,6 +129,47 @@ export default function TherapistProfileEditor({ therapistId, initialData }: Pro
     } else {
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
+    }
+  };
+
+  const handleRateSave = async () => {
+    if (!rate.commission_type) { setRateError("請選擇抽成類型"); return; }
+    setRateSaving(true);
+    setRateError("");
+    setRateSaved(false);
+    try {
+      const payload: Record<string, unknown> = {
+        commission_type: rate.commission_type,
+        notes: rate.notes || null,
+      };
+      if (rate.commission_type === "percentage") {
+        const pct = parseFloat(rate.commission_rate);
+        if (isNaN(pct) || pct <= 0 || pct > 100) { setRateError("請輸入 1–100 的百分比數字"); return; }
+        payload.commission_rate = pct / 100;
+      } else if (rate.commission_type === "flat_per_session") {
+        payload.flat_amount = parseFloat(rate.flat_amount) || null;
+        payload.free_sessions = parseInt(rate.free_sessions) || 0;
+      } else if (rate.commission_type === "event") {
+        payload.flat_amount = parseFloat(rate.flat_amount) || null;
+      } else if (rate.commission_type === "tiered") {
+        if (rate.tier_config.length === 0) { setRateError("請至少新增一個階梯設定"); return; }
+        payload.tier_config = rate.tier_config.map((t) => ({
+          threshold: t.threshold,
+          rate: t.rate / 100,
+        }));
+      }
+      const res = await fetch(`/api/admin/salary/rates/${therapistId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      if (!res.ok) { setRateError(json.error ?? "發生錯誤"); return; }
+      setRate((r) => ({ ...r, id: json.id }));
+      setRateSaved(true);
+      setTimeout(() => setRateSaved(false), 3000);
+    } finally {
+      setRateSaving(false);
     }
   };
 
@@ -367,6 +459,217 @@ export default function TherapistProfileEditor({ therapistId, initialData }: Pro
           <AddBtn onClick={() => setData((p) => ({ ...p, services: [...p.services, { name: "", fee: "" }] }))} label="+ 新增服務" />
         </div>
       </Section>
+
+      {/* 薪酬抽成設定（僅行政/所長可見） */}
+      {isAdmin && (
+        <Section title="薪酬抽成設定">
+          <p className="font-sans text-[11px] text-muted/70 -mt-1">
+            設定此心理師的收入分成模式，用於每月薪酬計算。
+          </p>
+
+          <div>
+            <label className="block font-sans text-xs text-muted mb-1">抽成模式</label>
+            <select
+              value={rate.commission_type}
+              onChange={(e) =>
+                setRate((r) => ({
+                  ...r,
+                  commission_type: e.target.value as RateData["commission_type"],
+                }))
+              }
+              className={inputCls}
+            >
+              <option value="">（未設定）</option>
+              <option value="percentage">固定比例 — 每堂收費的固定 % 歸心理師</option>
+              <option value="tiered">階梯式 — 依當月累計堂數適用不同比例</option>
+              <option value="flat_per_session">每次固定金額 — 每堂固定金額（可設免費堂）</option>
+              <option value="event">講座 / 工作坊固定費 — 整場活動固定報酬</option>
+            </select>
+          </div>
+
+          {/* percentage */}
+          {rate.commission_type === "percentage" && (
+            <div>
+              <label className="block font-sans text-xs text-muted mb-1">
+                心理師分成比例（%）
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={rate.commission_rate}
+                  onChange={(e) => setRate((r) => ({ ...r, commission_rate: e.target.value }))}
+                  className={cn(inputCls, "w-28")}
+                  placeholder="70"
+                />
+                <span className="font-sans text-xs text-muted">%</span>
+                {rate.commission_rate && (
+                  <span className="font-sans text-[11px] text-muted/60">
+                    → 每收 MOP 600，心理師得 MOP {Math.round(600 * +rate.commission_rate / 100)}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* flat_per_session */}
+          {rate.commission_type === "flat_per_session" && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block font-sans text-xs text-muted mb-1">每堂固定金額（MOP）</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={rate.flat_amount}
+                  onChange={(e) => setRate((r) => ({ ...r, flat_amount: e.target.value }))}
+                  className={inputCls}
+                  placeholder="400"
+                />
+              </div>
+              <div>
+                <label className="block font-sans text-xs text-muted mb-1">
+                  前 N 堂免費（歸工作室）
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  value={rate.free_sessions}
+                  onChange={(e) => setRate((r) => ({ ...r, free_sessions: e.target.value }))}
+                  className={inputCls}
+                  placeholder="0"
+                />
+                <p className="font-sans text-[10px] text-muted/50 mt-1">
+                  填 0 代表每堂都計算
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* event */}
+          {rate.commission_type === "event" && (
+            <div>
+              <label className="block font-sans text-xs text-muted mb-1">整場固定報酬（MOP）</label>
+              <input
+                type="number"
+                min={0}
+                value={rate.flat_amount}
+                onChange={(e) => setRate((r) => ({ ...r, flat_amount: e.target.value }))}
+                className={cn(inputCls, "w-40")}
+                placeholder="1500"
+              />
+            </div>
+          )}
+
+          {/* tiered */}
+          {rate.commission_type === "tiered" && (
+            <div className="space-y-3">
+              <p className="font-sans text-[11px] text-muted/70">
+                依當月累計堂數設定分成比例。達到門檻後，之後每堂適用該比例。
+              </p>
+              <div className="space-y-2">
+                {rate.tier_config.map((tier, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <span className="font-sans text-[11px] text-muted w-12 flex-shrink-0">第</span>
+                    <input
+                      type="number"
+                      min={1}
+                      value={tier.threshold}
+                      onChange={(e) => {
+                        const u = [...rate.tier_config];
+                        u[idx] = { ...u[idx], threshold: +e.target.value };
+                        setRate((r) => ({ ...r, tier_config: u }));
+                      }}
+                      className={cn(inputCls, "w-20")}
+                      placeholder="10"
+                    />
+                    <span className="font-sans text-[11px] text-muted flex-shrink-0">堂起，心理師得</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={100}
+                      value={tier.rate}
+                      onChange={(e) => {
+                        const u = [...rate.tier_config];
+                        u[idx] = { ...u[idx], rate: +e.target.value };
+                        setRate((r) => ({ ...r, tier_config: u }));
+                      }}
+                      className={cn(inputCls, "w-20")}
+                      placeholder="70"
+                    />
+                    <span className="font-sans text-[11px] text-muted flex-shrink-0">%</span>
+                    <RemoveBtn
+                      onClick={() =>
+                        setRate((r) => ({
+                          ...r,
+                          tier_config: r.tier_config.filter((_, i) => i !== idx),
+                        }))
+                      }
+                    />
+                  </div>
+                ))}
+              </div>
+              <AddBtn
+                onClick={() =>
+                  setRate((r) => ({
+                    ...r,
+                    tier_config: [
+                      ...r.tier_config,
+                      { threshold: (r.tier_config.at(-1)?.threshold ?? 0) + 10, rate: 70 },
+                    ],
+                  }))
+                }
+                label="+ 新增階梯"
+              />
+              {rate.tier_config.length > 0 && (
+                <div className="bg-sand/10 px-3 py-2 font-sans text-[11px] text-muted space-y-0.5">
+                  {rate.tier_config
+                    .slice()
+                    .sort((a, b) => a.threshold - b.threshold)
+                    .map((t, i, arr) => (
+                      <p key={i}>
+                        第 {t.threshold} 堂起（{i === 0 ? `1–${t.threshold - 1} 堂` : `${arr[i - 1].threshold}–${t.threshold - 1} 堂`}後）：心理師得 {t.rate}%
+                      </p>
+                    ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Notes */}
+          {rate.commission_type && (
+            <div>
+              <label className="block font-sans text-xs text-muted mb-1">備註（選填）</label>
+              <input
+                value={rate.notes}
+                onChange={(e) => setRate((r) => ({ ...r, notes: e.target.value }))}
+                className={inputCls}
+                placeholder="例：2025年合約調整"
+              />
+            </div>
+          )}
+
+          {/* Rate save button */}
+          <div className="flex items-center gap-3 pt-1">
+            <button
+              type="button"
+              onClick={handleRateSave}
+              disabled={rateSaving || !rate.commission_type}
+              className="px-5 py-2 bg-deep text-paper font-sans text-xs hover:bg-forest transition-colors disabled:opacity-40 cursor-pointer"
+            >
+              {rateSaving ? "儲存中…" : "儲存抽成設定"}
+            </button>
+            {rateSaved && <span className="font-sans text-xs text-forest">已儲存 ✓</span>}
+            {rateError && <span className="font-sans text-xs text-red-500">{rateError}</span>}
+          </div>
+
+          {rate.id && (
+            <p className="font-sans text-[10px] text-muted/40">
+              目前設定生效中。儲存後將自動建立新版本，歷史紀錄保留於資料庫。
+            </p>
+          )}
+        </Section>
+      )}
 
       {/* Save */}
       <div className="pt-4 border-t border-sand/20 space-y-3">

@@ -49,6 +49,7 @@ export default async function MemberEditPage({ params }: Props) {
 
       <TherapistProfileEditor
         therapistId={id}
+        userRole={auth.role}
         initialData={{
           id,
           name: "",

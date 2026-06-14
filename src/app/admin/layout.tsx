@@ -31,32 +31,49 @@ export default async function AdminLayout({
                 <Link href="/admin" className="hover:text-paper transition-colors">
                   儀表板
                 </Link>
-                <Link
-                  href="/admin/members"
-                  className="hover:text-paper transition-colors"
-                >
-                  成員資料
+                <Link href="/admin/members" className="hover:text-paper transition-colors">
+                  成員
                 </Link>
-                <Link
-                  href="/admin/articles"
-                  className="hover:text-paper transition-colors"
-                >
-                  文章管理
+                <Link href="/admin/clients" className="hover:text-paper transition-colors">
+                  個案
                 </Link>
-                <Link
-                  href="/admin/invite"
-                  className="hover:text-paper transition-colors"
-                >
-                  邀請成員
+                <Link href="/admin/appointments" className="hover:text-paper transition-colors">
+                  預約派案
+                </Link>
+                <Link href="/admin/calendar" className="hover:text-paper transition-colors">
+                  行事曆
+                </Link>
+                <Link href="/admin/rooms" className="hover:text-paper transition-colors">
+                  空間
+                </Link>
+                <Link href="/admin/salary" className="hover:text-paper transition-colors">
+                  薪酬
+                </Link>
+                <Link href="/admin/sessions" className="hover:text-paper transition-colors">
+                  晤談紀錄
+                </Link>
+                <Link href="/admin/articles" className="hover:text-paper transition-colors">
+                  文章
+                </Link>
+                <Link href="/admin/invite" className="hover:text-paper transition-colors">
+                  邀請
                 </Link>
               </>
             ) : auth.profileId ? (
-              <Link
-                href={`/admin/members/${auth.profileId}`}
-                className="hover:text-paper transition-colors"
-              >
-                我的資料
-              </Link>
+              <>
+                <Link
+                  href={`/admin/members/${auth.profileId}`}
+                  className="hover:text-paper transition-colors"
+                >
+                  我的資料
+                </Link>
+                <Link href="/admin/appointments" className="hover:text-paper transition-colors">
+                  預約
+                </Link>
+                <Link href="/admin/sessions" className="hover:text-paper transition-colors">
+                  晤談紀錄
+                </Link>
+              </>
             ) : (
               <span className="text-paper/40">帳號尚未連結至成員資料</span>
             )}
