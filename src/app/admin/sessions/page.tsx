@@ -84,9 +84,10 @@ export default async function SessionsPage() {
       <div className="space-y-3">
         {(notes ?? []).map((note) => {
           const appt = Array.isArray(note.appointments) ? note.appointments[0] : note.appointments;
-          const clientName = Array.isArray(appt?.clients)
-            ? appt.clients[0]?.full_name
-            : appt?.clients?.full_name;
+          const rawClients = appt?.clients as { full_name: string } | { full_name: string }[] | null | undefined;
+          const clientName = Array.isArray(rawClients)
+            ? rawClients[0]?.full_name
+            : rawClients?.full_name;
 
           return (
             <div key={note.id} className="bg-white border border-sand/20 p-4">

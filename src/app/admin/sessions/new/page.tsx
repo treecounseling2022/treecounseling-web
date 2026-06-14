@@ -49,9 +49,10 @@ export default async function NewSessionPage() {
         availableAppointments={available.map((a) => ({
           id: a.id,
           scheduled_at: a.scheduled_at,
-          clientName: Array.isArray(a.clients)
-            ? a.clients[0]?.full_name ?? "未知"
-            : (a.clients as { full_name: string } | null)?.full_name ?? "未知",
+          clientName: (() => {
+            const c = a.clients as { full_name: string } | { full_name: string }[] | null | undefined;
+            return (Array.isArray(c) ? c[0]?.full_name : c?.full_name) ?? "未知";
+          })(),
         }))}
       />
     </div>
