@@ -29,8 +29,8 @@ export default async function InquiryDetailPage({
 
   const { data: rooms } = await db
     .from("rooms")
-    .select("id, name")
-    .order("name");
+    .select("id, name, is_online")
+    .order("sort_order");
 
   return (
     <InquiryDetailClient

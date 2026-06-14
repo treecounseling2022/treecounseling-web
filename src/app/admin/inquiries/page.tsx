@@ -18,7 +18,7 @@ type Inquiry = {
 
 type TherapistService = { name?: string; fee?: string | number };
 type Therapist = { id: string; name: string; services?: TherapistService[] };
-type Room = { id: string; name: string };
+type Room = { id: string; name: string; is_online?: boolean };
 
 const SERVICE_LABEL: Record<string, string> = {
   individual: "個人心理輔導",
@@ -77,7 +77,7 @@ export default function InquiriesPage() {
   const [therapists, setTherapists] = useState<Therapist[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [assignTarget, setAssignTarget] = useState<Inquiry | null>(null);
-  const [assignForm, setAssignForm] = useState({ therapist_id: "", room_id: "", scheduled_at: "", session_fee: "" });
+  const [assignForm, setAssignForm] = useState({ therapist_id: "", room_id: "", scheduled_at: "", session_fee: "", is_online: false });
   const [assigning, setAssigning] = useState(false);
   const [assignErr, setAssignErr] = useState("");
 
@@ -122,7 +122,7 @@ export default function InquiriesPage() {
 
   function openAssign(inq: Inquiry) {
     setAssignTarget(inq);
-    setAssignForm({ therapist_id: "", room_id: "", scheduled_at: "", session_fee: "" });
+    setAssignForm({ therapist_id: "", room_id: "", scheduled_at: "", session_fee: "", is_online: false });
     setAssignErr("");
   }
 
