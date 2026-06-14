@@ -36,8 +36,21 @@ type ProfileData = {
 
 type TierRow = { threshold: number; rate: number };
 
-type SessionRateData = {
-  id?: string;
+// Raw rule from DB
+type RuleFromDB = {
+  id: string;
+  commission_type: string;
+  commission_rate: number | null;
+  flat_amount: number | null;
+  free_sessions: number;
+  tier_config: TierRow[] | null;
+  notes: string | null;
+  effective_from: string;
+  effective_to: string | null;
+};
+
+// Form data for adding a new session rule
+type AddSessionForm = {
   commission_type: "percentage" | "tiered" | "flat_per_session" | "";
   commission_rate: string;
   flat_amount: string;
@@ -47,8 +60,8 @@ type SessionRateData = {
   effective_from: string;
 };
 
-type EventRateData = {
-  id?: string;
+// Form data for adding a new event rule
+type AddEventForm = {
   flat_amount: string;
   notes: string;
   effective_from: string;
@@ -60,7 +73,7 @@ function todayStr() {
   return new Date().toISOString().split("T")[0];
 }
 
-const EMPTY_SESSION_RATE: SessionRateData = {
+const EMPTY_SESSION_FORM: AddSessionForm = {
   commission_type: "",
   commission_rate: "",
   flat_amount: "",
@@ -70,11 +83,35 @@ const EMPTY_SESSION_RATE: SessionRateData = {
   effective_from: todayStr(),
 };
 
-const EMPTY_EVENT_RATE: EventRateData = {
+const EMPTY_EVENT_FORM: AddEventForm = {
   flat_amount: "",
   notes: "",
   effective_from: todayStr(),
 };
+
+// ── Helpers ──────────────────────────────────────────────────────
+const SESSION_TYPE_LABEL: Record<string, string> = {
+  percentage: "固定比例",
+  tiered: "階梯式",
+  flat_per_session: "每次固定",
+};
+
+function describeRule(rule: RuleFromDB): string {
+  if (rule.commission_type === "percentage") {
+    return `${Math.round((rule.commission_rate ?? 0) * 100)}%`;
+  }
+  if (rule.commission_type === "flat_per_session") {
+    const free = (rule.free_sessions ?? 0) > 0 ? `，前 ${rule.free_sessions} 堂免費` : "";
+    return `MOP ${rule.flat_amount}/堂${free}`;
+  }
+  if (rule.commission_type === "tiered") {
+    return `${(rule.tier_config ?? []).length} 個階梯`;
+  }
+  if (rule.commission_type === "event") {
+    return `MOP ${rule.flat_amount}/場`;
+  }
+  return "—";
+}
 
 type Props = {
   therapistId: string;
