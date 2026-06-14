@@ -5,6 +5,7 @@ import FadeIn from "@/components/ui/FadeIn";
 import ScrollDivider from "@/components/ui/ScrollDivider";
 import { VibrantTreeCrown, LushFern } from "@/components/ui/VibrantPlants";
 import { TEAM } from "@/lib/data";
+import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
   title: "專業團隊",
@@ -12,7 +13,17 @@ export const metadata: Metadata = {
     "樹心理工作室的專業輔導團隊均持有輔導心理學碩士學歷，擁有豐富的跨機構實務經驗並持續進修。",
 };
 
-export default function TeamPage() {
+type Socials = { instagram?: string; facebook?: string; threads?: string };
+
+export default async function TeamPage() {
+  // Fetch social links from Supabase (DB is source of truth; data.ts is fallback)
+  const supabase = await createClient();
+  const { data: profiles } = await supabase
+    .from("therapist_profiles")
+    .select("id, socials");
+  const socialsMap: Record<string, Socials> = Object.fromEntries(
+    (profiles ?? []).map((p) => [p.id, (p.socials as Socials) ?? {}])
+  );
   return (
     <div className="relative w-full overflow-hidden bg-background isolate">
       {/* 頁面級全景水墨背景層 (z-[-1], 超低不透明度，30秒慢生長) */}
@@ -53,7 +64,11 @@ export default function TeamPage() {
         <section className="bg-transparent py-16">
           <div className="max-w-6xl mx-auto px-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-x-16 lg:gap-y-16">
-              {TEAM.map((member, i) => (
+              {TEAM.map((member, i) => {
+                const dbSocials = socialsMap[member.id] ?? {};
+                const instagram = dbSocials.instagram ?? ("instagram" in member ? (member as {instagram?:string}).instagram : undefined);
+                const facebook  = dbSocials.facebook  ?? ("facebook"  in member ? (member as {facebook?:string}).facebook   : undefined);
+                return (
                 <FadeIn key={member.id} direction="up" delay={i * 80}>
                   <div className="group flex flex-row gap-6 items-start h-full">
                     
@@ -104,12 +119,12 @@ export default function TeamPage() {
                           </Link>
                         </div>
 
-                        {/* Social Links */}
-                        {(member.instagram || member.facebook) && (
+                        {/* Social Links — source: Supabase socials, fallback: data.ts */}
+                        {(instagram || facebook) && (
                           <div className="flex items-center gap-3 pt-2 border-t border-sand/15">
-                            {member.facebook && (
+                            {facebook && (
                               <a
-                                href={member.facebook}
+                                href={facebook}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 aria-label="Facebook"
@@ -120,9 +135,9 @@ export default function TeamPage() {
                                 </svg>
                               </a>
                             )}
-                            {member.instagram && (
+                            {instagram && (
                               <a
-                                href={member.instagram}
+                                href={instagram}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 aria-label="Instagram"
@@ -140,7 +155,8 @@ export default function TeamPage() {
 
                   </div>
                 </FadeIn>
-              ))}
+                );
+              })}
             </div>
           </div>
         </section>
