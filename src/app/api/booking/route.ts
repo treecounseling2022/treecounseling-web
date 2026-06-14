@@ -42,6 +42,9 @@ export async function POST(request: Request) {
     }
 
     // Send emails only if Resend is configured
+    console.log("[booking] RESEND_API_KEY set:", !!process.env.RESEND_API_KEY);
+    console.log("[booking] ADMIN_EMAIL:", process.env.ADMIN_NOTIFICATION_EMAIL);
+    console.log("[booking] FROM:", FROM);
     if (process.env.RESEND_API_KEY) {
       const serviceLabel = SERVICE_LABEL[body.serviceType] ?? body.serviceType;
       const name = body.name ?? "（未填）";
@@ -51,6 +54,7 @@ export async function POST(request: Request) {
       const adminUrl = `${process.env.NEXT_PUBLIC_SITE_URL ?? "https://treecounseling-web.vercel.app"}/admin/inquiries`;
 
       // 1. Notify admin
+      console.log("[booking] sending admin email to:", ADMIN_EMAIL);
       if (ADMIN_EMAIL) {
         await resend.emails.send({
           from: FROM,
@@ -73,10 +77,11 @@ export async function POST(request: Request) {
               <p style="color:#bbb;font-size:0.75rem;margin-top:32px;border-top:1px solid #eee;padding-top:8px">樹心理工作室後台通知</p>
             </div>
           `,
-        }).catch(console.error);
+        }).then(() => console.log("[booking] admin email sent")).catch((e) => console.error("[booking] admin email error:", e));
       }
 
       // 2. Confirmation to client
+      console.log("[booking] client email:", clientEmail);
       if (clientEmail) {
         await resend.emails.send({
           from: FROM,
