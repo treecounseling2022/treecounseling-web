@@ -136,10 +136,12 @@ export default function WorkshopsPage() {
         total_fee: totalFee,
         notes: form.notes || null,
       };
-      const isEdit = modal.mode === "edit";
-      const url = isEdit ? `/api/admin/workshops/${modal.workshop.id}` : "/api/admin/workshops";
+      const workshopId = modal.mode === "edit" ? modal.workshop.id : undefined;
+      const url = workshopId
+        ? `/api/admin/workshops/${workshopId}`
+        : "/api/admin/workshops";
       const res = await fetch(url, {
-        method: isEdit ? "PATCH" : "POST",
+        method: workshopId ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
