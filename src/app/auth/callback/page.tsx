@@ -28,6 +28,11 @@ export default function AuthCallbackPage() {
             router.replace("/admin/login?error=auth_failed");
             return;
           }
+          // Invite links require the user to set a password before entering
+          if (params.get("type") === "invite") {
+            router.replace("/auth/set-password");
+            return;
+          }
         }
       }
 
