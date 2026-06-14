@@ -76,26 +76,43 @@ export async function POST(request: Request) {
         }).catch(console.error);
       }
 
-      // 2. Confirmation to client
-      if (clientEmail) {
+      // 2. Confirmation to client(s)
+      // For couple counseling, send to both partners
+      const coupleDetails = body.coupleDetails as { partnerA?: { name?: string; email?: string }; partnerB?: { name?: string; email?: string } } | undefined;
+      const clientRecipients: { email: string; name: string }[] = [];
+
+      if (body.serviceType === "couple" && coupleDetails) {
+        const emailA = coupleDetails.partnerA?.email;
+        const emailB = coupleDetails.partnerB?.email;
+        const nameA = coupleDetails.partnerA?.name ?? "A";
+        const nameB = coupleDetails.partnerB?.name ?? "B";
+        if (emailA) clientRecipients.push({ email: emailA, name: nameA });
+        if (emailB) clientRecipients.push({ email: emailB, name: nameB });
+      } else if (clientEmail) {
+        clientRecipients.push({ email: clientEmail, name });
+      }
+
+      const confirmHtml = (recipientName: string) => `
+        <div style="font-family:sans-serif;max-width:480px;margin:0 auto;color:#333;line-height:1.7">
+          <h2 style="color:#2d4a38">預約申請已收到</h2>
+          <p>您好，${recipientName}，</p>
+          <p>我們已收到您的 <strong>${serviceLabel}</strong> 預約申請，感謝您的信任。</p>
+          <p>行政人員將在 <strong>兩個工作天內</strong> 以 WhatsApp 或 Email 與您聯絡，確認後續晤談安排。</p>
+          <p>如有緊急需求，歡迎直接聯繫我們：</p>
+          <ul style="font-size:0.9rem;color:#555">
+            <li>WhatsApp：請至官網查看最新聯絡資訊</li>
+            <li>Email：<a href="mailto:${FROM}" style="color:#2d4a38">${FROM}</a></li>
+          </ul>
+          <p style="color:#888;font-size:0.85rem;margin-top:24px">— 樹心理工作室 Tree Counseling Studio</p>
+        </div>
+      `;
+
+      for (const recipient of clientRecipients) {
         await resend.emails.send({
           from: FROM,
-          to: clientEmail,
+          to: recipient.email,
           subject: "【樹心理工作室】已收到您的預約申請",
-          html: `
-            <div style="font-family:sans-serif;max-width:480px;margin:0 auto;color:#333;line-height:1.7">
-              <h2 style="color:#2d4a38">預約申請已收到</h2>
-              <p>您好，${name}，</p>
-              <p>我們已收到您的 <strong>${serviceLabel}</strong> 預約申請，感謝您的信任。</p>
-              <p>行政人員將在 <strong>兩個工作天內</strong> 以 WhatsApp 或 Email 與您聯絡，確認後續晤談安排。</p>
-              <p>如有緊急需求，歡迎直接聯繫我們：</p>
-              <ul style="font-size:0.9rem;color:#555">
-                <li>WhatsApp：請至官網查看最新聯絡資訊</li>
-                <li>Email：<a href="mailto:${FROM}" style="color:#2d4a38">${FROM}</a></li>
-              </ul>
-              <p style="color:#888;font-size:0.85rem;margin-top:24px">— 樹心理工作室 Tree Counseling Studio</p>
-            </div>
-          `,
+          html: confirmHtml(recipient.name),
         }).catch(console.error);
       }
     }

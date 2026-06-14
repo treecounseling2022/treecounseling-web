@@ -131,6 +131,11 @@ const INDIVIDUAL_ISSUES = [
       "其他",
     ],
   },
+  {
+    id: "other_issue",
+    label: "其他困擾",
+    subIssues: [],
+  },
 ];
 
 // 伴侶輔導狀況
@@ -215,6 +220,7 @@ export default function BookingForm() {
   const [counselingDetails, setCounselingDetails] = useState("");
   const [concern, setConcern] = useState("");
   const [therapistRequirements, setTherapistRequirements] = useState("");
+  const [otherIssueText, setOtherIssueText] = useState("");
 
   // 步驟二：B - 伴侶心理輔導
   const [nameA, setNameA] = useState("");
@@ -463,6 +469,7 @@ export default function BookingForm() {
           hasCounselingExp,
           counselingDetails,
           therapistRequirements,
+          otherIssueText: selectedMainIssues.includes("other_issue") ? otherIssueText : undefined,
         }
       } : {}),
 
@@ -550,6 +557,7 @@ export default function BookingForm() {
             setCounselingDetails("");
             setConcern("");
             setTherapistRequirements("");
+            setOtherIssueText("");
             setNameA("");
             setGenderA("");
             setBirthdayA("");
@@ -854,6 +862,32 @@ export default function BookingForm() {
 
                     {INDIVIDUAL_ISSUES.map((mainIssue) => {
                       if (!selectedMainIssues.includes(mainIssue.id)) return null;
+
+                      // 其他困擾：顯示文字框 + AI 助手
+                      if (mainIssue.id === "other_issue") {
+                        return (
+                          <div key={mainIssue.id} className="p-4 bg-paper/50 border border-sand/15 space-y-3 transition-all">
+                            <h4 className="font-serif text-xs font-semibold text-forest uppercase tracking-wider">
+                              其他困擾說明
+                            </h4>
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                              <p className="text-xs text-muted/70">請描述您的困擾，或使用 AI 助手協助整理。</p>
+                              <AIConcernHelper
+                                serviceType="individual"
+                                onComplete={(summary) => setOtherIssueText(summary)}
+                              />
+                            </div>
+                            <textarea
+                              rows={4}
+                              value={otherIssueText}
+                              onChange={(e) => setOtherIssueText(e.target.value)}
+                              placeholder="請描述您目前遇到的困擾與狀況，或點擊上方 AI 助手協助您整理…"
+                              className={cn(inputClass(false), "resize-none")}
+                            />
+                          </div>
+                        );
+                      }
+
                       return (
                         <div key={mainIssue.id} className="p-4 bg-paper/50 border border-sand/15 space-y-3 transition-all">
                           <h4 className="font-serif text-xs font-semibold text-forest uppercase tracking-wider">
@@ -1349,17 +1383,11 @@ export default function BookingForm() {
                   />
                 </Field>
 
-                {/* 詳細需求說明 + AI 助手按鈕 */}
+                {/* 詳細需求說明 */}
                 <div className="space-y-2">
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                    <label className="block font-sans text-sm text-deep font-medium">
-                      詳細需求說明 <span className="text-sand ml-1">*</span>
-                    </label>
-                    <AIConcernHelper
-                      serviceType={serviceType}
-                      onComplete={(summary) => setOtherConcern(summary)}
-                    />
-                  </div>
+                  <label className="block font-sans text-sm text-deep font-medium">
+                    詳細需求說明 <span className="text-sand ml-1">*</span>
+                  </label>
                   <p className="text-xs text-muted/70">請簡單描述活動目的、對象、預算、期望舉辦的月份或其它具體合作細節。</p>
                   <textarea
                     rows={6}
