@@ -24,7 +24,7 @@ export default async function InquiryDetailPage({
 
   const { data: therapists } = await db
     .from("therapist_profiles")
-    .select("id, name")
+    .select("id, name, services")
     .order("name");
 
   const { data: rooms } = await db

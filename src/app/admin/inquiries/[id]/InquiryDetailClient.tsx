@@ -17,7 +17,8 @@ type Inquiry = {
   created_at: string;
 };
 
-type Therapist = { id: string; name: string };
+type TherapistService = { name?: string; fee?: string | number; duration?: string; note?: string };
+type Therapist = { id: string; name: string; services?: TherapistService[] };
 type Room = { id: string; name: string };
 
 const SERVICE_LABEL: Record<string, string> = {
@@ -232,6 +233,24 @@ export default function InquiryDetailClient({
     scheduled_at: "",
     session_fee: "",
   });
+
+  function guessTherapistFee(therapist: Therapist): string {
+    const services = therapist.services ?? [];
+    const svcType = inquiry.service_type;
+    const keywords: Record<string, string[]> = {
+      individual: ["個人", "個別", "individual"],
+      couple: ["伴侶", "couple", "partner"],
+      hoarding: ["囤積", "hoarding"],
+    };
+    const kws = keywords[svcType] ?? [];
+    const match = kws.length > 0
+      ? services.find((s) => kws.some((kw) => (s.name ?? "").toLowerCase().includes(kw)))
+      : null;
+    const svc = match ?? services[0];
+    if (!svc?.fee) return "";
+    const num = typeof svc.fee === "number" ? svc.fee : parseFloat(String(svc.fee).replace(/[^\d.]/g, ""));
+    return isNaN(num) ? "" : String(num);
+  }
   const [assigning, setAssigning] = useState(false);
   const [assignErr, setAssignErr] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -478,7 +497,12 @@ export default function InquiryDetailClient({
                 <label className="font-sans text-xs text-muted block mb-1">心理師 *</label>
                 <select
                   value={assignForm.therapist_id}
-                  onChange={(e) => setAssignForm((f) => ({ ...f, therapist_id: e.target.value }))}
+                  onChange={(e) => {
+                    const tid = e.target.value;
+                    const t = therapists.find((x) => x.id === tid);
+                    const fee = t ? guessTherapistFee(t) : "";
+                    setAssignForm((f) => ({ ...f, therapist_id: tid, session_fee: fee || f.session_fee }));
+                  }}
                   className="w-full border border-sand/30 px-3 py-2 font-sans text-sm text-deep focus:outline-none focus:border-forest/50 bg-white"
                 >
                   <option value="">— 請選擇 —</option>

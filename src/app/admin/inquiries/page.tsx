@@ -16,6 +16,10 @@ type Inquiry = {
   created_at: string;
 };
 
+type TherapistService = { name?: string; fee?: string | number };
+type Therapist = { id: string; name: string; services?: TherapistService[] };
+type Room = { id: string; name: string };
+
 const SERVICE_LABEL: Record<string, string> = {
   individual: "個人心理輔導",
   couple: "伴侶心理輔導",
@@ -45,6 +49,23 @@ function fmtDate(iso: string) {
   });
 }
 
+function guessTherapistFee(therapist: Therapist, serviceType: string): string {
+  const services = therapist.services ?? [];
+  const keywords: Record<string, string[]> = {
+    individual: ["個人", "個別", "individual"],
+    couple: ["伴侶", "couple", "partner"],
+    hoarding: ["囤積", "hoarding"],
+  };
+  const kws = keywords[serviceType] ?? [];
+  const match = kws.length > 0
+    ? services.find((s) => kws.some((kw) => (s.name ?? "").toLowerCase().includes(kw)))
+    : null;
+  const svc = match ?? services[0];
+  if (!svc?.fee) return "";
+  const num = typeof svc.fee === "number" ? svc.fee : parseFloat(String(svc.fee).replace(/[^\d.]/g, ""));
+  return isNaN(num) ? "" : String(num);
+}
+
 export default function InquiriesPage() {
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [filter, setFilter] = useState<string>("new");
@@ -52,12 +73,25 @@ export default function InquiriesPage() {
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
 
+  // Quick assign state
+  const [therapists, setTherapists] = useState<Therapist[]>([]);
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [assignTarget, setAssignTarget] = useState<Inquiry | null>(null);
+  const [assignForm, setAssignForm] = useState({ therapist_id: "", room_id: "", scheduled_at: "", session_fee: "" });
+  const [assigning, setAssigning] = useState(false);
+  const [assignErr, setAssignErr] = useState("");
+
   const load = useCallback(async () => {
     const res = await fetch("/api/admin/inquiries");
     if (res.ok) setInquiries(await res.json());
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    fetch("/api/admin/therapists").then((r) => r.ok ? r.json() : []).then(setTherapists).catch(() => {});
+    fetch("/api/admin/rooms").then((r) => r.ok ? r.json() : []).then(setRooms).catch(() => {});
+  }, []);
 
   const filtered = filter === "all"
     ? inquiries
@@ -84,6 +118,34 @@ export default function InquiriesPage() {
     });
     await load();
     setSaving(false);
+  }
+
+  function openAssign(inq: Inquiry) {
+    setAssignTarget(inq);
+    setAssignForm({ therapist_id: "", room_id: "", scheduled_at: "", session_fee: "" });
+    setAssignErr("");
+  }
+
+  async function doAssign() {
+    if (!assignTarget) return;
+    if (!assignForm.therapist_id) { setAssignErr("請選擇心理師"); return; }
+    setAssigning(true);
+    setAssignErr("");
+    const res = await fetch(`/api/admin/inquiries/${assignTarget.id}/assign`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        therapist_id: assignForm.therapist_id,
+        room_id: assignForm.room_id || undefined,
+        scheduled_at: assignForm.scheduled_at || undefined,
+        session_fee: assignForm.session_fee ? Number(assignForm.session_fee) : undefined,
+      }),
+    });
+    const data = await res.json();
+    setAssigning(false);
+    if (!res.ok) { setAssignErr(data.error ?? "派案失敗"); return; }
+    setAssignTarget(null);
+    await load();
   }
 
   const counts = {
@@ -132,81 +194,83 @@ export default function InquiriesPage() {
 
       {/* List */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {filtered.map((inq) => (
-          <div key={inq.id} className="bg-white border border-sand/20 p-4 space-y-3 hover:border-sand/40 transition-colors">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <p className="font-serif text-deep">{inq.name ?? "（未填姓名）"}</p>
-                <p className="font-sans text-[11px] text-sand mt-0.5">
-                  {SERVICE_LABEL[inq.service_type] ?? inq.service_type}
-                </p>
+        {filtered.map((inq) => {
+          const canAssign = inq.status !== "converted" && inq.status !== "closed";
+          return (
+            <div key={inq.id} className="bg-white border border-sand/20 p-4 space-y-3 hover:border-sand/40 transition-colors">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="font-serif text-deep">{inq.name ?? "（未填姓名）"}</p>
+                  <p className="font-sans text-[11px] text-sand mt-0.5">
+                    {SERVICE_LABEL[inq.service_type] ?? inq.service_type}
+                  </p>
+                </div>
+                <span className={`font-sans text-[10px] px-2 py-0.5 flex-shrink-0 ${STATUS_CLS[inq.status]}`}>
+                  {STATUS_LABEL[inq.status]}
+                </span>
               </div>
-              <span className={`font-sans text-[10px] px-2 py-0.5 flex-shrink-0 ${STATUS_CLS[inq.status]}`}>
-                {STATUS_LABEL[inq.status]}
-              </span>
-            </div>
 
-            <div className="font-sans text-[11px] text-muted space-y-0.5">
-              {inq.email && <p>Email：{inq.email}</p>}
-              {inq.phone && <p>電話：{inq.phone}</p>}
-              <p className="text-muted/40">申請於 {fmtDate(inq.created_at)}</p>
-            </div>
+              <div className="font-sans text-[11px] text-muted space-y-0.5">
+                {inq.email && <p>Email：{inq.email}</p>}
+                {inq.phone && <p>電話：{inq.phone}</p>}
+                <p className="text-muted/40">申請於 {fmtDate(inq.created_at)}</p>
+              </div>
 
-            {inq.concern && (
-              <p className="font-sans text-xs text-muted leading-relaxed line-clamp-2 bg-sand/10 px-3 py-2">
-                {inq.concern}
-              </p>
-            )}
-
-            {inq.admin_notes && (
-              <p className="font-sans text-[11px] text-forest/70 bg-forest/5 px-3 py-1.5">
-                備註：{inq.admin_notes}
-              </p>
-            )}
-
-            <div className="flex items-center gap-2 pt-1 flex-wrap">
-              <a
-                href={`/admin/inquiries/${inq.id}`}
-                className="font-sans text-[11px] px-3 py-1.5 border border-sand/30 text-muted hover:text-deep transition-colors"
-              >
-                查看詳情
-              </a>
-              <button
-                onClick={() => { setDetail(inq); setNotes(inq.admin_notes ?? ""); }}
-                className="font-sans text-[11px] px-3 py-1.5 border border-sand/30 text-muted hover:text-deep transition-colors"
-              >
-                快速備註
-              </button>
-              {inq.status === "new" && (
-                <button
-                  onClick={() => updateStatus(inq.id, "contacted")}
-                  disabled={saving}
-                  className="font-sans text-[11px] px-3 py-1.5 bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-40 transition-colors"
-                >
-                  標記已聯繫
-                </button>
+              {inq.concern && (
+                <p className="font-sans text-xs text-muted leading-relaxed line-clamp-2 bg-sand/10 px-3 py-2">
+                  {inq.concern}
+                </p>
               )}
-              {inq.status === "contacted" && (
-                <button
-                  onClick={() => updateStatus(inq.id, "converted")}
-                  disabled={saving}
-                  className="font-sans text-[11px] px-3 py-1.5 bg-green-600 text-white hover:bg-green-700 disabled:opacity-40 transition-colors"
-                >
-                  已轉個案
-                </button>
+
+              {inq.admin_notes && (
+                <p className="font-sans text-[11px] text-forest/70 bg-forest/5 px-3 py-1.5">
+                  備註：{inq.admin_notes}
+                </p>
               )}
-              {inq.status !== "closed" && inq.status !== "converted" && (
-                <button
-                  onClick={() => updateStatus(inq.id, "closed")}
-                  disabled={saving}
-                  className="font-sans text-[11px] px-3 py-1.5 text-muted/50 hover:text-red-400 transition-colors ml-auto"
+
+              <div className="flex items-center gap-2 pt-1 flex-wrap">
+                <a
+                  href={`/admin/inquiries/${inq.id}`}
+                  className="font-sans text-[11px] px-3 py-1.5 border border-sand/30 text-muted hover:text-deep transition-colors"
                 >
-                  關閉
+                  查看詳情
+                </a>
+                {canAssign && (
+                  <button
+                    onClick={() => openAssign(inq)}
+                    className="font-sans text-[11px] px-3 py-1.5 bg-deep text-paper hover:bg-forest transition-colors"
+                  >
+                    派案 →
+                  </button>
+                )}
+                <button
+                  onClick={() => { setDetail(inq); setNotes(inq.admin_notes ?? ""); }}
+                  className="font-sans text-[11px] px-3 py-1.5 border border-sand/30 text-muted hover:text-deep transition-colors"
+                >
+                  快速備註
                 </button>
-              )}
+                {inq.status === "new" && (
+                  <button
+                    onClick={() => updateStatus(inq.id, "contacted")}
+                    disabled={saving}
+                    className="font-sans text-[11px] px-3 py-1.5 bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-40 transition-colors"
+                  >
+                    標記已聯繫
+                  </button>
+                )}
+                {inq.status !== "closed" && inq.status !== "converted" && (
+                  <button
+                    onClick={() => updateStatus(inq.id, "closed")}
+                    disabled={saving}
+                    className="font-sans text-[11px] px-3 py-1.5 text-muted/50 hover:text-red-400 transition-colors ml-auto"
+                  >
+                    關閉
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
 
         {filtered.length === 0 && (
           <div className="col-span-2 text-center py-16 font-sans text-xs text-muted/40">
@@ -215,7 +279,106 @@ export default function InquiriesPage() {
         )}
       </div>
 
-      {/* Detail Modal */}
+      {/* Quick Assign Modal */}
+      {assignTarget && (
+        <div
+          className="fixed inset-0 bg-black/25 flex items-center justify-center z-50 p-4"
+          onClick={() => setAssignTarget(null)}
+        >
+          <div
+            className="bg-white p-6 w-full max-w-md space-y-4 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div>
+              <h2 className="font-serif text-deep text-lg">派案</h2>
+              <p className="font-sans text-xs text-muted mt-0.5">
+                {assignTarget.name ?? "（未填姓名）"} ／ {SERVICE_LABEL[assignTarget.service_type] ?? assignTarget.service_type}
+              </p>
+            </div>
+            <p className="font-sans text-xs text-muted/70">
+              指定心理師後系統將通知心理師確認。時間與診室可先略填。
+            </p>
+
+            <div className="space-y-3">
+              <div>
+                <label className="font-sans text-xs text-muted block mb-1">心理師 *</label>
+                <select
+                  value={assignForm.therapist_id}
+                  onChange={(e) => {
+                    const tid = e.target.value;
+                    const t = therapists.find((x) => x.id === tid);
+                    const fee = t ? guessTherapistFee(t, assignTarget.service_type) : "";
+                    setAssignForm((f) => ({ ...f, therapist_id: tid, session_fee: fee || f.session_fee }));
+                  }}
+                  className="w-full border border-sand/30 px-3 py-2 font-sans text-sm text-deep focus:outline-none focus:border-forest/50 bg-white"
+                >
+                  <option value="">— 請選擇 —</option>
+                  {therapists.map((t) => (
+                    <option key={t.id} value={t.id}>{t.name ?? t.id}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="font-sans text-xs text-muted block mb-1">診室（選填）</label>
+                <select
+                  value={assignForm.room_id}
+                  onChange={(e) => setAssignForm((f) => ({ ...f, room_id: e.target.value }))}
+                  className="w-full border border-sand/30 px-3 py-2 font-sans text-sm text-deep focus:outline-none focus:border-forest/50 bg-white"
+                >
+                  <option value="">— 待定 —</option>
+                  {rooms.map((r) => (
+                    <option key={r.id} value={r.id}>{r.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="font-sans text-xs text-muted block mb-1">預計時間（選填）</label>
+                <input
+                  type="datetime-local"
+                  value={assignForm.scheduled_at}
+                  onChange={(e) => setAssignForm((f) => ({ ...f, scheduled_at: e.target.value }))}
+                  className="w-full border border-sand/30 px-3 py-2 font-sans text-sm text-deep focus:outline-none focus:border-forest/50"
+                />
+              </div>
+
+              <div>
+                <label className="font-sans text-xs text-muted block mb-1">收費（MOP，選填）</label>
+                <input
+                  type="number"
+                  value={assignForm.session_fee}
+                  onChange={(e) => setAssignForm((f) => ({ ...f, session_fee: e.target.value }))}
+                  placeholder="例：600"
+                  className="w-full border border-sand/30 px-3 py-2 font-sans text-sm text-deep focus:outline-none focus:border-forest/50"
+                />
+              </div>
+            </div>
+
+            {assignErr && (
+              <p className="font-sans text-xs text-red-500">{assignErr}</p>
+            )}
+
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={doAssign}
+                disabled={assigning}
+                className="font-sans text-xs px-5 py-2 bg-deep text-paper hover:bg-forest disabled:opacity-40 transition-colors"
+              >
+                {assigning ? "派案中…" : "確認派案"}
+              </button>
+              <button
+                onClick={() => setAssignTarget(null)}
+                className="font-sans text-xs px-4 py-2 border border-sand/30 text-muted hover:text-deep transition-colors ml-auto"
+              >
+                取消
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Notes Modal */}
       {detail && (
         <div
           className="fixed inset-0 bg-black/20 flex items-center justify-center z-50 p-4"
@@ -249,7 +412,6 @@ export default function InquiriesPage() {
               </div>
             )}
 
-            {/* 完整表單資料 */}
             <details className="group">
               <summary className="font-sans text-[11px] text-muted/60 cursor-pointer hover:text-muted">
                 查看完整表單資料 ▸
@@ -259,7 +421,6 @@ export default function InquiriesPage() {
               </pre>
             </details>
 
-            {/* 備註 */}
             <div>
               <label className="font-sans text-[11px] text-muted block mb-1">行政備註</label>
               <textarea

@@ -61,7 +61,7 @@ export async function POST(
         full_name: inquiry.name ?? "未知",
         email: inquiry.email ?? null,
         phone: inquiry.phone ?? null,
-        status: "active",
+        is_active: true,
       })
       .select("id")
       .single();
