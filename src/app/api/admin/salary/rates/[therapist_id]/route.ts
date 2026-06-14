@@ -4,6 +4,7 @@ import { getAuthInfo, isAdminLevel } from "@/lib/auth-role";
 
 const SESSION_TYPES = ["percentage", "tiered", "flat_per_session"];
 const EVENT_TYPES = ["event"];
+const WORKSHOP_TYPES = ["workshop_pct"];
 
 async function adminGuard() {
   const auth = await getAuthInfo();
@@ -30,8 +31,9 @@ export async function GET(
 
   const session = (data ?? []).filter((r) => SESSION_TYPES.includes(r.commission_type));
   const event = (data ?? []).filter((r) => EVENT_TYPES.includes(r.commission_type));
+  const workshop = (data ?? []).filter((r) => WORKSHOP_TYPES.includes(r.commission_type));
 
-  return NextResponse.json({ session, event });
+  return NextResponse.json({ session, event, workshop });
 }
 
 export async function POST(
@@ -56,7 +58,8 @@ export async function POST(
   }
 
   const isEvent = EVENT_TYPES.includes(body.commission_type);
-  const typesToClose = isEvent ? EVENT_TYPES : SESSION_TYPES;
+  const isWorkshop = WORKSHOP_TYPES.includes(body.commission_type);
+  const typesToClose = isWorkshop ? WORKSHOP_TYPES : isEvent ? EVENT_TYPES : SESSION_TYPES;
   const today = new Date().toISOString().split("T")[0];
   const effectiveFrom = body.effective_from || today;
 

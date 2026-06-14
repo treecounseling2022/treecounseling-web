@@ -67,6 +67,13 @@ type AddEventForm = {
   effective_from: string;
 };
 
+// Form data for adding a new workshop commission rule
+type AddWorkshopForm = {
+  commission_rate: string;
+  notes: string;
+  effective_from: string;
+};
+
 type RateSaveState = { saving: boolean; saved: boolean; error: string };
 
 function todayStr() {
@@ -85,6 +92,12 @@ const EMPTY_SESSION_FORM: AddSessionForm = {
 
 const EMPTY_EVENT_FORM: AddEventForm = {
   flat_amount: "",
+  notes: "",
+  effective_from: todayStr(),
+};
+
+const EMPTY_WORKSHOP_FORM: AddWorkshopForm = {
+  commission_rate: "",
   notes: "",
   effective_from: todayStr(),
 };
@@ -148,19 +161,24 @@ export default function TherapistProfileEditor({ therapistId, initialData, userR
   const isAdmin = userRole === "director" || userRole === "admin";
   const [sessionRules, setSessionRules] = useState<RuleFromDB[]>([]);
   const [eventRules, setEventRules] = useState<RuleFromDB[]>([]);
+  const [workshopRules, setWorkshopRules] = useState<RuleFromDB[]>([]);
   const [addSessionForm, setAddSessionForm] = useState<AddSessionForm>({ ...EMPTY_SESSION_FORM });
   const [addEventForm, setAddEventForm] = useState<AddEventForm>({ ...EMPTY_EVENT_FORM });
+  const [addWorkshopForm, setAddWorkshopForm] = useState<AddWorkshopForm>({ ...EMPTY_WORKSHOP_FORM });
   const [showAddSession, setShowAddSession] = useState(false);
   const [showAddEvent, setShowAddEvent] = useState(false);
+  const [showAddWorkshop, setShowAddWorkshop] = useState(false);
   const [sessionSave, setSessionSave] = useState<RateSaveState>({ saving: false, saved: false, error: "" });
   const [eventSave, setEventSave] = useState<RateSaveState>({ saving: false, saved: false, error: "" });
+  const [workshopSave, setWorkshopSave] = useState<RateSaveState>({ saving: false, saved: false, error: "" });
 
   const loadRates = async () => {
     const res = await fetch(`/api/admin/salary/rates/${therapistId}`);
     if (!res.ok) return;
-    const d: { session: RuleFromDB[]; event: RuleFromDB[] } = await res.json();
+    const d: { session: RuleFromDB[]; event: RuleFromDB[]; workshop: RuleFromDB[] } = await res.json();
     setSessionRules(d.session ?? []);
     setEventRules(d.event ?? []);
+    setWorkshopRules(d.workshop ?? []);
   };
 
   useEffect(() => {
@@ -269,6 +287,40 @@ export default function TherapistProfileEditor({ therapistId, initialData, userR
       setTimeout(() => setEventSave((s) => ({ ...s, saved: false })), 3000);
     } catch {
       setEventSave((s) => ({ ...s, saving: false, error: "網路錯誤" }));
+    }
+  };
+
+  const saveWorkshopRate = async () => {
+    const pct = parseFloat(addWorkshopForm.commission_rate);
+    if (isNaN(pct) || pct <= 0 || pct > 100) {
+      setWorkshopSave((s) => ({ ...s, error: "請輸入 1–100 的百分比" }));
+      return;
+    }
+    setWorkshopSave({ saving: true, saved: false, error: "" });
+    try {
+      const payload = {
+        commission_type: "workshop_pct",
+        commission_rate: pct / 100,
+        notes: addWorkshopForm.notes || null,
+        effective_from: addWorkshopForm.effective_from || todayStr(),
+      };
+      const res = await fetch(`/api/admin/salary/rates/${therapistId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setWorkshopSave((s) => ({ ...s, saving: false, error: json.error ?? "發生錯誤" }));
+        return;
+      }
+      setWorkshopSave({ saving: false, saved: true, error: "" });
+      setAddWorkshopForm({ ...EMPTY_WORKSHOP_FORM, effective_from: todayStr() });
+      setShowAddWorkshop(false);
+      await loadRates();
+      setTimeout(() => setWorkshopSave((s) => ({ ...s, saved: false })), 3000);
+    } catch {
+      setWorkshopSave((s) => ({ ...s, saving: false, error: "網路錯誤" }));
     }
   };
 
@@ -818,28 +870,30 @@ export default function TherapistProfileEditor({ therapistId, initialData, userR
       {isAdmin && (
         <Section title="講座 / 工作坊抽成">
           <p className="font-sans text-[11px] text-muted/70 -mt-1">
-            與常規諮商抽成<strong>並行獨立</strong>，不互相影響。適用於講座、工作坊、培訓等活動，每場固定報酬。
+            與常規諮商抽成<strong>並行獨立</strong>，不互相影響。按每場講座總費用（時薪 × 時數）的比例計算心理師報酬。
           </p>
 
           {/* History table */}
-          {eventRules.length > 0 && (
+          {workshopRules.length > 0 && (
             <div className="border border-sand/20 overflow-hidden">
               <table className="w-full text-xs font-sans">
                 <thead>
                   <tr className="bg-sand/10 border-b border-sand/20">
                     <th className="text-left text-muted px-3 py-2 font-normal">生效日期</th>
                     <th className="text-left text-muted px-3 py-2 font-normal">結束日期</th>
-                    <th className="text-left text-muted px-3 py-2 font-normal">每場報酬</th>
+                    <th className="text-left text-muted px-3 py-2 font-normal">心理師分成</th>
                     <th className="text-left text-muted px-3 py-2 font-normal">備註</th>
                     <th className="text-left text-muted px-3 py-2 font-normal">狀態</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {eventRules.map((rule) => (
+                  {workshopRules.map((rule) => (
                     <tr key={rule.id} className="border-b border-sand/10 last:border-0">
                       <td className="px-3 py-2 text-deep">{rule.effective_from}</td>
                       <td className="px-3 py-2 text-muted">{rule.effective_to ?? "—"}</td>
-                      <td className="px-3 py-2 text-deep font-medium">MOP {rule.flat_amount}/場</td>
+                      <td className="px-3 py-2 text-deep font-medium">
+                        {Math.round((rule.commission_rate ?? 0) * 100)}%
+                      </td>
                       <td className="px-3 py-2 text-muted">{rule.notes ?? "—"}</td>
                       <td className="px-3 py-2">
                         {rule.effective_to === null ? (
@@ -855,15 +909,15 @@ export default function TherapistProfileEditor({ therapistId, initialData, userR
             </div>
           )}
 
-          {eventRules.length === 0 && !showAddEvent && (
-            <p className="font-sans text-[11px] text-muted/40 italic">尚未設定任何講座抽成規則。</p>
+          {workshopRules.length === 0 && !showAddWorkshop && (
+            <p className="font-sans text-[11px] text-muted/40 italic">尚未設定任何講座 / 工作坊抽成規則。</p>
           )}
 
           {/* Toggle add form */}
-          {!showAddEvent ? (
+          {!showAddWorkshop ? (
             <button
               type="button"
-              onClick={() => { setShowAddEvent(true); setEventSave({ saving: false, saved: false, error: "" }); }}
+              onClick={() => { setShowAddWorkshop(true); setWorkshopSave({ saving: false, saved: false, error: "" }); }}
               className="font-sans text-xs text-forest hover:text-deep transition-colors cursor-pointer border border-dashed border-forest/40 hover:border-deep/40 px-4 py-1.5 w-full text-center"
             >
               + 新增抽成規則
@@ -874,7 +928,7 @@ export default function TherapistProfileEditor({ therapistId, initialData, userR
                 <p className="font-sans text-xs font-medium text-deep">新增講座 / 工作坊抽成規則</p>
                 <button
                   type="button"
-                  onClick={() => { setShowAddEvent(false); setEventSave({ saving: false, saved: false, error: "" }); }}
+                  onClick={() => { setShowAddWorkshop(false); setWorkshopSave({ saving: false, saved: false, error: "" }); }}
                   className="font-sans text-xs text-muted hover:text-deep cursor-pointer"
                 >
                   取消
@@ -886,45 +940,54 @@ export default function TherapistProfileEditor({ therapistId, initialData, userR
                   <label className="block font-sans text-xs text-muted mb-1">生效日期</label>
                   <input
                     type="date"
-                    value={addEventForm.effective_from}
-                    onChange={(e) => setAddEventForm((r) => ({ ...r, effective_from: e.target.value }))}
+                    value={addWorkshopForm.effective_from}
+                    onChange={(e) => setAddWorkshopForm((r) => ({ ...r, effective_from: e.target.value }))}
                     className={inputCls}
                   />
                 </div>
                 <div>
-                  <label className="block font-sans text-xs text-muted mb-1">每場固定報酬（MOP）</label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={addEventForm.flat_amount}
-                    onChange={(e) => setAddEventForm((r) => ({ ...r, flat_amount: e.target.value }))}
-                    className={inputCls}
-                    placeholder="1500"
-                  />
+                  <label className="block font-sans text-xs text-muted mb-1">心理師分成比例（%）</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min={1}
+                      max={100}
+                      value={addWorkshopForm.commission_rate}
+                      onChange={(e) => setAddWorkshopForm((r) => ({ ...r, commission_rate: e.target.value }))}
+                      className={cn(inputCls, "w-28")}
+                      placeholder="70"
+                    />
+                    <span className="font-sans text-xs text-muted">%</span>
+                    {addWorkshopForm.commission_rate && !isNaN(+addWorkshopForm.commission_rate) && (
+                      <span className="font-sans text-[11px] text-muted/60">
+                        → 每收 MOP 1000，心理師得 MOP {Math.round(1000 * +addWorkshopForm.commission_rate / 100)}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
 
               <div>
                 <label className="block font-sans text-xs text-muted mb-1">備註（選填）</label>
                 <input
-                  value={addEventForm.notes}
-                  onChange={(e) => setAddEventForm((r) => ({ ...r, notes: e.target.value }))}
+                  value={addWorkshopForm.notes}
+                  onChange={(e) => setAddWorkshopForm((r) => ({ ...r, notes: e.target.value }))}
                   className={inputCls}
-                  placeholder="例：半天講座 MOP 1500，全天 MOP 2500"
+                  placeholder="例：2025 年度講座合約"
                 />
               </div>
 
               <div className="flex items-center gap-3 pt-1">
                 <button
                   type="button"
-                  onClick={saveEventRate}
-                  disabled={eventSave.saving}
+                  onClick={saveWorkshopRate}
+                  disabled={workshopSave.saving}
                   className="px-5 py-2 bg-deep text-paper font-sans text-xs hover:bg-forest transition-colors disabled:opacity-40 cursor-pointer"
                 >
-                  {eventSave.saving ? "儲存中…" : "新增此規則"}
+                  {workshopSave.saving ? "儲存中…" : "新增此規則"}
                 </button>
-                {eventSave.saved && <span className="font-sans text-xs text-forest">已儲存 ✓</span>}
-                {eventSave.error && <span className="font-sans text-xs text-red-500">{eventSave.error}</span>}
+                {workshopSave.saved && <span className="font-sans text-xs text-forest">已儲存 ✓</span>}
+                {workshopSave.error && <span className="font-sans text-xs text-red-500">{workshopSave.error}</span>}
               </div>
               <p className="font-sans text-[10px] text-muted/40">
                 新增後，目前生效中的規則自動設為結束，此規則立即生效。

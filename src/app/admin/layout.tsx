@@ -46,6 +46,9 @@ export default async function AdminLayout({
                 <Link href="/admin/rooms" className="hover:text-paper transition-colors">
                   空間
                 </Link>
+                <Link href="/admin/workshops" className="hover:text-paper transition-colors">
+                  講座
+                </Link>
                 <Link href="/admin/salary" className="hover:text-paper transition-colors">
                   薪酬
                 </Link>
