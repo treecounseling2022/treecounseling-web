@@ -51,7 +51,7 @@ type RuleFromDB = {
 
 // Form data for adding a new session rule
 type AddSessionForm = {
-  commission_type: "percentage" | "tiered" | "flat_per_session" | "";
+  commission_type: "percentage" | "tiered" | "tiered_per_client" | "flat_per_session" | "";
   commission_rate: string;
   flat_amount: string;
   free_sessions: string;
@@ -105,7 +105,8 @@ const EMPTY_WORKSHOP_FORM: AddWorkshopForm = {
 // ── Helpers ──────────────────────────────────────────────────────
 const SESSION_TYPE_LABEL: Record<string, string> = {
   percentage: "固定比例",
-  tiered: "階梯式",
+  tiered: "階梯式（月累計）",
+  tiered_per_client: "階梯式（個案累計）",
   flat_per_session: "每次固定",
 };
 
@@ -117,7 +118,7 @@ function describeRule(rule: RuleFromDB): string {
     const free = (rule.free_sessions ?? 0) > 0 ? `，前 ${rule.free_sessions} 堂免費` : "";
     return `MOP ${rule.flat_amount}/堂${free}`;
   }
-  if (rule.commission_type === "tiered") {
+  if (rule.commission_type === "tiered" || rule.commission_type === "tiered_per_client") {
     return `${(rule.tier_config ?? []).length} 個階梯`;
   }
   if (rule.commission_type === "event") {
@@ -168,6 +169,8 @@ export default function TherapistProfileEditor({ therapistId, initialData, userR
   const [showAddSession, setShowAddSession] = useState(false);
   const [showAddEvent, setShowAddEvent] = useState(false);
   const [showAddWorkshop, setShowAddWorkshop] = useState(false);
+  const [editingSessionRule, setEditingSessionRule] = useState<RuleFromDB | null>(null);
+  const [editingWorkshopRule, setEditingWorkshopRule] = useState<RuleFromDB | null>(null);
   const [sessionSave, setSessionSave] = useState<RateSaveState>({ saving: false, saved: false, error: "" });
   const [eventSave, setEventSave] = useState<RateSaveState>({ saving: false, saved: false, error: "" });
   const [workshopSave, setWorkshopSave] = useState<RateSaveState>({ saving: false, saved: false, error: "" });
@@ -204,6 +207,35 @@ export default function TherapistProfileEditor({ therapistId, initialData, userR
     }
   };
 
+  const openEditSession = (rule: RuleFromDB) => {
+    setAddSessionForm({
+      commission_type: rule.commission_type as AddSessionForm["commission_type"],
+      commission_rate: rule.commission_rate != null ? String(Math.round(rule.commission_rate * 100)) : "",
+      flat_amount: rule.flat_amount != null ? String(rule.flat_amount) : "",
+      free_sessions: String(rule.free_sessions ?? 0),
+      tier_config: (rule.tier_config ?? []).map((t) => ({
+        threshold: t.threshold,
+        rate: Math.round(t.rate * 100),
+      })),
+      notes: rule.notes ?? "",
+      effective_from: rule.effective_from,
+    });
+    setEditingSessionRule(rule);
+    setShowAddSession(true);
+    setSessionSave({ saving: false, saved: false, error: "" });
+  };
+
+  const openEditWorkshop = (rule: RuleFromDB) => {
+    setAddWorkshopForm({
+      commission_rate: rule.commission_rate != null ? String(Math.round(rule.commission_rate * 100)) : "",
+      notes: rule.notes ?? "",
+      effective_from: rule.effective_from,
+    });
+    setEditingWorkshopRule(rule);
+    setShowAddWorkshop(true);
+    setWorkshopSave({ saving: false, saved: false, error: "" });
+  };
+
   const saveSessionRate = async () => {
     if (!addSessionForm.commission_type) {
       setSessionSave((s) => ({ ...s, error: "請選擇抽成模式" }));
@@ -226,7 +258,7 @@ export default function TherapistProfileEditor({ therapistId, initialData, userR
       } else if (addSessionForm.commission_type === "flat_per_session") {
         payload.flat_amount = parseFloat(addSessionForm.flat_amount) || null;
         payload.free_sessions = parseInt(addSessionForm.free_sessions) || 0;
-      } else if (addSessionForm.commission_type === "tiered") {
+      } else if (addSessionForm.commission_type === "tiered" || addSessionForm.commission_type === "tiered_per_client") {
         if (addSessionForm.tier_config.length === 0) {
           setSessionSave((s) => ({ ...s, saving: false, error: "請至少新增一個階梯" }));
           return;
@@ -236,8 +268,11 @@ export default function TherapistProfileEditor({ therapistId, initialData, userR
           rate: t.rate / 100,
         }));
       }
-      const res = await fetch(`/api/admin/salary/rates/${therapistId}`, {
-        method: "POST",
+      const url = editingSessionRule
+        ? `/api/admin/salary/rates/${therapistId}/${editingSessionRule.id}`
+        : `/api/admin/salary/rates/${therapistId}`;
+      const res = await fetch(url, {
+        method: editingSessionRule ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
@@ -248,6 +283,7 @@ export default function TherapistProfileEditor({ therapistId, initialData, userR
       }
       setSessionSave({ saving: false, saved: true, error: "" });
       setAddSessionForm({ ...EMPTY_SESSION_FORM, effective_from: todayStr() });
+      setEditingSessionRule(null);
       setShowAddSession(false);
       await loadRates();
       setTimeout(() => setSessionSave((s) => ({ ...s, saved: false })), 3000);
@@ -304,10 +340,16 @@ export default function TherapistProfileEditor({ therapistId, initialData, userR
         notes: addWorkshopForm.notes || null,
         effective_from: addWorkshopForm.effective_from || todayStr(),
       };
-      const res = await fetch(`/api/admin/salary/rates/${therapistId}`, {
-        method: "POST",
+      const url = editingWorkshopRule
+        ? `/api/admin/salary/rates/${therapistId}/${editingWorkshopRule.id}`
+        : `/api/admin/salary/rates/${therapistId}`;
+      const workshopPayload = editingWorkshopRule
+        ? { commission_rate: pct / 100, notes: addWorkshopForm.notes || null, effective_from: addWorkshopForm.effective_from || todayStr() }
+        : payload;
+      const res = await fetch(url, {
+        method: editingWorkshopRule ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(workshopPayload),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -316,6 +358,7 @@ export default function TherapistProfileEditor({ therapistId, initialData, userR
       }
       setWorkshopSave({ saving: false, saved: true, error: "" });
       setAddWorkshopForm({ ...EMPTY_WORKSHOP_FORM, effective_from: todayStr() });
+      setEditingWorkshopRule(null);
       setShowAddWorkshop(false);
       await loadRates();
       setTimeout(() => setWorkshopSave((s) => ({ ...s, saved: false })), 3000);
@@ -629,11 +672,12 @@ export default function TherapistProfileEditor({ therapistId, initialData, userR
                     <th className="text-left text-muted px-3 py-2 font-normal">模式</th>
                     <th className="text-left text-muted px-3 py-2 font-normal">說明</th>
                     <th className="text-left text-muted px-3 py-2 font-normal">狀態</th>
+                    <th className="px-3 py-2"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {sessionRules.map((rule) => (
-                    <tr key={rule.id} className="border-b border-sand/10 last:border-0">
+                    <tr key={rule.id} className={`border-b border-sand/10 last:border-0 ${editingSessionRule?.id === rule.id ? "bg-soft/40" : ""}`}>
                       <td className="px-3 py-2 text-deep">{rule.effective_from}</td>
                       <td className="px-3 py-2 text-muted">{rule.effective_to ?? "—"}</td>
                       <td className="px-3 py-2 text-muted">{SESSION_TYPE_LABEL[rule.commission_type] ?? rule.commission_type}</td>
@@ -644,6 +688,15 @@ export default function TherapistProfileEditor({ therapistId, initialData, userR
                         ) : (
                           <span className="text-muted/40 text-[10px]">已結束</span>
                         )}
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        <button
+                          type="button"
+                          onClick={() => openEditSession(rule)}
+                          className="font-sans text-[10px] text-forest hover:text-deep cursor-pointer"
+                        >
+                          編輯
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -660,7 +713,12 @@ export default function TherapistProfileEditor({ therapistId, initialData, userR
           {!showAddSession ? (
             <button
               type="button"
-              onClick={() => { setShowAddSession(true); setSessionSave({ saving: false, saved: false, error: "" }); }}
+              onClick={() => {
+                setAddSessionForm({ ...EMPTY_SESSION_FORM, effective_from: todayStr() });
+                setEditingSessionRule(null);
+                setShowAddSession(true);
+                setSessionSave({ saving: false, saved: false, error: "" });
+              }}
               className="font-sans text-xs text-forest hover:text-deep transition-colors cursor-pointer border border-dashed border-forest/40 hover:border-deep/40 px-4 py-1.5 w-full text-center"
             >
               + 新增抽成規則
@@ -668,10 +726,16 @@ export default function TherapistProfileEditor({ therapistId, initialData, userR
           ) : (
             <div className="border border-sand/25 p-4 space-y-3 bg-soft/20">
               <div className="flex items-center justify-between">
-                <p className="font-sans text-xs font-medium text-deep">新增常規諮商抽成規則</p>
+                <p className="font-sans text-xs font-medium text-deep">
+                  {editingSessionRule ? "編輯抽成規則" : "新增常規諮商抽成規則"}
+                </p>
                 <button
                   type="button"
-                  onClick={() => { setShowAddSession(false); setSessionSave({ saving: false, saved: false, error: "" }); }}
+                  onClick={() => {
+                    setShowAddSession(false);
+                    setEditingSessionRule(null);
+                    setSessionSave({ saving: false, saved: false, error: "" });
+                  }}
                   className="font-sans text-xs text-muted hover:text-deep cursor-pointer"
                 >
                   取消
@@ -698,11 +762,13 @@ export default function TherapistProfileEditor({ therapistId, initialData, userR
                         commission_type: e.target.value as AddSessionForm["commission_type"],
                       }))
                     }
-                    className={inputCls}
+                    disabled={!!editingSessionRule}
+                    className={cn(inputCls, editingSessionRule ? "opacity-60 cursor-not-allowed" : "")}
                   >
                     <option value="">（未設定）</option>
                     <option value="percentage">固定比例</option>
-                    <option value="tiered">階梯式（依月份累計總堂數）</option>
+                    <option value="tiered">階梯式 — 依當月所有個案累計總堂數</option>
+                    <option value="tiered_per_client">階梯式 — 依個案與本師的歷史總次數</option>
                     <option value="flat_per_session">每次固定金額</option>
                   </select>
                 </div>
@@ -758,10 +824,13 @@ export default function TherapistProfileEditor({ therapistId, initialData, userR
                 </div>
               )}
 
-              {addSessionForm.commission_type === "tiered" && (
+              {(addSessionForm.commission_type === "tiered" || addSessionForm.commission_type === "tiered_per_client") && (
                 <div className="space-y-3">
                   <p className="font-sans text-[11px] text-muted/70">
-                    以<strong>月份內跨所有個案的累計總堂數</strong>決定適用比例。
+                    {addSessionForm.commission_type === "tiered"
+                      ? <>以<strong>當月所有個案的累計總堂數</strong>決定適用比例（跨個案合計）。</>
+                      : <>以<strong>該個案與本心理師的歷史累計次數</strong>決定適用比例（每位個案獨立計算）。</>
+                    }
                   </p>
                   <div className="space-y-2">
                     {addSessionForm.tier_config.map((tier, idx) => (
@@ -779,7 +848,9 @@ export default function TherapistProfileEditor({ therapistId, initialData, userR
                           className={cn(inputCls, "w-20")}
                           placeholder="10"
                         />
-                        <span className="font-sans text-[11px] text-muted flex-shrink-0">堂後，心理師得</span>
+                        <span className="font-sans text-[11px] text-muted flex-shrink-0">
+                          {addSessionForm.commission_type === "tiered_per_client" ? "次後，心理師得" : "堂後，心理師得"}
+                        </span>
                         <input
                           type="number"
                           min={1}
@@ -823,9 +894,10 @@ export default function TherapistProfileEditor({ therapistId, initialData, userR
                         .sort((a, b) => a.threshold - b.threshold)
                         .map((t, i, sorted) => {
                           const next = sorted[i + 1];
+                          const unit = addSessionForm.commission_type === "tiered_per_client" ? "次" : "堂";
                           return (
                             <p key={i}>
-                              第 {t.threshold} 堂起{next ? `（至第 ${next.threshold - 1} 堂）` : "（含以後）"}：心理師得 {t.rate}%
+                              第 {t.threshold} {unit}起{next ? `（至第 ${next.threshold - 1} ${unit}）` : "（含以後）"}：心理師得 {t.rate}%
                             </p>
                           );
                         })}
@@ -853,14 +925,16 @@ export default function TherapistProfileEditor({ therapistId, initialData, userR
                   disabled={sessionSave.saving || !addSessionForm.commission_type}
                   className="px-5 py-2 bg-deep text-paper font-sans text-xs hover:bg-forest transition-colors disabled:opacity-40 cursor-pointer"
                 >
-                  {sessionSave.saving ? "儲存中…" : "新增此規則"}
+                  {sessionSave.saving ? "儲存中…" : editingSessionRule ? "儲存修改" : "新增此規則"}
                 </button>
                 {sessionSave.saved && <span className="font-sans text-xs text-forest">已儲存 ✓</span>}
                 {sessionSave.error && <span className="font-sans text-xs text-red-500">{sessionSave.error}</span>}
               </div>
-              <p className="font-sans text-[10px] text-muted/40">
-                新增後，目前生效中的規則自動設為結束，此規則立即生效。
-              </p>
+              {!editingSessionRule && (
+                <p className="font-sans text-[10px] text-muted/40">
+                  新增後，目前生效中的規則自動設為結束，此規則立即生效。
+                </p>
+              )}
             </div>
           )}
         </Section>
@@ -884,11 +958,12 @@ export default function TherapistProfileEditor({ therapistId, initialData, userR
                     <th className="text-left text-muted px-3 py-2 font-normal">心理師分成</th>
                     <th className="text-left text-muted px-3 py-2 font-normal">備註</th>
                     <th className="text-left text-muted px-3 py-2 font-normal">狀態</th>
+                    <th className="px-3 py-2"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {workshopRules.map((rule) => (
-                    <tr key={rule.id} className="border-b border-sand/10 last:border-0">
+                    <tr key={rule.id} className={`border-b border-sand/10 last:border-0 ${editingWorkshopRule?.id === rule.id ? "bg-soft/40" : ""}`}>
                       <td className="px-3 py-2 text-deep">{rule.effective_from}</td>
                       <td className="px-3 py-2 text-muted">{rule.effective_to ?? "—"}</td>
                       <td className="px-3 py-2 text-deep font-medium">
@@ -901,6 +976,15 @@ export default function TherapistProfileEditor({ therapistId, initialData, userR
                         ) : (
                           <span className="text-muted/40 text-[10px]">已結束</span>
                         )}
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        <button
+                          type="button"
+                          onClick={() => openEditWorkshop(rule)}
+                          className="font-sans text-[10px] text-forest hover:text-deep cursor-pointer"
+                        >
+                          編輯
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -917,7 +1001,12 @@ export default function TherapistProfileEditor({ therapistId, initialData, userR
           {!showAddWorkshop ? (
             <button
               type="button"
-              onClick={() => { setShowAddWorkshop(true); setWorkshopSave({ saving: false, saved: false, error: "" }); }}
+              onClick={() => {
+                setAddWorkshopForm({ ...EMPTY_WORKSHOP_FORM, effective_from: todayStr() });
+                setEditingWorkshopRule(null);
+                setShowAddWorkshop(true);
+                setWorkshopSave({ saving: false, saved: false, error: "" });
+              }}
               className="font-sans text-xs text-forest hover:text-deep transition-colors cursor-pointer border border-dashed border-forest/40 hover:border-deep/40 px-4 py-1.5 w-full text-center"
             >
               + 新增抽成規則
@@ -925,10 +1014,16 @@ export default function TherapistProfileEditor({ therapistId, initialData, userR
           ) : (
             <div className="border border-sand/25 p-4 space-y-3 bg-soft/20">
               <div className="flex items-center justify-between">
-                <p className="font-sans text-xs font-medium text-deep">新增講座 / 工作坊抽成規則</p>
+                <p className="font-sans text-xs font-medium text-deep">
+                  {editingWorkshopRule ? "編輯講座 / 工作坊抽成規則" : "新增講座 / 工作坊抽成規則"}
+                </p>
                 <button
                   type="button"
-                  onClick={() => { setShowAddWorkshop(false); setWorkshopSave({ saving: false, saved: false, error: "" }); }}
+                  onClick={() => {
+                    setShowAddWorkshop(false);
+                    setEditingWorkshopRule(null);
+                    setWorkshopSave({ saving: false, saved: false, error: "" });
+                  }}
                   className="font-sans text-xs text-muted hover:text-deep cursor-pointer"
                 >
                   取消
@@ -984,14 +1079,16 @@ export default function TherapistProfileEditor({ therapistId, initialData, userR
                   disabled={workshopSave.saving}
                   className="px-5 py-2 bg-deep text-paper font-sans text-xs hover:bg-forest transition-colors disabled:opacity-40 cursor-pointer"
                 >
-                  {workshopSave.saving ? "儲存中…" : "新增此規則"}
+                  {workshopSave.saving ? "儲存中…" : editingWorkshopRule ? "儲存修改" : "新增此規則"}
                 </button>
                 {workshopSave.saved && <span className="font-sans text-xs text-forest">已儲存 ✓</span>}
                 {workshopSave.error && <span className="font-sans text-xs text-red-500">{workshopSave.error}</span>}
               </div>
-              <p className="font-sans text-[10px] text-muted/40">
-                新增後，目前生效中的規則自動設為結束，此規則立即生效。
-              </p>
+              {!editingWorkshopRule && (
+                <p className="font-sans text-[10px] text-muted/40">
+                  新增後，目前生效中的規則自動設為結束，此規則立即生效。
+                </p>
+              )}
             </div>
           )}
         </Section>

@@ -6,7 +6,7 @@ type Therapist = { id: string; name: string };
 type Rate = {
   id: string;
   therapist_id: string;
-  commission_type: "percentage" | "tiered" | "flat_per_session" | "event" | "workshop_pct";
+  commission_type: "percentage" | "tiered" | "tiered_per_client" | "flat_per_session" | "event" | "workshop_pct";
   commission_rate: number | null;
   flat_amount: number | null;
   free_sessions: number;
@@ -14,6 +14,7 @@ type Rate = {
 };
 type Appointment = {
   id: string;
+  client_id: string;
   therapist_id: string;
   session_fee: number | null;
   status: string;
@@ -49,12 +50,18 @@ type SalaryRow = {
 
 function calcSessionCommission(
   rate: Rate | null,
-  sessions: Appointment[]
+  sessions: Appointment[],
+  allAppointments: Appointment[]
 ): { commission: number; breakdown: BreakdownItem[] } {
   if (!rate || sessions.length === 0) return { commission: 0, breakdown: [] };
 
   const sorted = [...sessions].sort(
     (a, b) => new Date(a.scheduled_at ?? 0).getTime() - new Date(b.scheduled_at ?? 0).getTime()
+  );
+
+  // Pre-build completed set for quick lookup (for tiered_per_client)
+  const completedAll = allAppointments.filter(
+    (a) => a.status === "completed" || a.booking_status === "locked"
   );
 
   const breakdown: BreakdownItem[] = [];
@@ -75,6 +82,21 @@ function calcSessionCommission(
       let applicableRate = tiers[0]?.rate ?? 0;
       for (const tier of tiers) {
         if (sessionNum >= tier.threshold) applicableRate = tier.rate;
+      }
+      c = fee * applicableRate;
+    } else if (rate.commission_type === "tiered_per_client" && rate.tier_config) {
+      // Count all completed sessions for this client with this therapist up to and including this date
+      const apptDate = new Date(appt.scheduled_at ?? 0).getTime();
+      const clientCount = completedAll.filter(
+        (a) =>
+          a.client_id === appt.client_id &&
+          a.therapist_id === appt.therapist_id &&
+          new Date(a.scheduled_at ?? 0).getTime() <= apptDate
+      ).length;
+      const tiers = [...rate.tier_config].sort((a, b) => a.threshold - b.threshold);
+      let applicableRate = tiers[0]?.rate ?? 0;
+      for (const tier of tiers) {
+        if (clientCount >= tier.threshold) applicableRate = tier.rate;
       }
       c = fee * applicableRate;
     }
@@ -119,7 +141,8 @@ function calcWorkshopCommission(
 
 const COMMISSION_TYPE_LABEL: Record<string, string> = {
   percentage: "固定比例",
-  tiered: "階梯式",
+  tiered: "階梯式（月累計）",
+  tiered_per_client: "階梯式（個案累計）",
   flat_per_session: "每次固定",
   event: "講座固定",
   workshop_pct: "講座比例",
@@ -188,7 +211,7 @@ export default function SalaryPage() {
         const workshopGross = myWorkshops.reduce((s, w) => s + (w.total_fee ?? 0), 0);
 
         const { commission: sessionCommission, breakdown: sessionBreakdown } =
-          calcSessionCommission(sessionRate, mySessions);
+          calcSessionCommission(sessionRate, mySessions, appointments);
         const { commission: workshopCommission, breakdown: workshopBreakdown } =
           calcWorkshopCommission(workshopRate, myWorkshops);
 

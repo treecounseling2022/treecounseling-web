@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAuthInfo, isAdminLevel } from "@/lib/auth-role";
 
-const SESSION_TYPES = ["percentage", "tiered", "flat_per_session"];
+const SESSION_TYPES = ["percentage", "tiered", "tiered_per_client", "flat_per_session"];
 const EVENT_TYPES = ["event"];
 const WORKSHOP_TYPES = ["workshop_pct"];
 
