@@ -31,11 +31,8 @@ export default async function AdminLayout({
                 <Link href="/admin" className="hover:text-paper transition-colors">
                   儀表板
                 </Link>
-                <Link href="/admin/members" className="hover:text-paper transition-colors">
-                  成員
-                </Link>
-                <Link href="/admin/clients" className="hover:text-paper transition-colors">
-                  個案
+                <Link href="/admin/inquiries" className="hover:text-paper transition-colors">
+                  申請佇列
                 </Link>
                 <Link href="/admin/appointments" className="hover:text-paper transition-colors">
                   預約派案
@@ -43,15 +40,26 @@ export default async function AdminLayout({
                 <Link href="/admin/calendar" className="hover:text-paper transition-colors">
                   行事曆
                 </Link>
+                <Link href="/admin/clients" className="hover:text-paper transition-colors">
+                  個案
+                </Link>
+                <Link href="/admin/members" className="hover:text-paper transition-colors">
+                  成員
+                </Link>
                 <Link href="/admin/rooms" className="hover:text-paper transition-colors">
                   空間
                 </Link>
                 <Link href="/admin/workshops" className="hover:text-paper transition-colors">
                   講座
                 </Link>
-                <Link href="/admin/salary" className="hover:text-paper transition-colors">
-                  薪酬
+                <Link href="/admin/service-plans" className="hover:text-paper transition-colors">
+                  方案設定
                 </Link>
+                {auth.role === "director" && (
+                  <Link href="/admin/salary" className="hover:text-paper transition-colors">
+                    薪酬
+                  </Link>
+                )}
                 <Link href="/admin/sessions" className="hover:text-paper transition-colors">
                   晤談紀錄
                 </Link>
@@ -78,9 +86,6 @@ export default async function AdminLayout({
                 </Link>
                 <Link href="/admin/sessions" className="hover:text-paper transition-colors">
                   晤談紀錄
-                </Link>
-                <Link href="/admin/salary" className="hover:text-paper transition-colors">
-                  薪酬
                 </Link>
               </>
             ) : (

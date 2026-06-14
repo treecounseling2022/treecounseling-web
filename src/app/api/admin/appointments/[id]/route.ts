@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAuthInfo, isAdminLevel } from "@/lib/auth-role";
+import { Resend } from "resend";
+
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 type Action = "assign" | "confirm" | "reject" | "lock" | "cancel" | "complete";
 
@@ -49,6 +52,7 @@ export async function PATCH(
       return NextResponse.json({ error: "未授權" }, { status: 403 });
     }
     update = { booking_status: "confirmed" };
+    // Send confirmation email to client after update (handled below)
   } else if (action === "reject") {
     // Therapist rejects → back to pending_admin
     if (
@@ -87,5 +91,40 @@ export async function PATCH(
     .select()
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // After therapist confirms, send email to client
+  if (action === "confirm" && data?.client_id && process.env.RESEND_API_KEY) {
+    const { data: client } = await db
+      .from("clients")
+      .select("full_name, email")
+      .eq("id", data.client_id)
+      .single();
+    if (client?.email) {
+      const scheduledAt = data.scheduled_at
+        ? new Date(data.scheduled_at).toLocaleString("zh-TW", {
+            year: "numeric", month: "long", day: "numeric",
+            hour: "2-digit", minute: "2-digit", timeZone: "Asia/Macau",
+          })
+        : "（待另行通知）";
+      await resend.emails.send({
+        from: process.env.RESEND_FROM_EMAIL ?? "noreply@treecounseling.com",
+        to: client.email,
+        subject: "【樹心理工作室】預約確認通知",
+        html: `
+          <div style="font-family:sans-serif;max-width:480px;margin:0 auto;color:#333;line-height:1.7">
+            <h2 style="color:#2d4a38">預約確認通知</h2>
+            <p>您好，${client.full_name}，</p>
+            <p>您的預約已由心理師確認。</p>
+            <table style="width:100%;border-collapse:collapse;margin:16px 0;font-size:0.9rem">
+              <tr><td style="color:#888;padding:4px 12px 4px 0;white-space:nowrap">預約時間</td><td>${scheduledAt}</td></tr>
+            </table>
+            <p>如需更改或取消，請儘早聯繫我們。</p>
+            <p style="color:#888;font-size:0.85rem">— 樹心理工作室</p>
+          </div>
+        `,
+      });
+    }
+  }
+
   return NextResponse.json(data);
 }

@@ -8,15 +8,14 @@ async function adminGuard() {
   return auth;
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const auth = await getAuthInfo();
   if (!auth) return NextResponse.json({ error: "未授權" }, { status: 403 });
   const db = createAdminClient();
-  const { data, error } = await db
-    .from("service_plans")
-    .select("*")
-    .eq("is_active", true)
-    .order("sort_order");
+  const showAll = isAdminLevel(auth.role) && req.nextUrl.searchParams.get("all") === "1";
+  let query = db.from("service_plans").select("*").order("sort_order");
+  if (!showAll) query = query.eq("is_active", true);
+  const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json(data ?? []);
 }

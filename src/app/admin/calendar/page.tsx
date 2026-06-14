@@ -11,6 +11,18 @@ type Appointment = {
   therapist_id: string | null;
 };
 
+type Workshop = {
+  id: string;
+  title: string;
+  scheduled_at: string;
+  therapist_id: string;
+  status: string;
+};
+
+type CalendarEvent =
+  | { kind: "appt"; data: Appointment }
+  | { kind: "workshop"; data: Workshop };
+
 const STATUS_COLOR: Record<string, string> = {
   pending_admin: "#f59e0b",
   pending_therapist: "#3b82f6",
@@ -31,15 +43,23 @@ export default function CalendarPage() {
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [workshops, setWorkshops] = useState<Workshop[]>([]);
   const [therapistMap, setTherapistMap] = useState<Record<string, string>>({});
   const [selected, setSelected] = useState<Date | null>(null);
 
   const load = useCallback(async () => {
-    const res = await fetch("/api/admin/appointments");
-    if (res.ok) {
-      const json = await res.json();
+    const [apptRes, wsRes] = await Promise.all([
+      fetch("/api/admin/appointments"),
+      fetch("/api/admin/workshops"),
+    ]);
+    if (apptRes.ok) {
+      const json = await apptRes.json();
       setAppointments(json.appointments ?? []);
       setTherapistMap(json.therapistMap ?? {});
+    }
+    if (wsRes.ok) {
+      const json = await wsRes.json();
+      setWorkshops((json.workshops ?? []).filter((w: Workshop) => w.status !== "cancelled"));
     }
   }, []);
 
@@ -65,20 +85,29 @@ export default function CalendarPage() {
   // Pad to full weeks
   while (cells.length % 7 !== 0) cells.push(null);
 
-  // Group appointments by day
-  const apptsByDay: Record<number, Appointment[]> = {};
+  // Group appointments and workshops by day
+  const eventsByDay: Record<number, CalendarEvent[]> = {};
+
   appointments.forEach((a) => {
     if (!a.scheduled_at) return;
     const d = new Date(a.scheduled_at);
     if (d.getFullYear() !== year || d.getMonth() !== month) return;
     if (a.booking_status === "cancelled") return;
     const day = d.getDate();
-    if (!apptsByDay[day]) apptsByDay[day] = [];
-    apptsByDay[day].push(a);
+    if (!eventsByDay[day]) eventsByDay[day] = [];
+    eventsByDay[day].push({ kind: "appt", data: a });
+  });
+
+  workshops.forEach((w) => {
+    const d = new Date(w.scheduled_at);
+    if (d.getFullYear() !== year || d.getMonth() !== month) return;
+    const day = d.getDate();
+    if (!eventsByDay[day]) eventsByDay[day] = [];
+    eventsByDay[day].push({ kind: "workshop", data: w });
   });
 
   const selectedDay = selected?.getDate();
-  const selectedAppts = selectedDay ? (apptsByDay[selectedDay] ?? []) : [];
+  const selectedEvents: CalendarEvent[] = selectedDay ? (eventsByDay[selectedDay] ?? []) : [];
 
   return (
     <div className="space-y-6 pt-4">
@@ -119,7 +148,7 @@ export default function CalendarPage() {
           {cells.map((day, idx) => {
             const isToday = day === today.getDate() && month === today.getMonth() && year === today.getFullYear();
             const isSelected = day === selectedDay;
-            const dayAppts = day ? (apptsByDay[day] ?? []) : [];
+            const dayEvents = day ? (eventsByDay[day] ?? []) : [];
             const weekday = idx % 7;
 
             return (
@@ -153,20 +182,37 @@ export default function CalendarPage() {
                       {day}
                     </span>
                     <div className="space-y-0.5">
-                      {dayAppts.slice(0, 3).map((a) => (
-                        <div
-                          key={a.id}
-                          className="font-sans text-[9px] px-1 py-0.5 rounded truncate text-white"
-                          style={{ backgroundColor: STATUS_COLOR[a.booking_status] ?? "#9ca3af" }}
-                          title={`${a.clients?.full_name} · ${a.rooms?.name ?? ""}`}
-                        >
-                          {new Date(a.scheduled_at!).toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit" })}
-                          {" "}{a.clients?.full_name}
-                        </div>
-                      ))}
-                      {dayAppts.length > 3 && (
+                      {dayEvents.slice(0, 3).map((ev) => {
+                        if (ev.kind === "appt") {
+                          const a = ev.data;
+                          return (
+                            <div
+                              key={`a-${a.id}`}
+                              className="font-sans text-[9px] px-1 py-0.5 rounded truncate text-white"
+                              style={{ backgroundColor: STATUS_COLOR[a.booking_status] ?? "#9ca3af" }}
+                              title={`${a.clients?.full_name} · ${a.rooms?.name ?? ""}`}
+                            >
+                              {new Date(a.scheduled_at!).toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit" })}
+                              {" "}{a.clients?.full_name}
+                            </div>
+                          );
+                        }
+                        const w = ev.data;
+                        return (
+                          <div
+                            key={`w-${w.id}`}
+                            className="font-sans text-[9px] px-1 py-0.5 rounded truncate text-white"
+                            style={{ backgroundColor: "#7c3aed" }}
+                            title={`講座：${w.title}`}
+                          >
+                            {new Date(w.scheduled_at).toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit" })}
+                            {" "}🎤 {w.title}
+                          </div>
+                        );
+                      })}
+                      {dayEvents.length > 3 && (
                         <div className="font-sans text-[9px] text-muted/60 px-1">
-                          +{dayAppts.length - 3} 筆
+                          +{dayEvents.length - 3} 筆
                         </div>
                       )}
                     </div>
@@ -182,30 +228,46 @@ export default function CalendarPage() {
       {selected && (
         <div className="bg-white border border-sand/20 p-4 space-y-3">
           <h3 className="font-serif text-deep">
-            {year} 年 {MONTHS[month]} {selectedDay} 日 — {selectedAppts.length} 筆預約
+            {year} 年 {MONTHS[month]} {selectedDay} 日 — {selectedEvents.length} 筆活動
           </h3>
-          {selectedAppts.length === 0 && (
-            <p className="font-sans text-xs text-muted/40">此日無預約。</p>
+          {selectedEvents.length === 0 && (
+            <p className="font-sans text-xs text-muted/40">此日無預約或活動。</p>
           )}
           <div className="space-y-2">
-            {selectedAppts.map((a) => (
-              <div key={a.id} className="flex items-center gap-3 font-sans text-sm">
-                <div
-                  className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                  style={{ backgroundColor: a.rooms?.color ?? STATUS_COLOR[a.booking_status] }}
-                />
-                <span className="text-deep font-medium">
-                  {new Date(a.scheduled_at!).toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit" })}
-                </span>
-                <span className="text-muted">{a.clients?.full_name}</span>
-                {a.rooms && <span className="text-muted/60 text-xs">{a.rooms.name}</span>}
-                {a.therapist_id && (
-                  <span className="text-muted/60 text-xs ml-auto">
-                    {therapistMap[a.therapist_id] ?? ""}
+            {selectedEvents.map((ev) => {
+              if (ev.kind === "appt") {
+                const a = ev.data;
+                return (
+                  <div key={`a-${a.id}`} className="flex items-center gap-3 font-sans text-sm">
+                    <div
+                      className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: a.rooms?.color ?? STATUS_COLOR[a.booking_status] }}
+                    />
+                    <span className="text-deep font-medium">
+                      {new Date(a.scheduled_at!).toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                    <span className="text-muted">{a.clients?.full_name}</span>
+                    {a.rooms && <span className="text-muted/60 text-xs">{a.rooms.name}</span>}
+                    {a.therapist_id && (
+                      <span className="text-muted/60 text-xs ml-auto">
+                        {therapistMap[a.therapist_id] ?? ""}
+                      </span>
+                    )}
+                  </div>
+                );
+              }
+              const w = ev.data;
+              return (
+                <div key={`w-${w.id}`} className="flex items-center gap-3 font-sans text-sm">
+                  <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: "#7c3aed" }} />
+                  <span className="text-deep font-medium">
+                    {new Date(w.scheduled_at).toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit" })}
                   </span>
-                )}
-              </div>
-            ))}
+                  <span className="text-muted">🎤 {w.title}</span>
+                  <span className="font-sans text-[10px] bg-violet-50 text-violet-600 px-1.5 py-0.5 ml-auto">講座</span>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
