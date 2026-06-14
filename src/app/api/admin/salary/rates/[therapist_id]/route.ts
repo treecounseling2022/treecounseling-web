@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAuthInfo, isAdminLevel } from "@/lib/auth-role";
 
+const SESSION_TYPES = ["percentage", "tiered", "flat_per_session"];
+const EVENT_TYPES = ["event"];
+
 async function adminGuard() {
   const auth = await getAuthInfo();
   if (!auth || !isAdminLevel(auth.role)) return null;
@@ -15,15 +18,20 @@ export async function GET(
   if (!(await adminGuard())) return NextResponse.json({ error: "未授權" }, { status: 403 });
   const { therapist_id } = await params;
   const db = createAdminClient();
-  const { data } = await db
+
+  const { data, error } = await db
     .from("therapist_rates")
     .select("*")
     .eq("therapist_id", therapist_id)
     .is("effective_to", null)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  return NextResponse.json(data ?? null);
+    .order("created_at", { ascending: false });
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  const session = (data ?? []).find((r) => SESSION_TYPES.includes(r.commission_type)) ?? null;
+  const event = (data ?? []).find((r) => EVENT_TYPES.includes(r.commission_type)) ?? null;
+
+  return NextResponse.json({ session, event });
 }
 
 export async function POST(
@@ -32,6 +40,7 @@ export async function POST(
 ) {
   if (!(await adminGuard())) return NextResponse.json({ error: "未授權" }, { status: 403 });
   const { therapist_id } = await params;
+
   const body = await req.json() as {
     commission_type: string;
     commission_rate?: number | null;
@@ -39,22 +48,28 @@ export async function POST(
     free_sessions?: number;
     tier_config?: unknown;
     notes?: string;
+    effective_from?: string;
   };
 
   if (!body.commission_type) {
     return NextResponse.json({ error: "請選擇抽成類型" }, { status: 400 });
   }
 
+  const isEvent = EVENT_TYPES.includes(body.commission_type);
+  const typesToClose = isEvent ? EVENT_TYPES : SESSION_TYPES;
+  const today = new Date().toISOString().split("T")[0];
+  const effectiveFrom = body.effective_from || today;
+
   const db = createAdminClient();
 
-  // Close existing active rate
+  // Close only same-category active rates (keep other category untouched)
   await db
     .from("therapist_rates")
-    .update({ effective_to: new Date().toISOString().split("T")[0] })
+    .update({ effective_to: today })
     .eq("therapist_id", therapist_id)
-    .is("effective_to", null);
+    .is("effective_to", null)
+    .in("commission_type", typesToClose);
 
-  // Insert new rate
   const { data, error } = await db
     .from("therapist_rates")
     .insert({
@@ -65,7 +80,7 @@ export async function POST(
       free_sessions: body.free_sessions ?? 0,
       tier_config: body.tier_config ?? null,
       notes: body.notes ?? null,
-      effective_from: new Date().toISOString().split("T")[0],
+      effective_from: effectiveFrom,
     })
     .select()
     .single();
