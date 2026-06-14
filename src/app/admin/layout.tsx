@@ -87,15 +87,15 @@ export default async function AdminLayout({
               <span className="text-paper/40">帳號尚未連結至成員資料</span>
             )}
           </nav>
-          <div className="ml-auto flex items-center gap-4 text-xs font-sans text-paper/50">
-            <span className="text-paper/30">
+          <div className="ml-auto flex items-center gap-3 text-xs font-sans">
+            <span className="text-paper/40 hidden md:inline">
               {ROLE_LABEL[auth.role] ?? auth.role}
             </span>
-            <span>{auth.email}</span>
+            <span className="text-paper/60 hidden md:inline">{auth.email}</span>
             <form action="/api/admin/logout" method="POST">
               <button
                 type="submit"
-                className="hover:text-paper transition-colors cursor-pointer"
+                className="px-3 py-1 border border-paper/30 text-paper/80 hover:bg-paper/10 hover:text-paper hover:border-paper/60 transition-colors cursor-pointer"
               >
                 登出
               </button>
