@@ -110,26 +110,31 @@ export default function AppointmentsPage() {
   const [rejectReason, setRejectReason] = useState("");
   const [working, setWorking] = useState(false);
   const [err, setErr] = useState("");
+  const [myRole, setMyRole] = useState<string | null>(null);
 
   // ─── Load ─────────────────────────────────────────────────
   const load = useCallback(async () => {
-    const [apptRes, clientRes, roomRes, therapistRes, planRes] = await Promise.all([
+    const [apptRes, clientRes, roomRes, therapistRes, planRes, meRes] = await Promise.all([
       fetch("/api/admin/appointments"),
       fetch("/api/admin/clients"),
       fetch("/api/admin/rooms"),
       fetch("/api/admin/therapists"),
       fetch("/api/admin/service-plans"),
+      fetch("/api/admin/me"),
     ]);
     if (apptRes.ok) setData(await apptRes.json());
     if (clientRes.ok) setClients(await clientRes.json());
     if (roomRes.ok) setRooms(await roomRes.json());
     if (therapistRes.ok) setTherapists(await therapistRes.json());
     if (planRes.ok) setPlans(await planRes.json());
+    if (meRes.ok) { const me = await meRes.json(); setMyRole(me.role); }
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
   // ─── Derived lists ────────────────────────────────────────
+  const isTherapist = myRole === "therapist";
+
   const pending = data.appointments.filter(
     (a) => a.booking_status === "pending_admin" || a.booking_status === "rejected"
   );
@@ -138,11 +143,17 @@ export default function AppointmentsPage() {
     ["confirmed", "locked", "cancelled"].includes(a.booking_status)
   );
 
-  const tabs = [
-    { label: `待排案 (${pending.length})`, list: pending },
-    { label: `待確認 (${awaiting.length})`, list: awaiting },
-    { label: `已排定 (${settled.length})`, list: settled },
-  ];
+  // Therapist view: "待確認" is a banner, tabs show confirmed + history
+  const tabs = isTherapist
+    ? [
+        { label: `已確認 (${settled.filter((a) => a.booking_status === "confirmed").length})`, list: settled.filter((a) => a.booking_status === "confirmed") },
+        { label: `其他 (${settled.filter((a) => a.booking_status !== "confirmed").length})`, list: settled.filter((a) => a.booking_status !== "confirmed") },
+      ]
+    : [
+        { label: `待排案 (${pending.length})`, list: pending },
+        { label: `待確認 (${awaiting.length})`, list: awaiting },
+        { label: `已排定 (${settled.length})`, list: settled },
+      ];
 
   // ─── Actions ─────────────────────────────────────────────
   async function action(id: string, payload: Record<string, unknown>) {
@@ -254,7 +265,7 @@ export default function AppointmentsPage() {
 
         {/* Action buttons */}
         <div className="flex gap-2 pt-1 flex-wrap">
-          {appt.booking_status === "pending_admin" || appt.booking_status === "rejected" ? (
+          {!isTherapist && (appt.booking_status === "pending_admin" || appt.booking_status === "rejected") ? (
             <button
               onClick={() => {
                 setAssignForm({
@@ -280,7 +291,7 @@ export default function AppointmentsPage() {
                 disabled={working}
                 className="font-sans text-[11px] px-3 py-1.5 bg-green-600 text-white hover:bg-green-700 disabled:opacity-40 transition-colors"
               >
-                確認
+                確認接案
               </button>
               <button
                 onClick={() => { setErr(""); setRejectModal(appt); setRejectReason(""); }}
@@ -291,7 +302,7 @@ export default function AppointmentsPage() {
             </>
           ) : null}
 
-          {appt.booking_status === "confirmed" ? (
+          {!isTherapist && appt.booking_status === "confirmed" ? (
             <button
               onClick={() => action(appt.id, { action: "lock" })}
               disabled={working}
@@ -301,7 +312,7 @@ export default function AppointmentsPage() {
             </button>
           ) : null}
 
-          {["pending_admin", "pending_therapist", "confirmed"].includes(appt.booking_status) && (
+          {!isTherapist && ["pending_admin", "pending_therapist", "confirmed"].includes(appt.booking_status) && (
             <button
               onClick={() => { if (confirm("確定取消此預約？")) action(appt.id, { action: "cancel" }); }}
               disabled={working}
@@ -328,20 +339,43 @@ export default function AppointmentsPage() {
       <div className="flex items-start justify-between">
         <div>
           <p className="font-sans text-xs text-muted mb-1">
-            <a href="/admin" className="hover:text-forest">後台</a> / 預約派案
+            <a href="/admin" className="hover:text-forest">後台</a> / {isTherapist ? "我的預約" : "預約派案"}
           </p>
-          <h1 className="font-serif text-deep text-2xl">預約派案</h1>
+          <h1 className="font-serif text-deep text-2xl">
+            {isTherapist ? "我的預約" : "預約派案"}
+          </h1>
           <p className="font-sans text-xs text-muted mt-0.5">
-            管理個案預約申請，排案給心理師。
+            {isTherapist ? "查看及確認派給你的預約。" : "管理個案預約申請，排案給心理師。"}
           </p>
         </div>
-        <button
-          onClick={() => { setErr(""); setNewModal(true); }}
-          className="font-sans text-xs bg-deep text-paper px-4 py-2 hover:bg-forest transition-colors flex-shrink-0"
-        >
-          + 新增預約
-        </button>
+        {!isTherapist && (
+          <button
+            onClick={() => { setErr(""); setNewModal(true); }}
+            className="font-sans text-xs bg-deep text-paper px-4 py-2 hover:bg-forest transition-colors flex-shrink-0"
+          >
+            + 新增預約
+          </button>
+        )}
       </div>
+
+      {/* Therapist: highlight pending confirmations at top */}
+      {isTherapist && awaiting.length > 0 && (
+        <div className="border-2 border-amber-400 bg-amber-50 p-4 space-y-3">
+          <p className="font-sans text-xs font-medium text-amber-700">
+            ⚠ 有 {awaiting.length} 個預約等待你確認
+          </p>
+          <div className="space-y-3">
+            {awaiting.map((appt) => (
+              <Card key={appt.id} appt={appt} />
+            ))}
+          </div>
+        </div>
+      )}
+      {isTherapist && awaiting.length === 0 && (
+        <div className="border border-sand/20 bg-white px-4 py-3 font-sans text-xs text-muted/50">
+          目前沒有待確認的預約。
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="border-b border-sand/20">

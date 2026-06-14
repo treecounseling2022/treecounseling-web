@@ -71,6 +71,15 @@ export default function AdminLoginPage() {
             {loading ? "登入中…" : "登入"}
           </button>
         </form>
+
+        <div className="mt-6 text-center">
+          <a
+            href="/auth/reset-password"
+            className="font-sans text-[11px] text-muted/60 hover:text-muted transition-colors"
+          >
+            忘記密碼？
+          </a>
+        </div>
       </div>
     </div>
   );
