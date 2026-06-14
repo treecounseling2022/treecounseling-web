@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
 import { Noto_Serif_TC, Noto_Sans_TC, EB_Garamond } from "next/font/google";
 import "./globals.css";
-import Navbar from "@/components/layout/Navbar";
-import Footer from "@/components/layout/Footer";
-import AIChatWidget from "@/components/ui/AIChatWidget";
+import PublicShell from "@/components/layout/PublicShell";
 
 
 const notoSerifTC = Noto_Serif_TC({
@@ -53,10 +51,7 @@ export default function RootLayout({
       className={`${notoSerifTC.variable} ${notoSansTC.variable} ${ebGaramond.variable}`}
     >
       <body className="min-h-screen flex flex-col">
-        <Navbar />
-        <main className="flex-1">{children}</main>
-        <Footer />
-        <AIChatWidget />
+        <PublicShell>{children}</PublicShell>
       </body>
     </html>
   );
