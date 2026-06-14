@@ -19,17 +19,17 @@ export async function GET(
   const { therapist_id } = await params;
   const db = createAdminClient();
 
+  // Return ALL rules (current + historical) so the UI can show a timeline
   const { data, error } = await db
     .from("therapist_rates")
     .select("*")
     .eq("therapist_id", therapist_id)
-    .is("effective_to", null)
-    .order("created_at", { ascending: false });
+    .order("effective_from", { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const session = (data ?? []).find((r) => SESSION_TYPES.includes(r.commission_type)) ?? null;
-  const event = (data ?? []).find((r) => EVENT_TYPES.includes(r.commission_type)) ?? null;
+  const session = (data ?? []).filter((r) => SESSION_TYPES.includes(r.commission_type));
+  const event = (data ?? []).filter((r) => EVENT_TYPES.includes(r.commission_type));
 
   return NextResponse.json({ session, event });
 }
