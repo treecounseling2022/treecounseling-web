@@ -50,28 +50,165 @@ function fmtDate(iso: string) {
   });
 }
 
-function FormDataDisplay({ data }: { data: Record<string, unknown> }) {
-  const skip = new Set(["serviceType", "name", "email", "phone", "preferredTimes", "concern"]);
-  const extra = Object.entries(data).filter(([k]) => !skip.has(k));
+const FIELD_LABEL: Record<string, string> = {
+  gender: "性別",
+  birthday: "出生日期",
+  city: "居住城市",
+  contactType: "聯絡方式",
+  contactId: "聯絡帳號 / ID",
+  meetingType: "晤談方式",
+  nativeLanguage: "母語",
+  devices: "可使用設備",
+  preferredTherapist: "偏好心理師",
+};
 
-  const renderValue = (v: unknown): string => {
-    if (v === null || v === undefined) return "—";
-    if (typeof v === "string") return v || "—";
-    if (Array.isArray(v)) return v.join("、") || "—";
-    if (typeof v === "object") return JSON.stringify(v, null, 2);
+const VALUE_MAP: Record<string, string> = {
+  face: "面談",
+  online: "線上晤談",
+  whatsapp: "WhatsApp",
+  email: "Email",
+  cantonese: "粵語",
+  mandarin: "普通話 / 國語",
+  english: "英語",
+  yes: "有",
+  no: "沒有",
+};
+
+const SKIP_TOP = new Set(["serviceType", "name", "email", "phone", "preferredTimes", "concern", "signature", "individualDetails", "coupleDetails", "otherDetails"]);
+
+function FieldRow({ label, value }: { label: string; value: unknown }) {
+  const fmt = (v: unknown): string => {
+    if (v === null || v === undefined || v === "") return "—";
+    if (typeof v === "string") return (VALUE_MAP[v] ?? v) || "—";
+    if (Array.isArray(v)) return (v as string[]).map((i) => VALUE_MAP[i] ?? i).join("、") || "—";
     return String(v);
   };
+  return (
+    <div className="grid grid-cols-[160px_1fr] gap-2 text-xs py-1 border-b border-sand/10 last:border-0">
+      <span className="font-sans text-muted/60">{label}</span>
+      <span className="font-sans text-deep whitespace-pre-wrap">{fmt(value)}</span>
+    </div>
+  );
+}
 
-  if (extra.length === 0) return null;
+function IndividualDetails({ d }: { d: Record<string, unknown> }) {
+  const INDIVIDUAL_LABEL: Record<string, string> = {
+    mainCategories: "困擾類型",
+    subCategories: "困擾細項",
+    behaviorFrequency: "成癮行為頻率",
+    behaviorImpact: "成癮影響面向",
+    hasPsychiatryExp: "曾有精神科就診",
+    psychiatryDetails: "精神科就診說明",
+    hasCounselingExp: "曾有心理輔導經驗",
+    counselingDetails: "輔導經歷說明",
+    therapistRequirements: "對心理師的要求",
+  };
+  return (
+    <div className="space-y-0">
+      {Object.entries(d).map(([k, v]) => (
+        <FieldRow key={k} label={INDIVIDUAL_LABEL[k] ?? k} value={v} />
+      ))}
+    </div>
+  );
+}
+
+function CoupleDetails({ d }: { d: Record<string, unknown> }) {
+  const pa = d.partnerA as Record<string, unknown> | undefined;
+  const pb = d.partnerB as Record<string, unknown> | undefined;
+  const PARTNER_LABEL: Record<string, string> = {
+    name: "姓名", gender: "性別", birthday: "出生日期",
+    language: "母語", contactId: "聯絡帳號", email: "電郵", phone: "電話",
+  };
+  return (
+    <div className="space-y-3">
+      {pa && (
+        <div>
+          <p className="font-sans text-[11px] text-forest font-medium mb-1">伴侶 A</p>
+          {Object.entries(pa).map(([k, v]) => <FieldRow key={k} label={PARTNER_LABEL[k] ?? k} value={v} />)}
+        </div>
+      )}
+      {pb && (
+        <div>
+          <p className="font-sans text-[11px] text-forest font-medium mb-1">伴侶 B</p>
+          {Object.entries(pb).map(([k, v]) => <FieldRow key={k} label={PARTNER_LABEL[k] ?? k} value={v} />)}
+        </div>
+      )}
+      {!!d.issues && <FieldRow label="遇到的狀況" value={d.issues} />}
+      {!!d.duration && <FieldRow label="關係時長" value={d.duration} />}
+      {!!d.children && <FieldRow label="子女" value={d.children} />}
+      {!!d.meetingType && <FieldRow label="晤談方式" value={d.meetingType} />}
+      {!!d.contactType && <FieldRow label="聯絡方式" value={d.contactType} />}
+    </div>
+  );
+}
+
+function OtherDetails({ d }: { d: Record<string, unknown> }) {
+  const LABEL: Record<string, string> = {
+    companyName: "機構 / 單位名稱",
+    contactPerson: "聯絡人",
+    contactType: "聯絡方式",
+    contactId: "聯絡帳號",
+    theme: "項目主題",
+  };
+  return (
+    <div className="space-y-0">
+      {Object.entries(d).map(([k, v]) => <FieldRow key={k} label={LABEL[k] ?? k} value={v} />)}
+    </div>
+  );
+}
+
+function FormDataDisplay({ data }: { data: Record<string, unknown> }) {
+  const topFields = Object.entries(data).filter(([k]) => !SKIP_TOP.has(k) && k !== "signature");
+  const sig = data.signature as string | undefined;
+  const ind = data.individualDetails as Record<string, unknown> | undefined;
+  const couple = data.coupleDetails as Record<string, unknown> | undefined;
+  const other = data.otherDetails as Record<string, unknown> | undefined;
 
   return (
-    <div className="space-y-2">
-      {extra.map(([k, v]) => (
-        <div key={k} className="grid grid-cols-[160px_1fr] gap-2 text-xs">
-          <span className="font-sans text-muted/60 pt-0.5">{k}</span>
-          <span className="font-sans text-deep whitespace-pre-wrap">{renderValue(v)}</span>
+    <div className="space-y-4">
+      {/* Top-level fields */}
+      {topFields.length > 0 && (
+        <div className="space-y-0">
+          {topFields.map(([k, v]) => (
+            <FieldRow key={k} label={FIELD_LABEL[k] ?? k} value={v} />
+          ))}
         </div>
-      ))}
+      )}
+
+      {/* Individual details */}
+      {ind && (
+        <div>
+          <p className="font-sans text-[11px] text-forest font-medium mb-2 mt-2">困擾詳情</p>
+          <IndividualDetails d={ind} />
+        </div>
+      )}
+
+      {/* Couple details */}
+      {couple && (
+        <div>
+          <p className="font-sans text-[11px] text-forest font-medium mb-2 mt-2">伴侶資料</p>
+          <CoupleDetails d={couple} />
+        </div>
+      )}
+
+      {/* Other / org details */}
+      {other && (
+        <div>
+          <p className="font-sans text-[11px] text-forest font-medium mb-2 mt-2">機構合作資料</p>
+          <OtherDetails d={other} />
+        </div>
+      )}
+
+      {/* Signature */}
+      {sig && sig.startsWith("data:image/") && (
+        <div>
+          <p className="font-sans text-[11px] text-muted/60 mb-1">知情同意簽名</p>
+          <div className="border border-sand/20 inline-block bg-white p-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={sig} alt="簽名" style={{ maxWidth: 300, display: "block" }} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

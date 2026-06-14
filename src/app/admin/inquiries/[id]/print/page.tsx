@@ -31,15 +31,30 @@ export default async function InquiryPrintPage({
     other: "其他查詢",
   };
 
-  const fmt = (v: unknown): string => {
-    if (v == null) return "—";
-    if (typeof v === "string") return v || "—";
-    if (Array.isArray(v)) return (v as string[]).join("、");
-    return JSON.stringify(v);
+  const FIELD_LABEL: Record<string, string> = {
+    gender: "性別", birthday: "出生日期", city: "居住城市",
+    contactType: "聯絡方式", contactId: "聯絡帳號", meetingType: "晤談方式",
+    nativeLanguage: "母語", devices: "可使用設備", preferredTherapist: "偏好心理師",
+  };
+  const VALUE_MAP: Record<string, string> = {
+    face: "面談", online: "線上晤談", whatsapp: "WhatsApp",
+    cantonese: "粵語", mandarin: "普通話 / 國語", english: "英語",
+    yes: "有", no: "沒有",
+  };
+  const fmtVal = (v: unknown): string => {
+    if (v === null || v === undefined || v === "") return "—";
+    if (typeof v === "string") return (VALUE_MAP[v] ?? v) || "—";
+    if (Array.isArray(v)) return (v as string[]).map((i) => VALUE_MAP[i] ?? i).join("、") || "—";
+    return String(v);
   };
 
-  const skip = new Set(["serviceType", "name", "email", "phone", "preferredTimes", "concern"]);
-  const extra = Object.entries(inquiry.form_data as Record<string, unknown>).filter(([k]) => !skip.has(k));
+  const formData = inquiry.form_data as Record<string, unknown>;
+  const skip = new Set(["serviceType", "name", "email", "phone", "preferredTimes", "concern", "signature", "individualDetails", "coupleDetails", "otherDetails"]);
+  const extra = Object.entries(formData).filter(([k]) => !skip.has(k));
+  const sig = formData.signature as string | undefined;
+  const ind = formData.individualDetails as Record<string, unknown> | undefined;
+  const couple = formData.coupleDetails as Record<string, unknown> | undefined;
+  const other = formData.otherDetails as Record<string, unknown> | undefined;
 
   return (
     <>
@@ -87,13 +102,76 @@ export default async function InquiryPrintPage({
 
         {extra.length > 0 && (
           <>
-            <h2>詳細表單資料</h2>
+            <h2>基本資料（補充）</h2>
             {extra.map(([k, v]) => (
               <div key={k} className="field">
-                <span className="field-label">{k}</span>
-                <span style={{ whiteSpace: "pre-wrap" }}>{fmt(v)}</span>
+                <span className="field-label">{FIELD_LABEL[k] ?? k}</span>
+                <span style={{ whiteSpace: "pre-wrap" }}>{fmtVal(v)}</span>
               </div>
             ))}
+          </>
+        )}
+
+        {ind && (
+          <>
+            <h2>困擾詳情</h2>
+            {Object.entries(ind).map(([k, v]) => {
+              const IL: Record<string, string> = {
+                mainCategories: "困擾類型", subCategories: "困擾細項",
+                behaviorFrequency: "成癮頻率", behaviorImpact: "成癮影響",
+                hasPsychiatryExp: "曾有精神科就診", psychiatryDetails: "精神科說明",
+                hasCounselingExp: "曾有輔導經驗", counselingDetails: "輔導經歷說明",
+                therapistRequirements: "對心理師要求",
+              };
+              return (
+                <div key={k} className="field">
+                  <span className="field-label">{IL[k] ?? k}</span>
+                  <span style={{ whiteSpace: "pre-wrap" }}>{fmtVal(v)}</span>
+                </div>
+              );
+            })}
+          </>
+        )}
+
+        {couple && (
+          <>
+            <h2>伴侶資料</h2>
+            {(couple.partnerA as Record<string, unknown> | undefined) && (
+              <>
+                <p style={{ fontSize: "0.8rem", color: "#5a8a6a", margin: "8px 0 4px", fontWeight: 600 }}>伴侶 A</p>
+                {Object.entries(couple.partnerA as Record<string, unknown>).map(([k, v]) => (
+                  <div key={k} className="field"><span className="field-label">{k}</span><span>{fmtVal(v)}</span></div>
+                ))}
+              </>
+            )}
+            {(couple.partnerB as Record<string, unknown> | undefined) && (
+              <>
+                <p style={{ fontSize: "0.8rem", color: "#5a8a6a", margin: "8px 0 4px", fontWeight: 600 }}>伴侶 B</p>
+                {Object.entries(couple.partnerB as Record<string, unknown>).map(([k, v]) => (
+                  <div key={k} className="field"><span className="field-label">{k}</span><span>{fmtVal(v)}</span></div>
+                ))}
+              </>
+            )}
+            {couple.issues && <div className="field"><span className="field-label">遇到的狀況</span><span>{fmtVal(couple.issues)}</span></div>}
+            {couple.duration && <div className="field"><span className="field-label">關係時長</span><span>{fmtVal(couple.duration)}</span></div>}
+          </>
+        )}
+
+        {other && (
+          <>
+            <h2>機構合作資料</h2>
+            {Object.entries(other).map(([k, v]) => {
+              const OL: Record<string, string> = { companyName: "機構名稱", contactPerson: "聯絡人", contactType: "聯絡方式", contactId: "聯絡帳號", theme: "項目主題" };
+              return <div key={k} className="field"><span className="field-label">{OL[k] ?? k}</span><span>{fmtVal(v)}</span></div>;
+            })}
+          </>
+        )}
+
+        {sig && sig.startsWith("data:image/") && (
+          <>
+            <h2>知情同意簽名</h2>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={sig} alt="簽名" style={{ maxWidth: 280, border: "1px solid #e0dcd4", display: "block" }} />
           </>
         )}
 
