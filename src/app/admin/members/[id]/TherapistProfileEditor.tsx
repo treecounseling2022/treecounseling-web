@@ -144,46 +144,29 @@ export default function TherapistProfileEditor({ therapistId, initialData, userR
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Commission rate state (session + event are independent)
+  // Commission rate state (session + event are independent arrays/history)
   const isAdmin = userRole === "director" || userRole === "admin";
-  const [sessionRate, setSessionRate] = useState<SessionRateData>({ ...EMPTY_SESSION_RATE });
-  const [eventRate, setEventRate] = useState<EventRateData>({ ...EMPTY_EVENT_RATE });
+  const [sessionRules, setSessionRules] = useState<RuleFromDB[]>([]);
+  const [eventRules, setEventRules] = useState<RuleFromDB[]>([]);
+  const [addSessionForm, setAddSessionForm] = useState<AddSessionForm>({ ...EMPTY_SESSION_FORM });
+  const [addEventForm, setAddEventForm] = useState<AddEventForm>({ ...EMPTY_EVENT_FORM });
+  const [showAddSession, setShowAddSession] = useState(false);
+  const [showAddEvent, setShowAddEvent] = useState(false);
   const [sessionSave, setSessionSave] = useState<RateSaveState>({ saving: false, saved: false, error: "" });
   const [eventSave, setEventSave] = useState<RateSaveState>({ saving: false, saved: false, error: "" });
 
+  const loadRates = async () => {
+    const res = await fetch(`/api/admin/salary/rates/${therapistId}`);
+    if (!res.ok) return;
+    const d: { session: RuleFromDB[]; event: RuleFromDB[] } = await res.json();
+    setSessionRules(d.session ?? []);
+    setEventRules(d.event ?? []);
+  };
+
   useEffect(() => {
     if (!isAdmin) return;
-    fetch(`/api/admin/salary/rates/${therapistId}`)
-      .then((r) => r.ok ? r.json() : null)
-      .then((d: { session: Record<string, unknown> | null; event: Record<string, unknown> | null } | null) => {
-        if (!d) return;
-        if (d.session) {
-          const s = d.session;
-          setSessionRate({
-            id: s.id as string,
-            commission_type: (s.commission_type as SessionRateData["commission_type"]) ?? "",
-            commission_rate: s.commission_rate != null ? String(Math.round((s.commission_rate as number) * 100)) : "",
-            flat_amount: s.flat_amount != null ? String(s.flat_amount) : "",
-            free_sessions: String((s.free_sessions as number) ?? 0),
-            tier_config: ((s.tier_config ?? []) as TierRow[]).map((t) => ({
-              threshold: t.threshold,
-              rate: Math.round(t.rate * 100),
-            })),
-            notes: (s.notes as string) ?? "",
-            effective_from: (s.effective_from as string) ?? todayStr(),
-          });
-        }
-        if (d.event) {
-          const e = d.event;
-          setEventRate({
-            id: e.id as string,
-            flat_amount: e.flat_amount != null ? String(e.flat_amount) : "",
-            notes: (e.notes as string) ?? "",
-            effective_from: (e.effective_from as string) ?? todayStr(),
-          });
-        }
-      })
-      .catch(() => {});
+    loadRates().catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [therapistId, isAdmin]);
 
   const handleSave = async () => {
@@ -204,33 +187,33 @@ export default function TherapistProfileEditor({ therapistId, initialData, userR
   };
 
   const saveSessionRate = async () => {
-    if (!sessionRate.commission_type) {
+    if (!addSessionForm.commission_type) {
       setSessionSave((s) => ({ ...s, error: "請選擇抽成模式" }));
       return;
     }
     setSessionSave({ saving: true, saved: false, error: "" });
     try {
       const payload: Record<string, unknown> = {
-        commission_type: sessionRate.commission_type,
-        notes: sessionRate.notes || null,
-        effective_from: sessionRate.effective_from || todayStr(),
+        commission_type: addSessionForm.commission_type,
+        notes: addSessionForm.notes || null,
+        effective_from: addSessionForm.effective_from || todayStr(),
       };
-      if (sessionRate.commission_type === "percentage") {
-        const pct = parseFloat(sessionRate.commission_rate);
+      if (addSessionForm.commission_type === "percentage") {
+        const pct = parseFloat(addSessionForm.commission_rate);
         if (isNaN(pct) || pct <= 0 || pct > 100) {
           setSessionSave((s) => ({ ...s, saving: false, error: "請輸入 1–100 的百分比" }));
           return;
         }
         payload.commission_rate = pct / 100;
-      } else if (sessionRate.commission_type === "flat_per_session") {
-        payload.flat_amount = parseFloat(sessionRate.flat_amount) || null;
-        payload.free_sessions = parseInt(sessionRate.free_sessions) || 0;
-      } else if (sessionRate.commission_type === "tiered") {
-        if (sessionRate.tier_config.length === 0) {
+      } else if (addSessionForm.commission_type === "flat_per_session") {
+        payload.flat_amount = parseFloat(addSessionForm.flat_amount) || null;
+        payload.free_sessions = parseInt(addSessionForm.free_sessions) || 0;
+      } else if (addSessionForm.commission_type === "tiered") {
+        if (addSessionForm.tier_config.length === 0) {
           setSessionSave((s) => ({ ...s, saving: false, error: "請至少新增一個階梯" }));
           return;
         }
-        payload.tier_config = sessionRate.tier_config.map((t) => ({
+        payload.tier_config = addSessionForm.tier_config.map((t) => ({
           threshold: t.threshold,
           rate: t.rate / 100,
         }));
@@ -245,8 +228,10 @@ export default function TherapistProfileEditor({ therapistId, initialData, userR
         setSessionSave((s) => ({ ...s, saving: false, error: json.error ?? "發生錯誤" }));
         return;
       }
-      setSessionRate((r) => ({ ...r, id: json.id }));
       setSessionSave({ saving: false, saved: true, error: "" });
+      setAddSessionForm({ ...EMPTY_SESSION_FORM, effective_from: todayStr() });
+      setShowAddSession(false);
+      await loadRates();
       setTimeout(() => setSessionSave((s) => ({ ...s, saved: false })), 3000);
     } catch {
       setSessionSave((s) => ({ ...s, saving: false, error: "網路錯誤" }));
@@ -254,7 +239,7 @@ export default function TherapistProfileEditor({ therapistId, initialData, userR
   };
 
   const saveEventRate = async () => {
-    const amt = parseFloat(eventRate.flat_amount);
+    const amt = parseFloat(addEventForm.flat_amount);
     if (isNaN(amt) || amt <= 0) {
       setEventSave((s) => ({ ...s, error: "請輸入有效的報酬金額" }));
       return;
@@ -264,8 +249,8 @@ export default function TherapistProfileEditor({ therapistId, initialData, userR
       const payload = {
         commission_type: "event",
         flat_amount: amt,
-        notes: eventRate.notes || null,
-        effective_from: eventRate.effective_from || todayStr(),
+        notes: addEventForm.notes || null,
+        effective_from: addEventForm.effective_from || todayStr(),
       };
       const res = await fetch(`/api/admin/salary/rates/${therapistId}`, {
         method: "POST",
@@ -277,8 +262,10 @@ export default function TherapistProfileEditor({ therapistId, initialData, userR
         setEventSave((s) => ({ ...s, saving: false, error: json.error ?? "發生錯誤" }));
         return;
       }
-      setEventRate((r) => ({ ...r, id: json.id }));
       setEventSave({ saving: false, saved: true, error: "" });
+      setAddEventForm({ ...EMPTY_EVENT_FORM, effective_from: todayStr() });
+      setShowAddEvent(false);
+      await loadRates();
       setTimeout(() => setEventSave((s) => ({ ...s, saved: false })), 3000);
     } catch {
       setEventSave((s) => ({ ...s, saving: false, error: "網路錯誤" }));
@@ -576,205 +563,253 @@ export default function TherapistProfileEditor({ therapistId, initialData, userR
       {isAdmin && (
         <Section title="常規諮商抽成">
           <p className="font-sans text-[11px] text-muted/70 -mt-1">
-            適用於個人諮商、評估等常規晤談。與講座抽成並行，各自獨立設定。
+            適用於個人諮商、評估等常規晤談。與講座抽成並行，各自獨立設定。新增規則時，前一條自動設為結束。
           </p>
 
-          {/* Effective from */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block font-sans text-xs text-muted mb-1">生效日期</label>
-              <input
-                type="date"
-                value={sessionRate.effective_from}
-                onChange={(e) => setSessionRate((r) => ({ ...r, effective_from: e.target.value }))}
-                className={inputCls}
-              />
-            </div>
-            <div>
-              <label className="block font-sans text-xs text-muted mb-1">抽成模式</label>
-              <select
-                value={sessionRate.commission_type}
-                onChange={(e) =>
-                  setSessionRate((r) => ({
-                    ...r,
-                    commission_type: e.target.value as SessionRateData["commission_type"],
-                  }))
-                }
-                className={inputCls}
-              >
-                <option value="">（未設定）</option>
-                <option value="percentage">固定比例</option>
-                <option value="tiered">階梯式（依月份累計總堂數）</option>
-                <option value="flat_per_session">每次固定金額</option>
-              </select>
-            </div>
-          </div>
-
-          {/* percentage */}
-          {sessionRate.commission_type === "percentage" && (
-            <div>
-              <label className="block font-sans text-xs text-muted mb-1">心理師分成比例（%）</label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  min={1}
-                  max={100}
-                  value={sessionRate.commission_rate}
-                  onChange={(e) => setSessionRate((r) => ({ ...r, commission_rate: e.target.value }))}
-                  className={cn(inputCls, "w-28")}
-                  placeholder="70"
-                />
-                <span className="font-sans text-xs text-muted">%</span>
-                {sessionRate.commission_rate && !isNaN(+sessionRate.commission_rate) && (
-                  <span className="font-sans text-[11px] text-muted/60">
-                    → 每收 MOP 600，心理師得 MOP {Math.round(600 * +sessionRate.commission_rate / 100)}
-                  </span>
-                )}
-              </div>
+          {/* History table */}
+          {sessionRules.length > 0 && (
+            <div className="border border-sand/20 overflow-hidden">
+              <table className="w-full text-xs font-sans">
+                <thead>
+                  <tr className="bg-sand/10 border-b border-sand/20">
+                    <th className="text-left text-muted px-3 py-2 font-normal">生效日期</th>
+                    <th className="text-left text-muted px-3 py-2 font-normal">結束日期</th>
+                    <th className="text-left text-muted px-3 py-2 font-normal">模式</th>
+                    <th className="text-left text-muted px-3 py-2 font-normal">說明</th>
+                    <th className="text-left text-muted px-3 py-2 font-normal">狀態</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sessionRules.map((rule) => (
+                    <tr key={rule.id} className="border-b border-sand/10 last:border-0">
+                      <td className="px-3 py-2 text-deep">{rule.effective_from}</td>
+                      <td className="px-3 py-2 text-muted">{rule.effective_to ?? "—"}</td>
+                      <td className="px-3 py-2 text-muted">{SESSION_TYPE_LABEL[rule.commission_type] ?? rule.commission_type}</td>
+                      <td className="px-3 py-2 text-deep font-medium">{describeRule(rule)}</td>
+                      <td className="px-3 py-2">
+                        {rule.effective_to === null ? (
+                          <span className="bg-green-50 text-green-700 px-2 py-0.5 text-[10px]">生效中</span>
+                        ) : (
+                          <span className="text-muted/40 text-[10px]">已結束</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
 
-          {/* flat_per_session */}
-          {sessionRate.commission_type === "flat_per_session" && (
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block font-sans text-xs text-muted mb-1">每堂固定金額（MOP）</label>
-                <input
-                  type="number"
-                  min={0}
-                  value={sessionRate.flat_amount}
-                  onChange={(e) => setSessionRate((r) => ({ ...r, flat_amount: e.target.value }))}
-                  className={inputCls}
-                  placeholder="400"
-                />
-              </div>
-              <div>
-                <label className="block font-sans text-xs text-muted mb-1">前 N 堂免費（0 = 每堂計算）</label>
-                <input
-                  type="number"
-                  min={0}
-                  value={sessionRate.free_sessions}
-                  onChange={(e) => setSessionRate((r) => ({ ...r, free_sessions: e.target.value }))}
-                  className={inputCls}
-                  placeholder="0"
-                />
-              </div>
-            </div>
+          {sessionRules.length === 0 && !showAddSession && (
+            <p className="font-sans text-[11px] text-muted/40 italic">尚未設定任何常規諮商抽成規則。</p>
           )}
 
-          {/* tiered */}
-          {sessionRate.commission_type === "tiered" && (
-            <div className="space-y-3">
-              <p className="font-sans text-[11px] text-muted/70">
-                以<strong>月份內跨所有個案的累計總堂數</strong>決定適用比例。例：第 1–9 堂 60%，第 10 堂起 70%。
-              </p>
-              <div className="space-y-2">
-                {sessionRate.tier_config.map((tier, idx) => (
-                  <div key={idx} className="flex items-center gap-2 flex-wrap">
-                    <span className="font-sans text-[11px] text-muted flex-shrink-0">達第</span>
-                    <input
-                      type="number"
-                      min={1}
-                      value={tier.threshold}
-                      onChange={(e) => {
-                        const u = [...sessionRate.tier_config];
-                        u[idx] = { ...u[idx], threshold: +e.target.value };
-                        setSessionRate((r) => ({ ...r, tier_config: u }));
-                      }}
-                      className={cn(inputCls, "w-20")}
-                      placeholder="10"
-                    />
-                    <span className="font-sans text-[11px] text-muted flex-shrink-0">堂後，心理師得</span>
+          {/* Toggle add form */}
+          {!showAddSession ? (
+            <button
+              type="button"
+              onClick={() => { setShowAddSession(true); setSessionSave({ saving: false, saved: false, error: "" }); }}
+              className="font-sans text-xs text-forest hover:text-deep transition-colors cursor-pointer border border-dashed border-forest/40 hover:border-deep/40 px-4 py-1.5 w-full text-center"
+            >
+              + 新增抽成規則
+            </button>
+          ) : (
+            <div className="border border-sand/25 p-4 space-y-3 bg-soft/20">
+              <div className="flex items-center justify-between">
+                <p className="font-sans text-xs font-medium text-deep">新增常規諮商抽成規則</p>
+                <button
+                  type="button"
+                  onClick={() => { setShowAddSession(false); setSessionSave({ saving: false, saved: false, error: "" }); }}
+                  className="font-sans text-xs text-muted hover:text-deep cursor-pointer"
+                >
+                  取消
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-sans text-xs text-muted mb-1">生效日期</label>
+                  <input
+                    type="date"
+                    value={addSessionForm.effective_from}
+                    onChange={(e) => setAddSessionForm((r) => ({ ...r, effective_from: e.target.value }))}
+                    className={inputCls}
+                  />
+                </div>
+                <div>
+                  <label className="block font-sans text-xs text-muted mb-1">抽成模式</label>
+                  <select
+                    value={addSessionForm.commission_type}
+                    onChange={(e) =>
+                      setAddSessionForm((r) => ({
+                        ...r,
+                        commission_type: e.target.value as AddSessionForm["commission_type"],
+                      }))
+                    }
+                    className={inputCls}
+                  >
+                    <option value="">（未設定）</option>
+                    <option value="percentage">固定比例</option>
+                    <option value="tiered">階梯式（依月份累計總堂數）</option>
+                    <option value="flat_per_session">每次固定金額</option>
+                  </select>
+                </div>
+              </div>
+
+              {addSessionForm.commission_type === "percentage" && (
+                <div>
+                  <label className="block font-sans text-xs text-muted mb-1">心理師分成比例（%）</label>
+                  <div className="flex items-center gap-2">
                     <input
                       type="number"
                       min={1}
                       max={100}
-                      value={tier.rate}
-                      onChange={(e) => {
-                        const u = [...sessionRate.tier_config];
-                        u[idx] = { ...u[idx], rate: +e.target.value };
-                        setSessionRate((r) => ({ ...r, tier_config: u }));
-                      }}
-                      className={cn(inputCls, "w-20")}
+                      value={addSessionForm.commission_rate}
+                      onChange={(e) => setAddSessionForm((r) => ({ ...r, commission_rate: e.target.value }))}
+                      className={cn(inputCls, "w-28")}
                       placeholder="70"
                     />
-                    <span className="font-sans text-[11px] text-muted flex-shrink-0">%</span>
-                    <RemoveBtn
-                      onClick={() =>
-                        setSessionRate((r) => ({
-                          ...r,
-                          tier_config: r.tier_config.filter((_, i) => i !== idx),
-                        }))
-                      }
-                    />
+                    <span className="font-sans text-xs text-muted">%</span>
+                    {addSessionForm.commission_rate && !isNaN(+addSessionForm.commission_rate) && (
+                      <span className="font-sans text-[11px] text-muted/60">
+                        → 每收 MOP 600，心理師得 MOP {Math.round(600 * +addSessionForm.commission_rate / 100)}
+                      </span>
+                    )}
                   </div>
-                ))}
-              </div>
-              <AddBtn
-                onClick={() =>
-                  setSessionRate((r) => ({
-                    ...r,
-                    tier_config: [
-                      ...r.tier_config,
-                      { threshold: (r.tier_config.at(-1)?.threshold ?? 0) + 10, rate: 70 },
-                    ],
-                  }))
-                }
-                label="+ 新增階梯"
-              />
-              {/* Preview */}
-              {sessionRate.tier_config.length > 0 && (
-                <div className="bg-sand/10 px-3 py-2 font-sans text-[11px] text-muted space-y-0.5">
-                  {(() => {
-                    const sorted = [...sessionRate.tier_config].sort((a, b) => a.threshold - b.threshold);
-                    return sorted.map((t, i) => {
-                      const from = i === 0 ? 1 : sorted[i - 1].threshold;
-                      const to = t.threshold - 1;
-                      const next = sorted[i + 1];
-                      return (
-                        <p key={i}>
-                          {i === 0 && from < t.threshold && (
-                            <span>第 1–{to} 堂：（未達門檻，視前一設定）　</span>
-                          )}
-                          第 {t.threshold} 堂起{next ? `（至第 ${next.threshold - 1} 堂）` : "（含以後）"}：心理師得 {t.rate}%
-                        </p>
-                      );
-                    });
-                  })()}
                 </div>
               )}
-            </div>
-          )}
 
-          {/* Notes */}
-          {sessionRate.commission_type && (
-            <div>
-              <label className="block font-sans text-xs text-muted mb-1">備註（選填）</label>
-              <input
-                value={sessionRate.notes}
-                onChange={(e) => setSessionRate((r) => ({ ...r, notes: e.target.value }))}
-                className={inputCls}
-                placeholder="例：2025年合約調整"
-              />
-            </div>
-          )}
+              {addSessionForm.commission_type === "flat_per_session" && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-sans text-xs text-muted mb-1">每堂固定金額（MOP）</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={addSessionForm.flat_amount}
+                      onChange={(e) => setAddSessionForm((r) => ({ ...r, flat_amount: e.target.value }))}
+                      className={inputCls}
+                      placeholder="400"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-sans text-xs text-muted mb-1">前 N 堂免費（0 = 每堂計算）</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={addSessionForm.free_sessions}
+                      onChange={(e) => setAddSessionForm((r) => ({ ...r, free_sessions: e.target.value }))}
+                      className={inputCls}
+                      placeholder="0"
+                    />
+                  </div>
+                </div>
+              )}
 
-          <div className="flex items-center gap-3 pt-1">
-            <button
-              type="button"
-              onClick={saveSessionRate}
-              disabled={sessionSave.saving || !sessionRate.commission_type}
-              className="px-5 py-2 bg-deep text-paper font-sans text-xs hover:bg-forest transition-colors disabled:opacity-40 cursor-pointer"
-            >
-              {sessionSave.saving ? "儲存中…" : "儲存常規抽成"}
-            </button>
-            {sessionSave.saved && <span className="font-sans text-xs text-forest">已儲存 ✓</span>}
-            {sessionSave.error && <span className="font-sans text-xs text-red-500">{sessionSave.error}</span>}
-          </div>
-          {sessionRate.id && (
-            <p className="font-sans text-[10px] text-muted/40">
-              目前設定生效中。儲存後舊版本自動關閉，歷史紀錄保留於資料庫。
-            </p>
+              {addSessionForm.commission_type === "tiered" && (
+                <div className="space-y-3">
+                  <p className="font-sans text-[11px] text-muted/70">
+                    以<strong>月份內跨所有個案的累計總堂數</strong>決定適用比例。
+                  </p>
+                  <div className="space-y-2">
+                    {addSessionForm.tier_config.map((tier, idx) => (
+                      <div key={idx} className="flex items-center gap-2 flex-wrap">
+                        <span className="font-sans text-[11px] text-muted flex-shrink-0">達第</span>
+                        <input
+                          type="number"
+                          min={1}
+                          value={tier.threshold}
+                          onChange={(e) => {
+                            const u = [...addSessionForm.tier_config];
+                            u[idx] = { ...u[idx], threshold: +e.target.value };
+                            setAddSessionForm((r) => ({ ...r, tier_config: u }));
+                          }}
+                          className={cn(inputCls, "w-20")}
+                          placeholder="10"
+                        />
+                        <span className="font-sans text-[11px] text-muted flex-shrink-0">堂後，心理師得</span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={100}
+                          value={tier.rate}
+                          onChange={(e) => {
+                            const u = [...addSessionForm.tier_config];
+                            u[idx] = { ...u[idx], rate: +e.target.value };
+                            setAddSessionForm((r) => ({ ...r, tier_config: u }));
+                          }}
+                          className={cn(inputCls, "w-20")}
+                          placeholder="70"
+                        />
+                        <span className="font-sans text-[11px] text-muted flex-shrink-0">%</span>
+                        <RemoveBtn
+                          onClick={() =>
+                            setAddSessionForm((r) => ({
+                              ...r,
+                              tier_config: r.tier_config.filter((_, i) => i !== idx),
+                            }))
+                          }
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <AddBtn
+                    onClick={() =>
+                      setAddSessionForm((r) => ({
+                        ...r,
+                        tier_config: [
+                          ...r.tier_config,
+                          { threshold: (r.tier_config.at(-1)?.threshold ?? 0) + 10, rate: 70 },
+                        ],
+                      }))
+                    }
+                    label="+ 新增階梯"
+                  />
+                  {addSessionForm.tier_config.length > 0 && (
+                    <div className="bg-sand/10 px-3 py-2 font-sans text-[11px] text-muted space-y-0.5">
+                      {[...addSessionForm.tier_config]
+                        .sort((a, b) => a.threshold - b.threshold)
+                        .map((t, i, sorted) => {
+                          const next = sorted[i + 1];
+                          return (
+                            <p key={i}>
+                              第 {t.threshold} 堂起{next ? `（至第 ${next.threshold - 1} 堂）` : "（含以後）"}：心理師得 {t.rate}%
+                            </p>
+                          );
+                        })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {addSessionForm.commission_type && (
+                <div>
+                  <label className="block font-sans text-xs text-muted mb-1">備註（選填）</label>
+                  <input
+                    value={addSessionForm.notes}
+                    onChange={(e) => setAddSessionForm((r) => ({ ...r, notes: e.target.value }))}
+                    className={inputCls}
+                    placeholder="例：2025年合約調整"
+                  />
+                </div>
+              )}
+
+              <div className="flex items-center gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={saveSessionRate}
+                  disabled={sessionSave.saving || !addSessionForm.commission_type}
+                  className="px-5 py-2 bg-deep text-paper font-sans text-xs hover:bg-forest transition-colors disabled:opacity-40 cursor-pointer"
+                >
+                  {sessionSave.saving ? "儲存中…" : "新增此規則"}
+                </button>
+                {sessionSave.saved && <span className="font-sans text-xs text-forest">已儲存 ✓</span>}
+                {sessionSave.error && <span className="font-sans text-xs text-red-500">{sessionSave.error}</span>}
+              </div>
+              <p className="font-sans text-[10px] text-muted/40">
+                新增後，目前生效中的規則自動設為結束，此規則立即生效。
+              </p>
+            </div>
           )}
         </Section>
       )}
@@ -786,55 +821,115 @@ export default function TherapistProfileEditor({ therapistId, initialData, userR
             與常規諮商抽成<strong>並行獨立</strong>，不互相影響。適用於講座、工作坊、培訓等活動，每場固定報酬。
           </p>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block font-sans text-xs text-muted mb-1">生效日期</label>
-              <input
-                type="date"
-                value={eventRate.effective_from}
-                onChange={(e) => setEventRate((r) => ({ ...r, effective_from: e.target.value }))}
-                className={inputCls}
-              />
+          {/* History table */}
+          {eventRules.length > 0 && (
+            <div className="border border-sand/20 overflow-hidden">
+              <table className="w-full text-xs font-sans">
+                <thead>
+                  <tr className="bg-sand/10 border-b border-sand/20">
+                    <th className="text-left text-muted px-3 py-2 font-normal">生效日期</th>
+                    <th className="text-left text-muted px-3 py-2 font-normal">結束日期</th>
+                    <th className="text-left text-muted px-3 py-2 font-normal">每場報酬</th>
+                    <th className="text-left text-muted px-3 py-2 font-normal">備註</th>
+                    <th className="text-left text-muted px-3 py-2 font-normal">狀態</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {eventRules.map((rule) => (
+                    <tr key={rule.id} className="border-b border-sand/10 last:border-0">
+                      <td className="px-3 py-2 text-deep">{rule.effective_from}</td>
+                      <td className="px-3 py-2 text-muted">{rule.effective_to ?? "—"}</td>
+                      <td className="px-3 py-2 text-deep font-medium">MOP {rule.flat_amount}/場</td>
+                      <td className="px-3 py-2 text-muted">{rule.notes ?? "—"}</td>
+                      <td className="px-3 py-2">
+                        {rule.effective_to === null ? (
+                          <span className="bg-green-50 text-green-700 px-2 py-0.5 text-[10px]">生效中</span>
+                        ) : (
+                          <span className="text-muted/40 text-[10px]">已結束</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-            <div>
-              <label className="block font-sans text-xs text-muted mb-1">每場固定報酬（MOP）</label>
-              <input
-                type="number"
-                min={0}
-                value={eventRate.flat_amount}
-                onChange={(e) => setEventRate((r) => ({ ...r, flat_amount: e.target.value }))}
-                className={inputCls}
-                placeholder="1500"
-              />
-            </div>
-          </div>
+          )}
 
-          <div>
-            <label className="block font-sans text-xs text-muted mb-1">備註（選填）</label>
-            <input
-              value={eventRate.notes}
-              onChange={(e) => setEventRate((r) => ({ ...r, notes: e.target.value }))}
-              className={inputCls}
-              placeholder="例：半天講座 MOP 1500，全天 MOP 2500"
-            />
-          </div>
+          {eventRules.length === 0 && !showAddEvent && (
+            <p className="font-sans text-[11px] text-muted/40 italic">尚未設定任何講座抽成規則。</p>
+          )}
 
-          <div className="flex items-center gap-3 pt-1">
+          {/* Toggle add form */}
+          {!showAddEvent ? (
             <button
               type="button"
-              onClick={saveEventRate}
-              disabled={eventSave.saving}
-              className="px-5 py-2 bg-deep text-paper font-sans text-xs hover:bg-forest transition-colors disabled:opacity-40 cursor-pointer"
+              onClick={() => { setShowAddEvent(true); setEventSave({ saving: false, saved: false, error: "" }); }}
+              className="font-sans text-xs text-forest hover:text-deep transition-colors cursor-pointer border border-dashed border-forest/40 hover:border-deep/40 px-4 py-1.5 w-full text-center"
             >
-              {eventSave.saving ? "儲存中…" : "儲存講座抽成"}
+              + 新增抽成規則
             </button>
-            {eventSave.saved && <span className="font-sans text-xs text-forest">已儲存 ✓</span>}
-            {eventSave.error && <span className="font-sans text-xs text-red-500">{eventSave.error}</span>}
-          </div>
-          {eventRate.id && (
-            <p className="font-sans text-[10px] text-muted/40">
-              目前設定生效中。儲存後舊版本自動關閉，歷史紀錄保留於資料庫。
-            </p>
+          ) : (
+            <div className="border border-sand/25 p-4 space-y-3 bg-soft/20">
+              <div className="flex items-center justify-between">
+                <p className="font-sans text-xs font-medium text-deep">新增講座 / 工作坊抽成規則</p>
+                <button
+                  type="button"
+                  onClick={() => { setShowAddEvent(false); setEventSave({ saving: false, saved: false, error: "" }); }}
+                  className="font-sans text-xs text-muted hover:text-deep cursor-pointer"
+                >
+                  取消
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-sans text-xs text-muted mb-1">生效日期</label>
+                  <input
+                    type="date"
+                    value={addEventForm.effective_from}
+                    onChange={(e) => setAddEventForm((r) => ({ ...r, effective_from: e.target.value }))}
+                    className={inputCls}
+                  />
+                </div>
+                <div>
+                  <label className="block font-sans text-xs text-muted mb-1">每場固定報酬（MOP）</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={addEventForm.flat_amount}
+                    onChange={(e) => setAddEventForm((r) => ({ ...r, flat_amount: e.target.value }))}
+                    className={inputCls}
+                    placeholder="1500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-sans text-xs text-muted mb-1">備註（選填）</label>
+                <input
+                  value={addEventForm.notes}
+                  onChange={(e) => setAddEventForm((r) => ({ ...r, notes: e.target.value }))}
+                  className={inputCls}
+                  placeholder="例：半天講座 MOP 1500，全天 MOP 2500"
+                />
+              </div>
+
+              <div className="flex items-center gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={saveEventRate}
+                  disabled={eventSave.saving}
+                  className="px-5 py-2 bg-deep text-paper font-sans text-xs hover:bg-forest transition-colors disabled:opacity-40 cursor-pointer"
+                >
+                  {eventSave.saving ? "儲存中…" : "新增此規則"}
+                </button>
+                {eventSave.saved && <span className="font-sans text-xs text-forest">已儲存 ✓</span>}
+                {eventSave.error && <span className="font-sans text-xs text-red-500">{eventSave.error}</span>}
+              </div>
+              <p className="font-sans text-[10px] text-muted/40">
+                新增後，目前生效中的規則自動設為結束，此規則立即生效。
+              </p>
+            </div>
           )}
         </Section>
       )}
