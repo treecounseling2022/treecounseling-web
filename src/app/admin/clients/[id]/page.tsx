@@ -1,4 +1,4 @@
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireAuth, isAdminLevel } from "@/lib/auth-role";
 import ClientEditor from "./ClientEditor";
@@ -9,7 +9,7 @@ interface Props {
 
 export default async function ClientDetailPage({ params }: Props) {
   const auth = await requireAuth();
-  if (!isAdminLevel(auth.role)) redirect("/admin");
+  const isAdmin = isAdminLevel(auth.role);
 
   const { id } = await params;
   const supabase = await createClient();
@@ -22,10 +22,14 @@ export default async function ClientDetailPage({ params }: Props) {
 
   if (!client) notFound();
 
-  const { data: therapists } = await supabase
-    .from("therapist_profiles")
-    .select("id, name")
-    .order("name");
+  // Therapists may only view clients assigned to them
+  if (!isAdmin && client.assigned_therapist_id !== auth.profileId) notFound();
+
+  const therapists = isAdmin
+    ? ((await supabase.from("therapist_profiles").select("id, name").order("name")).data ?? [])
+    : [];
+
+  const clientsLabel = isAdmin ? "個案管理" : "我的個案";
 
   return (
     <div className="space-y-6 pt-4 max-w-2xl">
@@ -33,7 +37,7 @@ export default async function ClientDetailPage({ params }: Props) {
         <p className="font-sans text-xs text-muted mb-1">
           <a href="/admin" className="hover:text-forest">後台</a>
           {" / "}
-          <a href="/admin/clients" className="hover:text-forest">個案管理</a>
+          <a href="/admin/clients" className="hover:text-forest">{clientsLabel}</a>
           {" / "}
           {client.full_name}
         </p>
@@ -45,7 +49,8 @@ export default async function ClientDetailPage({ params }: Props) {
 
       <ClientEditor
         initialData={client}
-        therapists={therapists ?? []}
+        therapists={therapists}
+        readonly={!isAdmin}
       />
     </div>
   );

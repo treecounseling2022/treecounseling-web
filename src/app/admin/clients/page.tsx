@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { requireAuth, isAdminLevel } from "@/lib/auth-role";
-import { redirect } from "next/navigation";
 
 const GENDER_LABEL: Record<string, string> = {
   male: "男",
@@ -16,7 +15,7 @@ export default async function ClientsPage({
   searchParams: Promise<{ q?: string }>;
 }) {
   const auth = await requireAuth();
-  if (!isAdminLevel(auth.role)) redirect("/admin");
+  const isAdmin = isAdminLevel(auth.role);
 
   const { q } = await searchParams;
   const supabase = await createClient();
@@ -26,19 +25,27 @@ export default async function ClientsPage({
     .select("id, full_name, gender, phone, email, assigned_therapist_id, created_at, is_active")
     .eq("is_active", true)
     .order("created_at", { ascending: false });
-  if (q?.trim()) query = query.ilike("full_name", `%${q.trim()}%`);
 
+  // Therapists only see their own assigned clients
+  if (!isAdmin) {
+    if (!auth.profileId) return <div className="pt-4 font-sans text-xs text-muted">帳號尚未連結至心理師資料。</div>;
+    query = query.eq("assigned_therapist_id", auth.profileId);
+  }
+
+  if (q?.trim()) query = query.ilike("full_name", `%${q.trim()}%`);
   const { data: clients } = await query;
 
-  // Build therapist name map
-  const therapistIds = [...new Set((clients ?? []).map((c) => c.assigned_therapist_id).filter(Boolean))] as string[];
+  // Build therapist name map (only needed for admin view)
   let therapistMap: Record<string, string> = {};
-  if (therapistIds.length > 0) {
-    const { data: therapists } = await supabase
-      .from("therapist_profiles")
-      .select("id, name")
-      .in("id", therapistIds);
-    therapistMap = Object.fromEntries((therapists ?? []).map((t) => [t.id, t.name]));
+  if (isAdmin) {
+    const therapistIds = [...new Set((clients ?? []).map((c) => c.assigned_therapist_id).filter(Boolean))] as string[];
+    if (therapistIds.length > 0) {
+      const { data: therapists } = await supabase
+        .from("therapist_profiles")
+        .select("id, name")
+        .in("id", therapistIds);
+      therapistMap = Object.fromEntries((therapists ?? []).map((t) => [t.id, t.name]));
+    }
   }
 
   return (
@@ -46,19 +53,23 @@ export default async function ClientsPage({
       <div className="flex items-start justify-between">
         <div>
           <p className="font-sans text-xs text-muted mb-1">
-            <a href="/admin" className="hover:text-forest">後台</a> / 個案管理
+            <a href="/admin" className="hover:text-forest">後台</a> / 個案
           </p>
-          <h1 className="font-serif text-deep text-2xl">個案管理</h1>
+          <h1 className="font-serif text-deep text-2xl">
+            {isAdmin ? "個案管理" : "我的個案"}
+          </h1>
           <p className="font-sans text-xs text-muted mt-0.5">
             共 {clients?.length ?? 0} 位個案
           </p>
         </div>
-        <Link
-          href="/admin/clients/new"
-          className="font-sans text-xs bg-deep text-paper px-4 py-2 hover:bg-forest transition-colors flex-shrink-0"
-        >
-          + 新增個案
-        </Link>
+        {isAdmin && (
+          <Link
+            href="/admin/clients/new"
+            className="font-sans text-xs bg-deep text-paper px-4 py-2 hover:bg-forest transition-colors flex-shrink-0"
+          >
+            + 新增個案
+          </Link>
+        )}
       </div>
 
       {/* Search */}
@@ -93,7 +104,9 @@ export default async function ClientsPage({
               <th className="font-sans text-[11px] text-muted text-left px-4 py-3">姓名</th>
               <th className="font-sans text-[11px] text-muted text-left px-4 py-3 hidden sm:table-cell">性別</th>
               <th className="font-sans text-[11px] text-muted text-left px-4 py-3 hidden md:table-cell">聯絡方式</th>
-              <th className="font-sans text-[11px] text-muted text-left px-4 py-3">負責心理師</th>
+              {isAdmin && (
+                <th className="font-sans text-[11px] text-muted text-left px-4 py-3">負責心理師</th>
+              )}
               <th className="font-sans text-[11px] text-muted text-left px-4 py-3 hidden lg:table-cell">建立日期</th>
               <th className="px-4 py-3" />
             </tr>
@@ -119,13 +132,15 @@ export default async function ClientsPage({
                     {client.phone || client.email || "—"}
                   </span>
                 </td>
-                <td className="px-4 py-3">
-                  <span className="font-sans text-xs text-muted">
-                    {client.assigned_therapist_id
-                      ? therapistMap[client.assigned_therapist_id] ?? "—"
-                      : <span className="text-muted/40">未指派</span>}
-                  </span>
-                </td>
+                {isAdmin && (
+                  <td className="px-4 py-3">
+                    <span className="font-sans text-xs text-muted">
+                      {client.assigned_therapist_id
+                        ? therapistMap[client.assigned_therapist_id] ?? "—"
+                        : <span className="text-muted/40">未指派</span>}
+                    </span>
+                  </td>
+                )}
                 <td className="px-4 py-3 hidden lg:table-cell">
                   <span className="font-sans text-[11px] text-muted/60">
                     {new Date(client.created_at).toLocaleDateString("zh-TW")}
@@ -136,7 +151,7 @@ export default async function ClientsPage({
                     href={`/admin/clients/${client.id}`}
                     className="font-sans text-[11px] text-forest hover:underline"
                   >
-                    編輯 →
+                    {isAdmin ? "編輯 →" : "查看 →"}
                   </Link>
                 </td>
               </tr>
@@ -145,7 +160,7 @@ export default async function ClientsPage({
         </table>
         {(clients ?? []).length === 0 && (
           <div className="text-center py-16 font-sans text-xs text-muted/40">
-            {q ? `找不到「${q}」的相關個案。` : "尚未建立任何個案。"}
+            {q ? `找不到「${q}」的相關個案。` : "尚未有個案資料。"}
           </div>
         )}
       </div>

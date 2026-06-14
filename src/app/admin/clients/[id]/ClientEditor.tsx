@@ -33,9 +33,11 @@ const GENDER_OPTIONS = [
 export default function ClientEditor({
   initialData,
   therapists,
+  readonly = false,
 }: {
   initialData: Partial<ClientData> & { id?: string };
   therapists: Therapist[];
+  readonly?: boolean;
 }) {
   const router = useRouter();
   const isNew = !initialData.id;
@@ -106,7 +108,7 @@ export default function ClientEditor({
     if (res.ok) router.push("/admin/clients");
   }
 
-  const inputCls = "w-full border border-sand/30 px-3 py-2 font-sans text-sm text-deep focus:outline-none focus:border-forest/50";
+  const inputCls = `w-full border border-sand/30 px-3 py-2 font-sans text-sm text-deep focus:outline-none focus:border-forest/50${readonly ? " bg-sand/5 cursor-default" : ""}`;
   const labelCls = "font-sans text-[11px] text-muted block mb-1";
   const sectionCls = "space-y-4 pt-6 border-t border-sand/20";
 
@@ -118,19 +120,19 @@ export default function ClientEditor({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className={labelCls}>姓名 *</label>
-            <input value={form.full_name} onChange={(e) => setField("full_name", e.target.value)} className={inputCls} placeholder="中文姓名" />
+            <input value={form.full_name} onChange={(e) => setField("full_name", e.target.value)} className={inputCls} placeholder="中文姓名" disabled={readonly} />
           </div>
           <div>
             <label className={labelCls}>英文姓名</label>
-            <input value={form.name_en} onChange={(e) => setField("name_en", e.target.value)} className={inputCls} placeholder="English Name" />
+            <input value={form.name_en} onChange={(e) => setField("name_en", e.target.value)} className={inputCls} placeholder="English Name" disabled={readonly} />
           </div>
           <div>
             <label className={labelCls}>出生日期</label>
-            <input type="date" value={form.dob} onChange={(e) => setField("dob", e.target.value)} className={inputCls} />
+            <input type="date" value={form.dob} onChange={(e) => setField("dob", e.target.value)} className={inputCls} disabled={readonly} />
           </div>
           <div>
             <label className={labelCls}>性別</label>
-            <select value={form.gender} onChange={(e) => setField("gender", e.target.value)} className={inputCls}>
+            <select value={form.gender} onChange={(e) => setField("gender", e.target.value)} className={inputCls} disabled={readonly}>
               {GENDER_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </div>
@@ -143,19 +145,19 @@ export default function ClientEditor({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className={labelCls}>電話</label>
-            <input value={form.phone} onChange={(e) => setField("phone", e.target.value)} className={inputCls} placeholder="+853 xxxx xxxx" />
+            <input value={form.phone} onChange={(e) => setField("phone", e.target.value)} className={inputCls} placeholder="+853 xxxx xxxx" disabled={readonly} />
           </div>
           <div>
             <label className={labelCls}>Email</label>
-            <input type="email" value={form.email} onChange={(e) => setField("email", e.target.value)} className={inputCls} />
+            <input type="email" value={form.email} onChange={(e) => setField("email", e.target.value)} className={inputCls} disabled={readonly} />
           </div>
         </div>
         <div>
           <p className={labelCls}>緊急聯絡人</p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <input value={form.emergency_contact.name} onChange={(e) => setEc("name", e.target.value)} className={inputCls} placeholder="姓名" />
-            <input value={form.emergency_contact.phone} onChange={(e) => setEc("phone", e.target.value)} className={inputCls} placeholder="電話" />
-            <input value={form.emergency_contact.relationship} onChange={(e) => setEc("relationship", e.target.value)} className={inputCls} placeholder="關係（如：母親）" />
+            <input value={form.emergency_contact.name} onChange={(e) => setEc("name", e.target.value)} className={inputCls} placeholder="姓名" disabled={readonly} />
+            <input value={form.emergency_contact.phone} onChange={(e) => setEc("phone", e.target.value)} className={inputCls} placeholder="電話" disabled={readonly} />
+            <input value={form.emergency_contact.relationship} onChange={(e) => setEc("relationship", e.target.value)} className={inputCls} placeholder="關係（如：母親）" disabled={readonly} />
           </div>
         </div>
       </div>
@@ -165,14 +167,14 @@ export default function ClientEditor({
         <h2 className="font-serif text-deep text-base">派案資訊</h2>
         <div>
           <label className={labelCls}>負責心理師</label>
-          <select value={form.assigned_therapist_id} onChange={(e) => setField("assigned_therapist_id", e.target.value)} className={inputCls}>
+          <select value={form.assigned_therapist_id} onChange={(e) => setField("assigned_therapist_id", e.target.value)} className={inputCls} disabled={readonly}>
             <option value="">（未指派）</option>
             {therapists.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
         </div>
         <div>
           <label className={labelCls}>轉介來源</label>
-          <input value={form.referral_source} onChange={(e) => setField("referral_source", e.target.value)} className={inputCls} placeholder="例：朋友介紹、網路搜尋" />
+          <input value={form.referral_source} onChange={(e) => setField("referral_source", e.target.value)} className={inputCls} placeholder="例：朋友介紹、網路搜尋" disabled={readonly} />
         </div>
         <div>
           <label className={labelCls}>初次申請說明（個案填寫）</label>
@@ -182,47 +184,58 @@ export default function ClientEditor({
             rows={4}
             className={inputCls + " resize-none"}
             placeholder="個案提供的背景資訊…"
+            disabled={readonly}
           />
         </div>
       </div>
 
-      {/* 行政備註 */}
-      <div className={sectionCls}>
-        <h2 className="font-serif text-deep text-base">行政備註</h2>
-        <p className="font-sans text-[11px] text-muted/70">此備註僅行政可見，心理師無法看到。</p>
-        <textarea
-          value={form.admin_notes}
-          onChange={(e) => setField("admin_notes", e.target.value)}
-          rows={3}
-          className={inputCls + " resize-none"}
-          placeholder="內部備註…"
-        />
-      </div>
+      {/* 行政備註：僅管理員可見 */}
+      {!readonly && (
+        <div className={sectionCls}>
+          <h2 className="font-serif text-deep text-base">行政備註</h2>
+          <p className="font-sans text-[11px] text-muted/70">此備註僅行政可見，心理師無法看到。</p>
+          <textarea
+            value={form.admin_notes}
+            onChange={(e) => setField("admin_notes", e.target.value)}
+            rows={3}
+            className={inputCls + " resize-none"}
+            placeholder="內部備註…"
+          />
+        </div>
+      )}
 
       {/* Actions */}
-      {err && <p className="font-sans text-xs text-red-500">{err}</p>}
-      {saved && <p className="font-sans text-xs text-forest">已儲存</p>}
-
-      <div className="flex items-center gap-3 pt-2">
-        <button
-          onClick={save}
-          disabled={saving}
-          className="font-sans text-sm px-6 py-2 bg-deep text-paper hover:bg-forest disabled:opacity-40 transition-colors"
-        >
-          {saving ? "儲存中…" : isNew ? "建立個案" : "儲存變更"}
-        </button>
+      {!readonly && (
+        <>
+          {err && <p className="font-sans text-xs text-red-500">{err}</p>}
+          {saved && <p className="font-sans text-xs text-forest">已儲存</p>}
+          <div className="flex items-center gap-3 pt-2">
+            <button
+              onClick={save}
+              disabled={saving}
+              className="font-sans text-sm px-6 py-2 bg-deep text-paper hover:bg-forest disabled:opacity-40 transition-colors"
+            >
+              {saving ? "儲存中…" : isNew ? "建立個案" : "儲存變更"}
+            </button>
+            <a href="/admin/clients" className="font-sans text-xs text-muted hover:text-deep transition-colors">
+              返回列表
+            </a>
+            {!isNew && (
+              <button
+                onClick={archive}
+                className="ml-auto font-sans text-xs text-red-400 hover:text-red-600 transition-colors"
+              >
+                封存個案
+              </button>
+            )}
+          </div>
+        </>
+      )}
+      {readonly && (
         <a href="/admin/clients" className="font-sans text-xs text-muted hover:text-deep transition-colors">
-          返回列表
+          ← 返回列表
         </a>
-        {!isNew && (
-          <button
-            onClick={archive}
-            className="ml-auto font-sans text-xs text-red-400 hover:text-red-600 transition-colors"
-          >
-            封存個案
-          </button>
-        )}
-      </div>
+      )}
     </div>
   );
 }

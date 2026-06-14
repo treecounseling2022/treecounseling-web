@@ -70,11 +70,17 @@ export default async function AdminLayout({
                 >
                   我的資料
                 </Link>
+                <Link href="/admin/clients" className="hover:text-paper transition-colors">
+                  我的個案
+                </Link>
                 <Link href="/admin/appointments" className="hover:text-paper transition-colors">
                   預約
                 </Link>
                 <Link href="/admin/sessions" className="hover:text-paper transition-colors">
                   晤談紀錄
+                </Link>
+                <Link href="/admin/salary" className="hover:text-paper transition-colors">
+                  薪酬
                 </Link>
               </>
             ) : (
