@@ -98,7 +98,7 @@ const LANG_LABEL: Record<string, string> = {
 };
 
 const MEETING_LABEL: Record<string, string> = {
-  face: "面談（到診）", online: "線上晤談",
+  face: "面談", online: "線上晤談",
 };
 
 export type InquiryPDFData = {

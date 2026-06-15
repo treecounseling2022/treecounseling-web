@@ -129,23 +129,23 @@ export async function PATCH(
     ]);
     if (therapistProfile?.email) {
       const adminUrl = `${process.env.NEXT_PUBLIC_SITE_URL ?? "https://treecounseling-web.vercel.app"}/admin/appointments`;
+      const tdL = `style="color:#555;padding:6px 16px 6px 0;border-bottom:1px solid #eee;white-space:nowrap;font-size:0.88rem"`;
+      const tdR = `style="padding:6px 0;border-bottom:1px solid #eee;font-size:0.9rem;color:#111"`;
       await resend.emails.send({
         from: process.env.RESEND_FROM_EMAIL ?? "noreply@treecounseling.com",
         to: therapistProfile.email,
         subject: "【樹心理工作室】新派案通知",
         html: `
-          <div style="font-family:sans-serif;max-width:480px;margin:0 auto;color:#333;line-height:1.7">
-            <h2 style="color:#2d4a38">新派案通知</h2>
-            <p>您好，${therapistProfile.name ?? ""}，</p>
-            <p>行政已為您安排一個新個案，請確認是否接案。</p>
-            <table style="width:100%;border-collapse:collapse;margin:16px 0;font-size:0.9rem">
-              <tr><td style="color:#888;padding:4px 12px 4px 0;white-space:nowrap">個案</td><td>${clientData?.full_name ?? "—"}</td></tr>
-              ${data.scheduled_at ? `<tr><td style="color:#888;padding:4px 12px 4px 0;white-space:nowrap">預計時間</td><td>${new Date(data.scheduled_at).toLocaleString("zh-TW", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Macau" })}</td></tr>` : ""}
+          <div style="font-family:sans-serif;max-width:500px;margin:0 auto;color:#111;line-height:1.7">
+            <h2 style="font-size:1.1rem;border-bottom:2px solid #111;padding-bottom:8px;margin-bottom:16px">新派案通知</h2>
+            <p style="margin:0 0 4px">您好，${therapistProfile.name ?? ""}，</p>
+            <p style="margin:0 0 16px;color:#444">行政已為您安排一個新個案，請登入後台確認是否接案。</p>
+            <table style="width:100%;border-collapse:collapse;margin:0 0 20px">
+              <tr><td ${tdL}>個案</td><td ${tdR}><strong>${clientData?.full_name ?? "—"}</strong></td></tr>
+              ${data.scheduled_at ? `<tr><td ${tdL}>預計時間</td><td ${tdR}>${new Date(data.scheduled_at).toLocaleString("zh-TW", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Macau" })}</td></tr>` : ""}
             </table>
-            <p style="margin-top:20px">
-              <a href="${adminUrl}" style="display:inline-block;padding:10px 20px;background:#2d4a38;color:#fff;text-decoration:none;font-size:0.9rem">前往後台確認 →</a>
-            </p>
-            <p style="color:#888;font-size:0.85rem">— 樹心理工作室</p>
+            <p><a href="${adminUrl}" style="color:#111;font-weight:bold;text-decoration:underline">前往後台確認 →</a></p>
+            <p style="color:#888;font-size:0.8rem;margin-top:24px;border-top:1px solid #eee;padding-top:10px">樹心理工作室　Tree Counseling Studio</p>
           </div>
         `,
       }).catch(console.error);
@@ -166,20 +166,22 @@ export async function PATCH(
             hour: "2-digit", minute: "2-digit", timeZone: "Asia/Macau",
           })
         : "（待另行通知）";
+      const tdL = `style="color:#555;padding:6px 16px 6px 0;border-bottom:1px solid #eee;white-space:nowrap;font-size:0.88rem"`;
+      const tdR = `style="padding:6px 0;border-bottom:1px solid #eee;font-size:0.9rem;color:#111"`;
       await resend.emails.send({
         from: process.env.RESEND_FROM_EMAIL ?? "noreply@treecounseling.com",
         to: client.email,
         subject: "【樹心理工作室】預約確認通知",
         html: `
-          <div style="font-family:sans-serif;max-width:480px;margin:0 auto;color:#333;line-height:1.7">
-            <h2 style="color:#2d4a38">預約確認通知</h2>
-            <p>您好，${client.full_name}，</p>
-            <p>您的預約已由心理師確認。</p>
-            <table style="width:100%;border-collapse:collapse;margin:16px 0;font-size:0.9rem">
-              <tr><td style="color:#888;padding:4px 12px 4px 0;white-space:nowrap">預約時間</td><td>${scheduledAt}</td></tr>
+          <div style="font-family:sans-serif;max-width:500px;margin:0 auto;color:#111;line-height:1.7">
+            <h2 style="font-size:1.1rem;border-bottom:2px solid #111;padding-bottom:8px;margin-bottom:16px">預約確認通知</h2>
+            <p style="margin:0 0 16px">您好，${client.full_name}，</p>
+            <p style="margin:0 0 16px;color:#444">您的預約已由心理師確認，詳情如下：</p>
+            <table style="width:100%;border-collapse:collapse;margin:0 0 20px">
+              <tr><td ${tdL}>預約時間</td><td ${tdR}>${scheduledAt}</td></tr>
             </table>
-            <p>如需更改或取消，請儘早聯繫我們。</p>
-            <p style="color:#888;font-size:0.85rem">— 樹心理工作室</p>
+            <p style="color:#444">如需更改或取消，請儘早與我們聯繫。</p>
+            <p style="color:#888;font-size:0.8rem;margin-top:24px;border-top:1px solid #eee;padding-top:10px">樹心理工作室　Tree Counseling Studio</p>
           </div>
         `,
       });

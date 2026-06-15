@@ -114,27 +114,24 @@ export async function POST(request: Request) {
           console.error("PDF generation failed:", pdfErr);
         }
 
+        const tdL = `style="color:#555;padding:6px 16px 6px 0;border-bottom:1px solid #eee;white-space:nowrap;font-size:0.88rem"`;
+        const tdR = `style="padding:6px 0;border-bottom:1px solid #eee;font-size:0.9rem;color:#111"`;
         await resend.emails
           .send({
             from: FROM,
             to: ADMIN_EMAIL,
             subject: `【新預約申請】${name} — ${serviceLabel}`,
             html: `
-              <div style="font-family:sans-serif;max-width:520px;margin:0 auto;color:#333;line-height:1.7">
-                <h2 style="color:#2d4a38;border-bottom:2px solid #e8e4dc;padding-bottom:8px">新預約申請通知</h2>
-                <table style="width:100%;font-size:0.9rem;border-collapse:collapse">
-                  <tr><td style="color:#888;padding:4px 12px 4px 0;width:100px">申請人</td><td><strong>${name}</strong></td></tr>
-                  <tr><td style="color:#888;padding:4px 12px 4px 0">服務類型</td><td>${serviceLabel}</td></tr>
-                  ${body.preferredTimes ? `<tr><td style="color:#888;padding:4px 12px 4px 0;vertical-align:top">偏好時段</td><td style="font-size:0.82rem;color:#555">${body.preferredTimes}</td></tr>` : ""}
+              <div style="font-family:sans-serif;max-width:520px;margin:0 auto;color:#111;line-height:1.7">
+                <h2 style="font-size:1.1rem;border-bottom:2px solid #111;padding-bottom:8px;margin-bottom:16px">新預約申請通知</h2>
+                <table style="width:100%;border-collapse:collapse;margin:0 0 20px">
+                  <tr><td ${tdL}>申請人</td><td ${tdR}><strong>${name}</strong></td></tr>
+                  <tr><td ${tdL}>服務類型</td><td ${tdR}>${serviceLabel}</td></tr>
+                  ${body.preferredTimes ? `<tr><td ${tdL} style="color:#555;padding:6px 16px 6px 0;border-bottom:1px solid #eee;white-space:nowrap;vertical-align:top;font-size:0.88rem">偏好時段</td><td ${tdR}><span style="font-size:0.85rem">${body.preferredTimes}</span></td></tr>` : ""}
                 </table>
-                <div style="margin-top:14px;background:#f7f5ef;padding:10px 14px;border-left:3px solid #b5c9b9;font-size:0.82rem;color:#777">
-                  完整申請資料（不含聯絡方式）請見附件 PDF。<br>
-                  如需聯絡申請人，請至後台查閱聯絡方式。
-                </div>
-                <p style="margin-top:20px">
-                  <a href="${adminUrl}" style="display:inline-block;padding:10px 20px;background:#2d4a38;color:#fff;text-decoration:none;font-size:0.9rem">在後台查看申請 →</a>
-                </p>
-                <p style="color:#bbb;font-size:0.75rem;margin-top:32px;border-top:1px solid #eee;padding-top:8px">樹心理工作室後台通知</p>
+                <p style="color:#555;font-size:0.85rem">完整申請資料（不含聯絡方式）請見附件 PDF。如需聯絡申請人，請至後台查閱聯絡方式。</p>
+                <p><a href="${adminUrl}" style="color:#111;font-weight:bold;text-decoration:underline">前往後台查看申請 →</a></p>
+                <p style="color:#888;font-size:0.8rem;margin-top:24px;border-top:1px solid #eee;padding-top:10px">樹心理工作室　Tree Counseling Studio</p>
               </div>
             `,
             attachments: pdfAttachment ? [pdfAttachment] : [],
@@ -163,17 +160,30 @@ export async function POST(request: Request) {
       }
 
       const confirmHtml = (recipientName: string) => `
-        <div style="font-family:sans-serif;max-width:480px;margin:0 auto;color:#333;line-height:1.7">
-          <h2 style="color:#2d4a38">預約申請已收到</h2>
-          <p>您好，${recipientName}，</p>
-          <p>我們已收到您的 <strong>${serviceLabel}</strong> 預約申請，感謝您的信任。</p>
-          <p>行政人員將在 <strong>兩個工作天內</strong> 以 WhatsApp 或 Email 與您聯絡，確認後續晤談安排。</p>
-          <p>如有緊急需求，歡迎直接聯繫我們：</p>
-          <ul style="font-size:0.9rem;color:#555">
-            <li>WhatsApp：請至官網查看最新聯絡資訊</li>
-            <li>Email：<a href="mailto:${FROM}" style="color:#2d4a38">${FROM}</a></li>
-          </ul>
-          <p style="color:#888;font-size:0.85rem;margin-top:24px">— 樹心理工作室 Tree Counseling Studio</p>
+        <div style="font-family:sans-serif;max-width:520px;margin:0 auto;background:#f7f5ef;border-radius:8px;overflow:hidden">
+          <!-- Header -->
+          <div style="background:#2d4a38;padding:28px 36px 24px">
+            <p style="margin:0 0 4px;color:#a8c5b0;font-size:11px;letter-spacing:1.5px">TREE COUNSELING STUDIO</p>
+            <p style="margin:0;color:#ffffff;font-size:20px;font-weight:600;letter-spacing:0.3px">預約申請已收到</p>
+          </div>
+          <!-- Body -->
+          <div style="background:#ffffff;padding:28px 36px">
+            <p style="margin:0 0 14px;color:#2d4a38;font-size:15px;font-weight:600">您好，${recipientName}，</p>
+            <p style="margin:0 0 14px;color:#555;line-height:1.75">感謝您信任樹心理工作室。我們已收到您的 <strong style="color:#2d4a38">${serviceLabel}</strong> 預約申請。</p>
+            <!-- Highlight box -->
+            <div style="background:#f0f5f1;border-left:3px solid #5a8a6a;padding:14px 18px;margin:0 0 18px;border-radius:0 4px 4px 0">
+              <p style="margin:0;color:#2d4a38;font-size:13.5px;line-height:1.7">行政人員將在 <strong>兩個工作天內</strong> 以 WhatsApp 或 Email 與您聯絡，確認後續晤談安排。</p>
+            </div>
+            <p style="margin:0 0 6px;color:#777;font-size:13px">如有緊急需求，歡迎直接聯繫我們：</p>
+            <ul style="margin:0 0 0;padding-left:18px;color:#555;font-size:13px;line-height:2">
+              <li>WhatsApp：請至官網查看最新聯絡資訊</li>
+              <li>Email：<a href="mailto:${FROM}" style="color:#2d4a38;text-decoration:none;font-weight:500">${FROM}</a></li>
+            </ul>
+          </div>
+          <!-- Footer -->
+          <div style="background:#f7f5ef;padding:16px 36px;text-align:center">
+            <p style="margin:0;color:#999;font-size:11px;letter-spacing:0.5px">樹心理工作室　Tree Counseling Studio</p>
+          </div>
         </div>
       `;
 

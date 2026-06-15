@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAuthInfo, isAdminLevel } from "@/lib/auth-role";
 import { Resend } from "resend";
+import { generateInquiryPDF } from "@/lib/pdf/inquiry-pdf";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -12,6 +13,17 @@ const SERVICE_LABEL: Record<string, string> = {
   workshop: "講座 / 工作坊",
   proposal: "方案與計劃撰寫",
   other: "其他行政查詢",
+};
+
+const MEETING_LABEL: Record<string, string> = {
+  face: "到診",
+  online: "線上晤談",
+};
+
+const LANG_LABEL: Record<string, string> = {
+  cantonese: "粵語",
+  mandarin: "普通話",
+  english: "英語",
 };
 
 function extractClientName(inquiry: { name?: string | null; service_type?: string; form_data?: unknown }): string {
@@ -25,6 +37,32 @@ function extractClientName(inquiry: { name?: string | null; service_type?: strin
     if (a || b) return [a, b].filter(Boolean).join(" & ");
   }
   return "未知";
+}
+
+function calcAge(dob: string): number | null {
+  try {
+    const today = new Date();
+    const birth = new Date(dob);
+    if (isNaN(birth.getTime())) return null;
+    let age = today.getFullYear() - birth.getFullYear();
+    const m = today.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+    return age >= 0 ? age : null;
+  } catch {
+    return null;
+  }
+}
+
+function fmtBirthday(dob: string): string {
+  const age = calcAge(dob);
+  return age !== null ? `${dob}（${age} 歲）` : dob;
+}
+
+const TD_LABEL = `style="color:#555;padding:6px 16px 6px 0;border-bottom:1px solid #eee;white-space:nowrap;vertical-align:top;font-size:0.88rem"`;
+const TD_VALUE = `style="padding:6px 0;border-bottom:1px solid #eee;font-size:0.9rem;color:#111"`;
+
+function row(label: string, value: string): string {
+  return `<tr><td ${TD_LABEL}>${label}</td><td ${TD_VALUE}>${value}</td></tr>`;
 }
 
 export async function POST(
@@ -84,7 +122,6 @@ export async function POST(
     const formData = (inquiry.form_data as Record<string, unknown>) ?? {};
     const GENDER_MAP: Record<string, string> = { "男": "male", "女": "female", "其他": "other" };
     const rawGender = formData.gender as string | undefined;
-
     const clientName = extractClientName(inquiry);
 
     const { data: newClient, error: clientErr } = await db
@@ -157,27 +194,122 @@ export async function POST(
       const clientName = extractClientName(inquiry);
       const serviceLabel = SERVICE_LABEL[inquiry.service_type] ?? inquiry.service_type;
       const adminUrl = `${process.env.NEXT_PUBLIC_SITE_URL ?? "https://treecounseling-web.vercel.app"}/admin/appointments`;
+
+      // Extract extra fields from form_data
+      const fd = (inquiry.form_data ?? {}) as Record<string, unknown>;
+      const isCouple = inquiry.service_type === "couple";
+      const cd = isCouple
+        ? (fd.coupleDetails as { partnerA?: { name?: string; birthday?: string; language?: string }; partnerB?: { name?: string; birthday?: string; language?: string }; meetingType?: string } | undefined)
+        : undefined;
+      const meetingType = (cd?.meetingType ?? fd.meetingType) as string | undefined;
+      const birthday = fd.birthday as string | undefined;
+      const nativeLanguage = fd.nativeLanguage as string | undefined;
+      const concern = inquiry.concern;
+
+      // Build table rows
+      const tableRows: string[] = [];
+      tableRows.push(row("個案", `<strong>${clientName}</strong>`));
+      tableRows.push(row("服務類型", serviceLabel));
+
+      // Birthday with age (individual/hoarding)
+      if (!isCouple && birthday) {
+        tableRows.push(row("出生日期", fmtBirthday(birthday)));
+      }
+      // For couple, show both partners' birthdays
+      if (isCouple && cd) {
+        if (cd.partnerA?.birthday) tableRows.push(row("伴侶 A 出生日期", fmtBirthday(cd.partnerA.birthday)));
+        if (cd.partnerB?.birthday) tableRows.push(row("伴侶 B 出生日期", fmtBirthday(cd.partnerB.birthday)));
+      }
+
+      // Mother tongue
+      if (nativeLanguage) {
+        tableRows.push(row("語言", LANG_LABEL[nativeLanguage] ?? nativeLanguage));
+      }
+
+      // Meeting type — only show if NOT 到診 (face-to-face)
+      if (meetingType && meetingType !== "face") {
+        tableRows.push(row("晤談方式", MEETING_LABEL[meetingType] ?? meetingType));
+      }
+
+      // Preferred times
+      if (inquiry.preferred_times) {
+        tableRows.push(row("偏好時段", `<span style="font-size:0.85rem">${inquiry.preferred_times}</span>`));
+      }
+
+      // Scheduled time (if already set)
+      if (body.scheduled_at) {
+        const scheduledStr = new Date(body.scheduled_at).toLocaleString("zh-TW", {
+          year: "numeric", month: "long", day: "numeric",
+          hour: "2-digit", minute: "2-digit", timeZone: "Asia/Macau",
+        });
+        tableRows.push(row("預計時間", scheduledStr));
+      }
+
+      // Generate PDF attachment (same as admin notification)
+      let pdfAttachment: { filename: string; content: string } | undefined;
+      try {
+        const pdfBuffer = await generateInquiryPDF({
+          serviceType: inquiry.service_type,
+          preferredTimes: inquiry.preferred_times ?? undefined,
+          name: (fd.name as string) ?? inquiry.name ?? undefined,
+          gender: fd.gender as string | undefined,
+          birthday: fd.birthday as string | undefined,
+          city: fd.city as string | undefined,
+          meetingType: fd.meetingType as string | undefined,
+          nativeLanguage: fd.nativeLanguage as string | undefined,
+          preferredTherapist: fd.preferredTherapist as string | undefined,
+          concern: inquiry.concern ?? undefined,
+          individualDetails: fd.individualDetails as Parameters<typeof generateInquiryPDF>[0]["individualDetails"],
+          coupleDetails: cd
+            ? {
+                partnerA: {
+                  name: cd.partnerA?.name ?? undefined,
+                  gender: (cd.partnerA as Record<string, unknown>)?.gender as string | undefined,
+                  birthday: cd.partnerA?.birthday ?? undefined,
+                  language: cd.partnerA?.language ?? undefined,
+                },
+                partnerB: {
+                  name: cd.partnerB?.name ?? undefined,
+                  gender: (cd.partnerB as Record<string, unknown>)?.gender as string | undefined,
+                  birthday: cd.partnerB?.birthday ?? undefined,
+                  language: cd.partnerB?.language ?? undefined,
+                },
+                issues: (fd.coupleDetails as Record<string, unknown>)?.issues as string[] | undefined,
+                duration: (fd.coupleDetails as Record<string, unknown>)?.duration as string | undefined,
+                children: (fd.coupleDetails as Record<string, unknown>)?.children as string | undefined,
+                meetingType: cd.meetingType ?? undefined,
+              }
+            : undefined,
+          otherDetails: fd.otherDetails as Parameters<typeof generateInquiryPDF>[0]["otherDetails"],
+          submittedAt: inquiry.created_at ?? new Date().toISOString(),
+        });
+        const dateStr = new Date().toISOString().slice(0, 10);
+        pdfAttachment = {
+          filename: `booking_inquiry_${dateStr}.pdf`,
+          content: pdfBuffer.toString("base64"),
+        };
+      } catch (pdfErr) {
+        console.error("Therapist PDF generation failed:", pdfErr);
+      }
+
       await resend.emails.send({
         from: process.env.RESEND_FROM_EMAIL ?? "noreply@treecounseling.com",
         to: therapistProfile.email,
         subject: "【樹心理工作室】新派案通知",
         html: `
-          <div style="font-family:sans-serif;max-width:480px;margin:0 auto;color:#333;line-height:1.7">
-            <h2 style="color:#2d4a38">新派案通知</h2>
-            <p>您好，${therapistProfile.name ?? ""}，</p>
-            <p>行政已為您安排一個新個案，請確認是否接案。</p>
-            <table style="width:100%;border-collapse:collapse;margin:16px 0;font-size:0.9rem">
-              <tr><td style="color:#888;padding:4px 12px 4px 0;white-space:nowrap">個案</td><td><strong>${clientName}</strong></td></tr>
-              <tr><td style="color:#888;padding:4px 12px 4px 0;white-space:nowrap">服務類型</td><td>${serviceLabel}</td></tr>
-              ${inquiry.preferred_times ? `<tr><td style="color:#888;padding:4px 12px 4px 0;vertical-align:top;white-space:nowrap">偏好時段</td><td style="font-size:0.85rem;color:#555">${inquiry.preferred_times}</td></tr>` : ""}
-              ${body.scheduled_at ? `<tr><td style="color:#888;padding:4px 12px 4px 0;white-space:nowrap">預計時間</td><td>${new Date(body.scheduled_at).toLocaleString("zh-TW", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Macau" })}</td></tr>` : ""}
+          <div style="font-family:sans-serif;max-width:500px;margin:0 auto;color:#111;line-height:1.7">
+            <h2 style="font-size:1.1rem;border-bottom:2px solid #111;padding-bottom:8px;margin-bottom:16px">新派案通知</h2>
+            <p style="margin:0 0 4px">您好，${therapistProfile.name ?? ""}，</p>
+            <p style="margin:0 0 16px;color:#444">行政已為您安排一個新個案，請登入後台確認是否接案。詳細資料請見附件 PDF。</p>
+            <table style="width:100%;border-collapse:collapse;margin:0 0 20px">
+              ${tableRows.join("\n")}
             </table>
-            <p style="margin-top:20px">
-              <a href="${adminUrl}" style="display:inline-block;padding:10px 20px;background:#2d4a38;color:#fff;text-decoration:none;font-size:0.9rem">前往後台確認 →</a>
-            </p>
-            <p style="color:#888;font-size:0.85rem">— 樹心理工作室</p>
+            ${concern ? `<div style="border-left:3px solid #ccc;padding:10px 14px;margin:0 0 20px;font-size:0.88rem;color:#333;line-height:1.65"><strong>個案說明：</strong><br>${concern.replace(/\n/g, "<br>")}</div>` : ""}
+            <p><a href="${adminUrl}" style="color:#111;font-weight:bold;text-decoration:underline">前往後台確認 →</a></p>
+            <p style="color:#888;font-size:0.8rem;margin-top:24px;border-top:1px solid #eee;padding-top:10px">樹心理工作室　Tree Counseling Studio</p>
           </div>
         `,
+        attachments: pdfAttachment ? [pdfAttachment] : [],
       }).catch(console.error);
     }
   }
