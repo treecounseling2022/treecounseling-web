@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { Resend } from "resend";
+import { generateInquiryPDF } from "@/lib/pdf/inquiry-pdf";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -46,39 +47,108 @@ export async function POST(request: Request) {
       const serviceLabel = SERVICE_LABEL[body.serviceType] ?? body.serviceType;
       const name = body.name ?? "（未填）";
       const clientEmail = body.email ?? null;
-      const phone = body.phone ?? "（未填）";
-      const concern = body.concern ?? "（未填）";
       const adminUrl = `${process.env.NEXT_PUBLIC_SITE_URL ?? "https://treecounseling-web.vercel.app"}/admin/inquiries`;
 
-      // 1. Notify admin
+      // 1. Notify admin — no contact info in body; full details in PDF attachment
       if (ADMIN_EMAIL) {
-        await resend.emails.send({
-          from: FROM,
-          to: ADMIN_EMAIL,
-          subject: `【新預約申請】${name} — ${serviceLabel}`,
-          html: `
-            <div style="font-family:sans-serif;max-width:520px;margin:0 auto;color:#333;line-height:1.7">
-              <h2 style="color:#2d4a38;border-bottom:2px solid #e8e4dc;padding-bottom:8px">新預約申請通知</h2>
-              <table style="width:100%;font-size:0.9rem;border-collapse:collapse">
-                <tr><td style="color:#888;padding:4px 12px 4px 0;width:100px">姓名</td><td><strong>${name}</strong></td></tr>
-                <tr><td style="color:#888;padding:4px 12px 4px 0">服務類型</td><td>${serviceLabel}</td></tr>
-                <tr><td style="color:#888;padding:4px 12px 4px 0">電郵</td><td>${clientEmail ?? "—"}</td></tr>
-                <tr><td style="color:#888;padding:4px 12px 4px 0">電話</td><td>${phone}</td></tr>
-                <tr><td style="color:#888;padding:4px 12px 4px 0">偏好時段</td><td>${body.preferredTimes ?? "—"}</td></tr>
-              </table>
-              ${concern ? `<div style="margin-top:16px;background:#f7f5ef;padding:12px 16px;border-left:3px solid #5a8a6a;font-size:0.85rem;white-space:pre-wrap">${concern}</div>` : ""}
-              <p style="margin-top:20px">
-                <a href="${adminUrl}" style="display:inline-block;padding:10px 20px;background:#2d4a38;color:#fff;text-decoration:none;font-size:0.9rem">在後台查看詳情 →</a>
-              </p>
-              <p style="color:#bbb;font-size:0.75rem;margin-top:32px;border-top:1px solid #eee;padding-top:8px">樹心理工作室後台通知</p>
-            </div>
-          `,
-        }).catch(console.error);
+        // Generate PDF (all form data except contact info)
+        let pdfAttachment: { filename: string; content: string } | undefined;
+        try {
+          const coupleDetails = body.coupleDetails as {
+            partnerA?: { name?: string; gender?: string; birthday?: string; language?: string };
+            partnerB?: { name?: string; gender?: string; birthday?: string; language?: string };
+            issues?: string[];
+            duration?: string;
+            children?: string;
+            meetingType?: string;
+          } | undefined;
+
+          const otherDetails = body.otherDetails as {
+            companyName?: string;
+            contactPerson?: string;
+            theme?: string;
+          } | undefined;
+
+          const pdfBuffer = await generateInquiryPDF({
+            serviceType: body.serviceType,
+            preferredTimes: body.preferredTimes ?? undefined,
+            name: body.name ?? undefined,
+            gender: body.gender ?? undefined,
+            birthday: body.birthday ?? undefined,
+            city: body.city ?? undefined,
+            meetingType: body.meetingType ?? undefined,
+            nativeLanguage: body.nativeLanguage ?? undefined,
+            preferredTherapist: body.preferredTherapist ?? undefined,
+            concern: body.concern ?? undefined,
+            individualDetails: body.individualDetails ?? undefined,
+            coupleDetails: coupleDetails
+              ? {
+                  partnerA: {
+                    name: coupleDetails.partnerA?.name,
+                    gender: coupleDetails.partnerA?.gender,
+                    birthday: coupleDetails.partnerA?.birthday,
+                    language: coupleDetails.partnerA?.language,
+                  },
+                  partnerB: {
+                    name: coupleDetails.partnerB?.name,
+                    gender: coupleDetails.partnerB?.gender,
+                    birthday: coupleDetails.partnerB?.birthday,
+                    language: coupleDetails.partnerB?.language,
+                  },
+                  issues: coupleDetails.issues,
+                  duration: coupleDetails.duration,
+                  children: coupleDetails.children,
+                  meetingType: coupleDetails.meetingType,
+                }
+              : undefined,
+            otherDetails,
+            submittedAt: new Date().toISOString(),
+          });
+
+          const dateStr = new Date().toISOString().slice(0, 10);
+          pdfAttachment = {
+            filename: `booking_inquiry_${dateStr}.pdf`,
+            content: pdfBuffer.toString("base64"),
+          };
+        } catch (pdfErr) {
+          console.error("PDF generation failed:", pdfErr);
+        }
+
+        await resend.emails
+          .send({
+            from: FROM,
+            to: ADMIN_EMAIL,
+            subject: `【新預約申請】${name} — ${serviceLabel}`,
+            html: `
+              <div style="font-family:sans-serif;max-width:520px;margin:0 auto;color:#333;line-height:1.7">
+                <h2 style="color:#2d4a38;border-bottom:2px solid #e8e4dc;padding-bottom:8px">新預約申請通知</h2>
+                <table style="width:100%;font-size:0.9rem;border-collapse:collapse">
+                  <tr><td style="color:#888;padding:4px 12px 4px 0;width:100px">申請人</td><td><strong>${name}</strong></td></tr>
+                  <tr><td style="color:#888;padding:4px 12px 4px 0">服務類型</td><td>${serviceLabel}</td></tr>
+                  ${body.preferredTimes ? `<tr><td style="color:#888;padding:4px 12px 4px 0;vertical-align:top">偏好時段</td><td style="font-size:0.82rem;color:#555">${body.preferredTimes}</td></tr>` : ""}
+                </table>
+                <div style="margin-top:14px;background:#f7f5ef;padding:10px 14px;border-left:3px solid #b5c9b9;font-size:0.82rem;color:#777">
+                  完整申請資料（不含聯絡方式）請見附件 PDF。<br>
+                  如需聯絡申請人，請至後台查閱聯絡方式。
+                </div>
+                <p style="margin-top:20px">
+                  <a href="${adminUrl}" style="display:inline-block;padding:10px 20px;background:#2d4a38;color:#fff;text-decoration:none;font-size:0.9rem">在後台查看申請 →</a>
+                </p>
+                <p style="color:#bbb;font-size:0.75rem;margin-top:32px;border-top:1px solid #eee;padding-top:8px">樹心理工作室後台通知</p>
+              </div>
+            `,
+            attachments: pdfAttachment ? [pdfAttachment] : [],
+          })
+          .catch(console.error);
       }
 
       // 2. Confirmation to client(s)
-      // For couple counseling, send to both partners
-      const coupleDetails = body.coupleDetails as { partnerA?: { name?: string; email?: string }; partnerB?: { name?: string; email?: string } } | undefined;
+      // For couple counseling, send to both partners (A and B each receive their own confirmation)
+      const coupleDetails = body.coupleDetails as {
+        partnerA?: { name?: string; email?: string };
+        partnerB?: { name?: string; email?: string };
+      } | undefined;
+
       const clientRecipients: { email: string; name: string }[] = [];
 
       if (body.serviceType === "couple" && coupleDetails) {
@@ -108,12 +178,14 @@ export async function POST(request: Request) {
       `;
 
       for (const recipient of clientRecipients) {
-        await resend.emails.send({
-          from: FROM,
-          to: recipient.email,
-          subject: "【樹心理工作室】已收到您的預約申請",
-          html: confirmHtml(recipient.name),
-        }).catch(console.error);
+        await resend.emails
+          .send({
+            from: FROM,
+            to: recipient.email,
+            subject: "【樹心理工作室】已收到您的預約申請",
+            html: confirmHtml(recipient.name),
+          })
+          .catch(console.error);
       }
     }
 

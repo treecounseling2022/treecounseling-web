@@ -52,6 +52,7 @@ export async function PATCH(
       session_fee: body.session_fee ?? null,
       plan_id: body.plan_id ?? null,
       arrangement_type: body.arrangement_type ?? null,
+      is_online: (body.is_online as boolean | undefined) ?? false,
       booking_status: "pending_therapist",
       rejection_reason: null,
     };
@@ -117,6 +118,39 @@ export async function PATCH(
     .select()
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // After admin assigns, send email to therapist
+  if (action === "assign" && data?.therapist_id && process.env.RESEND_API_KEY) {
+    const [{ data: therapistProfile }, { data: clientData }] = await Promise.all([
+      db.from("therapist_profiles").select("name, email").eq("id", data.therapist_id).single(),
+      data.client_id
+        ? db.from("clients").select("full_name").eq("id", data.client_id).single()
+        : Promise.resolve({ data: null }),
+    ]);
+    if (therapistProfile?.email) {
+      const adminUrl = `${process.env.NEXT_PUBLIC_SITE_URL ?? "https://treecounseling-web.vercel.app"}/admin/appointments`;
+      await resend.emails.send({
+        from: process.env.RESEND_FROM_EMAIL ?? "noreply@treecounseling.com",
+        to: therapistProfile.email,
+        subject: "【樹心理工作室】新派案通知",
+        html: `
+          <div style="font-family:sans-serif;max-width:480px;margin:0 auto;color:#333;line-height:1.7">
+            <h2 style="color:#2d4a38">新派案通知</h2>
+            <p>您好，${therapistProfile.name ?? ""}，</p>
+            <p>行政已為您安排一個新個案，請確認是否接案。</p>
+            <table style="width:100%;border-collapse:collapse;margin:16px 0;font-size:0.9rem">
+              <tr><td style="color:#888;padding:4px 12px 4px 0;white-space:nowrap">個案</td><td>${clientData?.full_name ?? "—"}</td></tr>
+              ${data.scheduled_at ? `<tr><td style="color:#888;padding:4px 12px 4px 0;white-space:nowrap">預計時間</td><td>${new Date(data.scheduled_at).toLocaleString("zh-TW", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Macau" })}</td></tr>` : ""}
+            </table>
+            <p style="margin-top:20px">
+              <a href="${adminUrl}" style="display:inline-block;padding:10px 20px;background:#2d4a38;color:#fff;text-decoration:none;font-size:0.9rem">前往後台確認 →</a>
+            </p>
+            <p style="color:#888;font-size:0.85rem">— 樹心理工作室</p>
+          </div>
+        `,
+      }).catch(console.error);
+    }
+  }
 
   // After therapist confirms, send email to client
   if (action === "confirm" && data?.client_id && process.env.RESEND_API_KEY) {

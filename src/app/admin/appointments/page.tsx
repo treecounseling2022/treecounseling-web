@@ -102,6 +102,7 @@ export default function AppointmentsPage() {
   const [assignForm, setAssignForm] = useState({
     therapist_id: "",
     room_id: "",
+    is_online: false,
     scheduled_at: "",
     session_fee: "",
     arrangement_type: "",
@@ -203,11 +204,12 @@ export default function AppointmentsPage() {
       action: "assign",
       therapist_id: assignForm.therapist_id,
       room_id: assignForm.room_id || null,
+      is_online: assignForm.is_online,
       scheduled_at: assignForm.scheduled_at || null,
       session_fee: assignForm.session_fee ? +assignForm.session_fee : null,
       arrangement_type: assignForm.arrangement_type || null,
     });
-    if (ok) { setAssignModal(null); setAssignForm({ therapist_id: "", room_id: "", scheduled_at: "", session_fee: "", arrangement_type: "" }); }
+    if (ok) { setAssignModal(null); setAssignForm({ therapist_id: "", room_id: "", is_online: false, scheduled_at: "", session_fee: "", arrangement_type: "" }); }
   }
 
   async function doReject() {
@@ -271,6 +273,7 @@ export default function AppointmentsPage() {
                 setAssignForm({
                   therapist_id: appt.therapist_id ?? "",
                   room_id: appt.room_id ?? "",
+                  is_online: false,
                   scheduled_at: appt.scheduled_at ? new Date(appt.scheduled_at).toISOString().slice(0,16) : "",
                   session_fee: appt.session_fee?.toString() ?? "",
                   arrangement_type: appt.arrangement_type ?? "",
@@ -505,6 +508,17 @@ export default function AppointmentsPage() {
                   <option value="">（未指定）</option>
                   {rooms.filter((r) => r.is_active).map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
                 </select>
+              </div>
+              <div className="border-t border-sand/20 pt-3">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={assignForm.is_online}
+                    onChange={(e) => setAssignForm((f) => ({ ...f, is_online: e.target.checked, room_id: e.target.checked ? "" : f.room_id }))}
+                    className="accent-forest w-4 h-4"
+                  />
+                  <span className="font-sans text-sm text-deep">線上諮商</span>
+                </label>
               </div>
               <div>
                 <label className="font-sans text-[11px] text-muted block mb-1">預定時間</label>

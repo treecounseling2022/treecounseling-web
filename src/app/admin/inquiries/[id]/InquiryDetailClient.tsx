@@ -547,15 +547,17 @@ export default function InquiryDetailClient({
                 </select>
               </div>
 
-              <label className="flex items-center gap-2 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={assignForm.is_online}
-                  onChange={(e) => setAssignForm((f) => ({ ...f, is_online: e.target.checked }))}
-                  className="accent-forest w-4 h-4"
-                />
-                <span className="font-sans text-sm text-deep">線上諮商</span>
-              </label>
+              <div className="border-t border-sand/20 pt-3">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={assignForm.is_online}
+                    onChange={(e) => setAssignForm((f) => ({ ...f, is_online: e.target.checked, room_id: e.target.checked ? "" : f.room_id }))}
+                    className="accent-forest w-4 h-4"
+                  />
+                  <span className="font-sans text-sm text-deep">線上諮商</span>
+                </label>
+              </div>
 
               <div>
                 <label className="font-sans text-xs text-muted block mb-1">預計時間（選填）</label>

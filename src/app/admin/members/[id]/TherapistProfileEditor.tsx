@@ -18,6 +18,7 @@ type ProfileData = {
   id: string;
   name?: string;
   name_en?: string;
+  email?: string;
   bio?: string;
   photo_url?: string;
   title?: string;
@@ -422,6 +423,16 @@ export default function TherapistProfileEditor({ therapistId, initialData, userR
               value={data.name_en ?? ""}
               onChange={(e) => setData((p) => ({ ...p, name_en: e.target.value }))}
               placeholder="例如：Tanky"
+              className={inputCls}
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="block font-sans text-xs text-muted mb-1">Email（派案通知用）</label>
+            <input
+              type="email"
+              value={data.email ?? ""}
+              onChange={(e) => setData((p) => ({ ...p, email: e.target.value }))}
+              placeholder="例如：therapist@example.com"
               className={inputCls}
             />
           </div>

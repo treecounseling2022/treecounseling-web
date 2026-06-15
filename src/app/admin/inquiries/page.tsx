@@ -49,6 +49,19 @@ function fmtDate(iso: string) {
   });
 }
 
+function getDisplayName(inq: Inquiry): string {
+  if (inq.name) return inq.name;
+  const fd = (inq.form_data ?? {}) as Record<string, unknown>;
+  if (typeof fd.name === "string" && fd.name) return fd.name;
+  if (inq.service_type === "couple") {
+    const cd = fd.coupleDetails as { partnerA?: { name?: string }; partnerB?: { name?: string } } | undefined;
+    const a = cd?.partnerA?.name;
+    const b = cd?.partnerB?.name;
+    if (a || b) return [a, b].filter(Boolean).join(" & ");
+  }
+  return "（未填姓名）";
+}
+
 function guessTherapistFee(therapist: Therapist, serviceType: string): string {
   const services = therapist.services ?? [];
   const keywords: Record<string, string[]> = {
@@ -202,7 +215,7 @@ export default function InquiriesPage() {
             <div key={inq.id} className="bg-white border border-sand/20 p-4 space-y-3 hover:border-sand/40 transition-colors">
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <p className="font-serif text-deep">{inq.name ?? "（未填姓名）"}</p>
+                  <p className="font-serif text-deep">{getDisplayName(inq)}</p>
                   <p className="font-sans text-[11px] text-sand mt-0.5">
                     {SERVICE_LABEL[inq.service_type] ?? inq.service_type}
                   </p>
@@ -294,7 +307,7 @@ export default function InquiriesPage() {
             <div>
               <h2 className="font-serif text-deep text-lg">派案</h2>
               <p className="font-sans text-xs text-muted mt-0.5">
-                {assignTarget.name ?? "（未填姓名）"} ／ {SERVICE_LABEL[assignTarget.service_type] ?? assignTarget.service_type}
+                {getDisplayName(assignTarget)} ／ {SERVICE_LABEL[assignTarget.service_type] ?? assignTarget.service_type}
               </p>
             </div>
             <p className="font-sans text-xs text-muted/70">
@@ -335,15 +348,17 @@ export default function InquiriesPage() {
                 </select>
               </div>
 
-              <label className="flex items-center gap-2 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={assignForm.is_online}
-                  onChange={(e) => setAssignForm((f) => ({ ...f, is_online: e.target.checked }))}
-                  className="accent-forest w-4 h-4"
-                />
-                <span className="font-sans text-sm text-deep">線上諮商</span>
-              </label>
+              <div className="border-t border-sand/20 pt-3">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={assignForm.is_online}
+                    onChange={(e) => setAssignForm((f) => ({ ...f, is_online: e.target.checked, room_id: e.target.checked ? "" : f.room_id }))}
+                    className="accent-forest w-4 h-4"
+                  />
+                  <span className="font-sans text-sm text-deep">線上諮商</span>
+                </label>
+              </div>
 
               <div>
                 <label className="font-sans text-xs text-muted block mb-1">預計時間（選填）</label>

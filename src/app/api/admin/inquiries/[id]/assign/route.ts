@@ -1,6 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAuthInfo, isAdminLevel } from "@/lib/auth-role";
+import { Resend } from "resend";
+
+const resend = new Resend(process.env.RESEND_API_KEY);
+
+const SERVICE_LABEL: Record<string, string> = {
+  individual: "個人心理輔導",
+  couple: "伴侶心理輔導",
+  hoarding: "囤積者諮商查詢",
+  workshop: "講座 / 工作坊",
+  proposal: "方案與計劃撰寫",
+  other: "其他行政查詢",
+};
+
+function extractClientName(inquiry: { name?: string | null; service_type?: string; form_data?: unknown }): string {
+  if (inquiry.name) return inquiry.name;
+  const fd = (inquiry.form_data ?? {}) as Record<string, unknown>;
+  if (typeof fd.name === "string" && fd.name) return fd.name;
+  if (inquiry.service_type === "couple") {
+    const cd = fd.coupleDetails as { partnerA?: { name?: string }; partnerB?: { name?: string } } | undefined;
+    const a = cd?.partnerA?.name;
+    const b = cd?.partnerB?.name;
+    if (a || b) return [a, b].filter(Boolean).join(" & ");
+  }
+  return "未知";
+}
 
 export async function POST(
   req: NextRequest,
@@ -60,10 +85,12 @@ export async function POST(
     const GENDER_MAP: Record<string, string> = { "男": "male", "女": "female", "其他": "other" };
     const rawGender = formData.gender as string | undefined;
 
+    const clientName = extractClientName(inquiry);
+
     const { data: newClient, error: clientErr } = await db
       .from("clients")
       .insert({
-        full_name: inquiry.name ?? "未知",
+        full_name: clientName,
         email: inquiry.email ?? null,
         phone: inquiry.phone ?? null,
         dob: (formData.birthday as string) || null,
@@ -112,6 +139,48 @@ export async function POST(
     .from("booking_inquiries")
     .update({ status: "converted", client_id: clientId, appointment_id: appt.id })
     .eq("id", id);
+
+  // Sync assigned_therapist_id so therapist can see the client immediately
+  await db
+    .from("clients")
+    .update({ assigned_therapist_id: body.therapist_id })
+    .eq("id", clientId);
+
+  // Send email notification to therapist
+  if (process.env.RESEND_API_KEY) {
+    const { data: therapistProfile } = await db
+      .from("therapist_profiles")
+      .select("name, email")
+      .eq("id", body.therapist_id)
+      .single();
+    if (therapistProfile?.email) {
+      const clientName = extractClientName(inquiry);
+      const serviceLabel = SERVICE_LABEL[inquiry.service_type] ?? inquiry.service_type;
+      const adminUrl = `${process.env.NEXT_PUBLIC_SITE_URL ?? "https://treecounseling-web.vercel.app"}/admin/appointments`;
+      await resend.emails.send({
+        from: process.env.RESEND_FROM_EMAIL ?? "noreply@treecounseling.com",
+        to: therapistProfile.email,
+        subject: "【樹心理工作室】新派案通知",
+        html: `
+          <div style="font-family:sans-serif;max-width:480px;margin:0 auto;color:#333;line-height:1.7">
+            <h2 style="color:#2d4a38">新派案通知</h2>
+            <p>您好，${therapistProfile.name ?? ""}，</p>
+            <p>行政已為您安排一個新個案，請確認是否接案。</p>
+            <table style="width:100%;border-collapse:collapse;margin:16px 0;font-size:0.9rem">
+              <tr><td style="color:#888;padding:4px 12px 4px 0;white-space:nowrap">個案</td><td><strong>${clientName}</strong></td></tr>
+              <tr><td style="color:#888;padding:4px 12px 4px 0;white-space:nowrap">服務類型</td><td>${serviceLabel}</td></tr>
+              ${inquiry.preferred_times ? `<tr><td style="color:#888;padding:4px 12px 4px 0;vertical-align:top;white-space:nowrap">偏好時段</td><td style="font-size:0.85rem;color:#555">${inquiry.preferred_times}</td></tr>` : ""}
+              ${body.scheduled_at ? `<tr><td style="color:#888;padding:4px 12px 4px 0;white-space:nowrap">預計時間</td><td>${new Date(body.scheduled_at).toLocaleString("zh-TW", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Macau" })}</td></tr>` : ""}
+            </table>
+            <p style="margin-top:20px">
+              <a href="${adminUrl}" style="display:inline-block;padding:10px 20px;background:#2d4a38;color:#fff;text-decoration:none;font-size:0.9rem">前往後台確認 →</a>
+            </p>
+            <p style="color:#888;font-size:0.85rem">— 樹心理工作室</p>
+          </div>
+        `,
+      }).catch(console.error);
+    }
+  }
 
   return NextResponse.json({ success: true, appointment_id: appt.id, client_id: clientId }, { status: 201 });
 }
