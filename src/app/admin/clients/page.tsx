@@ -22,7 +22,7 @@ export default async function ClientsPage({
 
   let query = supabase
     .from("clients")
-    .select("id, full_name, gender, phone, email, assigned_therapist_id, created_at, is_active")
+    .select("id, full_name, gender, phone, email, assigned_therapist_id, created_at, is_active, service_type, couple_partner_id")
     .eq("is_active", true)
     .order("created_at", { ascending: false });
 
@@ -54,15 +54,21 @@ export default async function ClientsPage({
 
   // Build therapist name map (only needed for admin view)
   let therapistMap: Record<string, string> = {};
+  let partnerNameMap: Record<string, string> = {};
   if (isAdmin) {
     const therapistIds = [...new Set((clients ?? []).map((c) => c.assigned_therapist_id).filter(Boolean))] as string[];
-    if (therapistIds.length > 0) {
-      const { data: therapists } = await supabase
-        .from("therapist_profiles")
-        .select("id, name")
-        .in("id", therapistIds);
-      therapistMap = Object.fromEntries((therapists ?? []).map((t) => [t.id, t.name]));
-    }
+    const partnerIds = [...new Set((clients ?? []).map((c) => (c as { couple_partner_id?: string | null }).couple_partner_id).filter(Boolean))] as string[];
+
+    const [therapistsRes, partnersRes] = await Promise.all([
+      therapistIds.length > 0
+        ? supabase.from("therapist_profiles").select("id, name").in("id", therapistIds)
+        : Promise.resolve({ data: [] }),
+      partnerIds.length > 0
+        ? supabase.from("clients").select("id, full_name").in("id", partnerIds)
+        : Promise.resolve({ data: [] }),
+    ]);
+    therapistMap = Object.fromEntries(((therapistsRes.data ?? []) as { id: string; name: string }[]).map((t) => [t.id, t.name]));
+    partnerNameMap = Object.fromEntries(((partnersRes.data ?? []) as { id: string; full_name: string }[]).map((c) => [c.id, c.full_name]));
   }
 
   return (
@@ -129,7 +135,11 @@ export default async function ClientsPage({
             </tr>
           </thead>
           <tbody>
-            {(clients ?? []).map((client, i) => (
+            {(clients ?? []).map((client, i) => {
+              const ext = client as typeof client & { service_type?: string; couple_partner_id?: string | null };
+              const isCouple = ext.service_type === "couple";
+              const partnerName = ext.couple_partner_id ? partnerNameMap[ext.couple_partner_id] : null;
+              return (
               <tr
                 key={client.id}
                 className={`border-b border-sand/10 hover:bg-sand/5 transition-colors ${
@@ -137,7 +147,17 @@ export default async function ClientsPage({
                 }`}
               >
                 <td className="px-4 py-3">
-                  <p className="font-sans text-sm text-deep">{client.full_name}</p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-sans text-sm text-deep">{client.full_name}</p>
+                    {isCouple && (
+                      <span className="font-sans text-[10px] bg-rose-50 text-rose-500 border border-rose-200 px-1.5 py-0.5 leading-none flex-shrink-0">
+                        伴侶
+                      </span>
+                    )}
+                  </div>
+                  {isCouple && partnerName && (
+                    <p className="font-sans text-[11px] text-muted/60 mt-0.5">配偶：{partnerName}</p>
+                  )}
                 </td>
                 <td className="px-4 py-3 hidden sm:table-cell">
                   <span className="font-sans text-xs text-muted">
@@ -172,7 +192,8 @@ export default async function ClientsPage({
                   </Link>
                 </td>
               </tr>
-            ))}
+            );
+            })}
           </tbody>
         </table>
         {(clients ?? []).length === 0 && (

@@ -120,6 +120,24 @@ export async function PATCH(
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+  // After rejection: clear assigned_therapist_id if no other confirmed/locked appointments exist
+  if (action === "reject" && appt.client_id && appt.therapist_id) {
+    const { count } = await db
+      .from("appointments")
+      .select("id", { count: "exact", head: true })
+      .eq("client_id", appt.client_id)
+      .eq("therapist_id", appt.therapist_id)
+      .in("booking_status", ["confirmed", "locked"])
+      .neq("id", id);
+    if ((count ?? 0) === 0) {
+      await db
+        .from("clients")
+        .update({ assigned_therapist_id: null })
+        .eq("id", appt.client_id)
+        .eq("assigned_therapist_id", appt.therapist_id);
+    }
+  }
+
   const FROM = process.env.RESEND_FROM_EMAIL ?? "noreply@treecounseling.com";
   const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://treecounseling-web.vercel.app";
   const ADMIN_EMAIL = process.env.ADMIN_NOTIFICATION_EMAIL;

@@ -51,7 +51,8 @@ type SalaryRow = {
 function calcSessionCommission(
   rate: Rate | null,
   sessions: Appointment[],
-  allAppointments: Appointment[]
+  allAppointments: Appointment[],
+  priorSessionsMap: Record<string, number> = {}
 ): { commission: number; breakdown: BreakdownItem[] } {
   if (!rate || sessions.length === 0) return { commission: 0, breakdown: [] };
 
@@ -59,9 +60,12 @@ function calcSessionCommission(
     (a, b) => new Date(a.scheduled_at ?? 0).getTime() - new Date(b.scheduled_at ?? 0).getTime()
   );
 
-  // Pre-build completed set for quick lookup (for tiered_per_client)
-  const completedAll = allAppointments.filter(
-    (a) => a.status === "completed" || a.booking_status === "locked"
+  // Pre-build counted set for tiered_per_client lookup
+  const countedAll = allAppointments.filter(
+    (a) =>
+      a.booking_status === "confirmed" ||
+      a.booking_status === "locked" ||
+      a.status === "completed"
   );
 
   const breakdown: BreakdownItem[] = [];
@@ -85,14 +89,17 @@ function calcSessionCommission(
       }
       c = fee * applicableRate;
     } else if (rate.commission_type === "tiered_per_client" && rate.tier_config) {
-      // Count all completed sessions for this client with this therapist up to and including this date
+      // Count all sessions for this client with this therapist up to and including this date,
+      // plus prior_sessions from old system as starting offset
       const apptDate = new Date(appt.scheduled_at ?? 0).getTime();
-      const clientCount = completedAll.filter(
+      const systemCount = countedAll.filter(
         (a) =>
           a.client_id === appt.client_id &&
           a.therapist_id === appt.therapist_id &&
           new Date(a.scheduled_at ?? 0).getTime() <= apptDate
       ).length;
+      const priorOffset = priorSessionsMap[appt.client_id] ?? 0;
+      const clientCount = priorOffset + systemCount;
       const tiers = [...rate.tier_config].sort((a, b) => a.threshold - b.threshold);
       let applicableRate = tiers[0]?.rate ?? 0;
       for (const tier of tiers) {
@@ -159,11 +166,12 @@ export default function SalaryClient() {
   const calculate = useCallback(async () => {
     setLoading(true);
     try {
-      const [tRes, rateRes, apptRes, workshopRes] = await Promise.all([
+      const [tRes, rateRes, apptRes, workshopRes, clientRes] = await Promise.all([
         fetch("/api/admin/therapists"),
         fetch("/api/admin/salary/rates"),
         fetch("/api/admin/appointments"),
         fetch("/api/admin/workshops"),
+        fetch("/api/admin/clients"),
       ]);
 
       if (!tRes.ok || !apptRes.ok) return;
@@ -174,6 +182,15 @@ export default function SalaryClient() {
       const { workshops: allWorkshops }: { workshops: Workshop[] } = workshopRes.ok
         ? await workshopRes.json()
         : { workshops: [] };
+
+      // Build prior sessions map: client_id → prior_sessions
+      const clientList: { id: string; prior_sessions?: number }[] = clientRes.ok
+        ? await clientRes.json()
+        : [];
+      const priorSessionsMap: Record<string, number> = {};
+      for (const c of clientList) {
+        if (c.prior_sessions) priorSessionsMap[c.id] = c.prior_sessions;
+      }
 
       // Build rate maps (session and workshop are separate buckets)
       const sessionRateMap: Record<string, Rate> = {};
@@ -190,10 +207,14 @@ export default function SalaryClient() {
         const sessionRate = sessionRateMap[t.id] ?? null;
         const workshopRate = workshopRateMap[t.id] ?? null;
 
-        // Filter sessions for this therapist & month (completed/locked)
+        // Filter sessions for this therapist & month (confirmed / locked / completed)
         const mySessions = appointments.filter((a) => {
           if (a.therapist_id !== t.id) return false;
-          if (a.status !== "completed" && a.booking_status !== "locked") return false;
+          const counted =
+            a.booking_status === "confirmed" ||
+            a.booking_status === "locked" ||
+            a.status === "completed";
+          if (!counted) return false;
           if (!a.scheduled_at) return false;
           const d = new Date(a.scheduled_at);
           return d.getFullYear() === year && d.getMonth() + 1 === month;
@@ -211,7 +232,7 @@ export default function SalaryClient() {
         const workshopGross = myWorkshops.reduce((s, w) => s + (w.total_fee ?? 0), 0);
 
         const { commission: sessionCommission, breakdown: sessionBreakdown } =
-          calcSessionCommission(sessionRate, mySessions, appointments);
+          calcSessionCommission(sessionRate, mySessions, appointments, priorSessionsMap);
         const { commission: workshopCommission, breakdown: workshopBreakdown } =
           calcWorkshopCommission(workshopRate, myWorkshops);
 

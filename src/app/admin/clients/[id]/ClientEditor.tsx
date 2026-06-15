@@ -21,6 +21,9 @@ type ClientData = {
   referral_source: string;
   intake_notes: string;
   admin_notes: string;
+  prior_sessions: number;
+  service_type: string;
+  couple_partner_id: string;
 };
 
 const GENDER_OPTIONS = [
@@ -67,6 +70,9 @@ export default function ClientEditor({
     referral_source: initialData.referral_source ?? "",
     intake_notes: initialData.intake_notes ?? "",
     admin_notes: initialData.admin_notes ?? "",
+    prior_sessions: (initialData as { prior_sessions?: number }).prior_sessions ?? 0,
+    service_type: (initialData as { service_type?: string }).service_type ?? "individual",
+    couple_partner_id: (initialData as { couple_partner_id?: string }).couple_partner_id ?? "",
   });
 
   const [saving, setSaving] = useState(false);
@@ -291,6 +297,17 @@ export default function ClientEditor({
       {/* 派案資訊 */}
       <div className={sectionCls}>
         <h2 className="font-serif text-deep text-base">派案資訊</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className={labelCls}>服務類型</label>
+            <select value={form.service_type} onChange={(e) => setField("service_type", e.target.value)} className={inputCls} disabled={readonly}>
+              <option value="individual">個人諮商</option>
+              <option value="couple">伴侶諮商</option>
+              <option value="hoarding">囤積症諮商</option>
+              <option value="other">其他</option>
+            </select>
+          </div>
+        </div>
         <div>
           <label className={labelCls}>負責心理師</label>
           <select value={form.assigned_therapist_id} onChange={(e) => setField("assigned_therapist_id", e.target.value)} className={inputCls} disabled={readonly}>
@@ -313,6 +330,23 @@ export default function ClientEditor({
             disabled={readonly}
           />
         </div>
+        {!readonly && (
+          <div>
+            <label className={labelCls}>舊系統已完成諮商堂數</label>
+            <p className="font-sans text-[11px] text-muted/60 mb-1">
+              使用新系統前已完成的諮商堂數，用於計算階梯式抽成的累計起始值。新個案填 0。
+            </p>
+            <input
+              type="number"
+              min={0}
+              step={1}
+              value={form.prior_sessions}
+              onChange={(e) => setField("prior_sessions", Math.max(0, parseInt(e.target.value) || 0))}
+              className={inputCls}
+              style={{ maxWidth: 120 }}
+            />
+          </div>
+        )}
       </div>
 
       {/* 行政備註：僅管理員可見 */}

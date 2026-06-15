@@ -155,11 +155,39 @@ export default async function ClientDetailPage({ params }: Props) {
     }));
   }
 
-  // Type-safe access for columns added in migrations 012/014
+  // Type-safe access for columns added in migrations 012/014/017
   const clientExt = client as typeof client & {
     case_status?: string | null;
     case_closed_at?: string | null;
+    service_type?: string | null;
+    couple_partner_id?: string | null;
   };
+
+  // Compute client statistics from loaded appointment data
+  const countedAppts = adminAppts.filter(
+    (a) => a.booking_status === "confirmed" || a.booking_status === "locked"
+  );
+  const totalSessions = countedAppts.length;
+  const totalFees = countedAppts.reduce((s, a) => s + (a.session_fee ?? 0), 0);
+  const paidTotal = adminPayments.reduce((s, p) => s + (p.amount ?? 0), 0);
+  const lastSession = countedAppts
+    .filter((a) => a.scheduled_at && new Date(a.scheduled_at) <= new Date())
+    .sort((a, b) => new Date(b.scheduled_at!).getTime() - new Date(a.scheduled_at!).getTime())[0];
+  const nextSession = countedAppts
+    .filter((a) => a.scheduled_at && new Date(a.scheduled_at) > new Date())
+    .sort((a, b) => new Date(a.scheduled_at!).getTime() - new Date(b.scheduled_at!).getTime())[0];
+
+  // Partner name for couple clients
+  let partnerName: string | null = null;
+  if (clientExt.service_type === "couple" && clientExt.couple_partner_id) {
+    const db2 = createAdminClient();
+    const { data: partner } = await db2
+      .from("clients")
+      .select("full_name")
+      .eq("id", clientExt.couple_partner_id)
+      .single();
+    partnerName = partner?.full_name ?? null;
+  }
 
   const clientsLabel = isAdmin ? "個案管理" : "我的個案";
 
@@ -173,11 +201,51 @@ export default async function ClientDetailPage({ params }: Props) {
           {" / "}
           {client.full_name}
         </p>
-        <h1 className="font-serif text-deep text-2xl">{client.full_name}</h1>
+        <div className="flex items-center gap-2 flex-wrap">
+          <h1 className="font-serif text-deep text-2xl">{client.full_name}</h1>
+          {clientExt.service_type === "couple" && (
+            <span className="font-sans text-[11px] bg-rose-50 text-rose-500 border border-rose-200 px-2 py-0.5">
+              伴侶諮商
+            </span>
+          )}
+        </div>
         <p className="font-sans text-[11px] text-muted mt-0.5">
           建立於 {new Date(client.created_at).toLocaleDateString("zh-TW")}
+          {partnerName && (
+            <span> · 配偶：
+              <Link href={`/admin/clients/${clientExt.couple_partner_id}`} className="text-forest hover:underline">
+                {partnerName}
+              </Link>
+            </span>
+          )}
         </p>
       </div>
+
+      {/* Statistics — admin only */}
+      {isAdmin && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[
+            { label: "已確認堂數", value: String(totalSessions), sub: "確認 + 鎖定" },
+            { label: "總諮商費用", value: `MOP ${totalFees.toLocaleString()}`, sub: "全部累計" },
+            { label: "已付款", value: `MOP ${paidTotal.toLocaleString()}`, sub: "付款記錄總計" },
+            {
+              label: "上次晤談",
+              value: lastSession?.scheduled_at
+                ? new Date(lastSession.scheduled_at).toLocaleDateString("zh-TW", { month: "short", day: "numeric" })
+                : "—",
+              sub: nextSession?.scheduled_at
+                ? `下次：${new Date(nextSession.scheduled_at).toLocaleDateString("zh-TW", { month: "short", day: "numeric" })}`
+                : "無下次預約",
+            },
+          ].map((c) => (
+            <div key={c.label} className="bg-white border border-sand/20 px-4 py-3">
+              <p className="font-sans text-[10px] text-muted/60">{c.label}</p>
+              <p className="font-serif text-deep text-lg mt-0.5">{c.value}</p>
+              <p className="font-sans text-[10px] text-muted/50 mt-0.5">{c.sub}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
       <ClientEditor
         initialData={client}

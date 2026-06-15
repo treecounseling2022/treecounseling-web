@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Noto_Serif_TC, Noto_Sans_TC, EB_Garamond } from "next/font/google";
 import "./globals.css";
 import PublicShell from "@/components/layout/PublicShell";
+import { ThemeProvider } from "@/components/ThemeProvider";
 
 
 const notoSerifTC = Noto_Serif_TC({
@@ -51,7 +52,9 @@ export default function RootLayout({
       className={`${notoSerifTC.variable} ${notoSansTC.variable} ${ebGaramond.variable}`}
     >
       <body className="min-h-screen flex flex-col">
-        <PublicShell>{children}</PublicShell>
+        <ThemeProvider>
+          <PublicShell>{children}</PublicShell>
+        </ThemeProvider>
       </body>
     </html>
   );

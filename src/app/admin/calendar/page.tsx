@@ -6,7 +6,10 @@ type Appointment = {
   id: string;
   scheduled_at: string | null;
   booking_status: string;
-  clients: { full_name: string } | null;
+  is_online: boolean;
+  session_fee: number | null;
+  duration_minutes: number | null;
+  clients: { id: string; full_name: string } | null;
   rooms: { name: string; color: string } | null;
   therapist_id: string | null;
 };
@@ -31,6 +34,14 @@ const STATUS_COLOR: Record<string, string> = {
   cancelled: "#d1d5db",
 };
 
+const STATUS_LABEL: Record<string, string> = {
+  pending_admin: "待排案",
+  pending_therapist: "待心理師確認",
+  confirmed: "已確認",
+  locked: "鎖定",
+  cancelled: "已取消",
+};
+
 const WEEKDAYS = ["日", "一", "二", "三", "四", "五", "六"];
 const MONTHS = ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"];
 
@@ -46,6 +57,7 @@ export default function CalendarPage() {
   const [workshops, setWorkshops] = useState<Workshop[]>([]);
   const [therapistMap, setTherapistMap] = useState<Record<string, string>>({});
   const [selected, setSelected] = useState<Date | null>(null);
+  const [detailAppt, setDetailAppt] = useState<Appointment | null>(null);
 
   const load = useCallback(async () => {
     const [apptRes, wsRes] = await Promise.all([
@@ -233,12 +245,16 @@ export default function CalendarPage() {
           {selectedEvents.length === 0 && (
             <p className="font-sans text-xs text-muted/40">此日無預約或活動。</p>
           )}
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             {selectedEvents.map((ev) => {
               if (ev.kind === "appt") {
                 const a = ev.data;
                 return (
-                  <div key={`a-${a.id}`} className="flex items-center gap-3 font-sans text-sm">
+                  <button
+                    key={`a-${a.id}`}
+                    onClick={() => setDetailAppt(a)}
+                    className="w-full flex items-center gap-3 font-sans text-sm px-3 py-2.5 rounded hover:bg-sand/10 transition-colors text-left"
+                  >
                     <div
                       className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                       style={{ backgroundColor: a.rooms?.color ?? STATUS_COLOR[a.booking_status] }}
@@ -248,17 +264,21 @@ export default function CalendarPage() {
                     </span>
                     <span className="text-muted">{a.clients?.full_name}</span>
                     {a.rooms && <span className="text-muted/60 text-xs">{a.rooms.name}</span>}
+                    <span className="text-[10px] px-1.5 py-0.5 ml-auto flex-shrink-0"
+                      style={{ background: `${STATUS_COLOR[a.booking_status]}18`, color: STATUS_COLOR[a.booking_status] }}>
+                      {STATUS_LABEL[a.booking_status] ?? a.booking_status}
+                    </span>
                     {a.therapist_id && (
-                      <span className="text-muted/60 text-xs ml-auto">
+                      <span className="text-muted/60 text-xs flex-shrink-0">
                         {therapistMap[a.therapist_id] ?? ""}
                       </span>
                     )}
-                  </div>
+                  </button>
                 );
               }
               const w = ev.data;
               return (
-                <div key={`w-${w.id}`} className="flex items-center gap-3 font-sans text-sm">
+                <div key={`w-${w.id}`} className="flex items-center gap-3 font-sans text-sm px-3 py-2.5">
                   <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: "#7c3aed" }} />
                   <span className="text-deep font-medium">
                     {new Date(w.scheduled_at).toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit" })}
@@ -268,6 +288,81 @@ export default function CalendarPage() {
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* Appointment detail modal */}
+      {detailAppt && (
+        <div
+          className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4"
+          onClick={() => setDetailAppt(null)}
+        >
+          <div
+            className="bg-white border border-sand/20 w-full max-w-sm shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-4 border-b border-sand/10">
+              <h3 className="font-serif text-deep text-lg">預約詳情</h3>
+              <button onClick={() => setDetailAppt(null)} className="text-muted/40 hover:text-muted text-xl leading-none">×</button>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              {[
+                {
+                  label: "個案",
+                  value: detailAppt.clients?.full_name ?? "—",
+                  href: detailAppt.clients?.id ? `/admin/clients/${detailAppt.clients.id}` : null,
+                },
+                {
+                  label: "時間",
+                  value: detailAppt.scheduled_at
+                    ? new Date(detailAppt.scheduled_at).toLocaleString("zh-TW", {
+                        year: "numeric", month: "long", day: "numeric",
+                        weekday: "short", hour: "2-digit", minute: "2-digit",
+                        timeZone: "Asia/Macau",
+                      })
+                    : "（待定）",
+                },
+                {
+                  label: "心理師",
+                  value: detailAppt.therapist_id ? (therapistMap[detailAppt.therapist_id] ?? "—") : "—",
+                },
+                { label: "診室", value: detailAppt.rooms?.name ?? "—" },
+                { label: "方式", value: detailAppt.is_online ? "線上（視訊）" : "到診面談" },
+                {
+                  label: "費用",
+                  value: detailAppt.session_fee != null ? `MOP ${detailAppt.session_fee}` : "—",
+                },
+                {
+                  label: "時長",
+                  value: detailAppt.duration_minutes ? `${detailAppt.duration_minutes} 分鐘` : "—",
+                },
+                { label: "狀態", value: STATUS_LABEL[detailAppt.booking_status] ?? detailAppt.booking_status },
+              ].map(({ label, value, href }) => (
+                <div key={label} className="flex items-start gap-3">
+                  <span className="font-sans text-[11px] text-muted/60 w-14 flex-shrink-0 pt-0.5">{label}</span>
+                  {href ? (
+                    <a href={href} className="font-sans text-sm text-forest hover:underline">{value}</a>
+                  ) : (
+                    <span className="font-sans text-sm text-deep">{value}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="px-5 py-3 border-t border-sand/10 flex justify-between items-center">
+              <a
+                href={`/admin/appointments`}
+                className="font-sans text-xs text-forest hover:underline"
+              >
+                前往預約管理 →
+              </a>
+              <button
+                onClick={() => setDetailAppt(null)}
+                className="font-sans text-xs px-4 py-2 bg-sand/20 text-muted hover:bg-sand/30 transition-colors"
+              >
+                關閉
+              </button>
+            </div>
           </div>
         </div>
       )}

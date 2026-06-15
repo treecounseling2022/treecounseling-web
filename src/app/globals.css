@@ -27,6 +27,31 @@
   --foreground: #1f2a24;
 }
 
+/* Dark mode — toggled via next-themes class strategy */
+.dark {
+  --color-forest:    #6aaa7a;
+  --color-deep:      #e2e9e2;
+  --color-sand:      #a08c5e;
+  --color-paper:     #1a2520;
+  --color-soft:      #111a14;
+  --color-muted:     #8faa8f;
+  --background: #111a14;
+  --foreground: #e2e9e2;
+}
+
+/* Admin dark mode: make white cards dark */
+.dark .bg-white {
+  background-color: #1a2520 !important;
+}
+.dark .bg-white\/80 {
+  background-color: rgba(26, 37, 32, 0.8) !important;
+}
+/* Slate background in dark */
+.dark .bg-slate-50,
+.dark .bg-slate-100 {
+  background-color: #0f1912 !important;
+}
+
 html {
   scroll-behavior: smooth;
 }
