@@ -1,8 +1,10 @@
 import { notFound, redirect } from "next/navigation";
 import { TEAM } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAuth, isAdminLevel } from "@/lib/auth-role";
 import TherapistProfileEditor from "./TherapistProfileEditor";
+import TherapistAvailability from "./TherapistAvailability";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -19,11 +21,15 @@ export default async function MemberEditPage({ params }: Props) {
   }
 
   const supabase = await createClient();
-  const { data: profile } = await supabase
-    .from("therapist_profiles")
-    .select("*")
-    .eq("id", id)
-    .single();
+  const [{ data: profile }, { data: availability }] = await Promise.all([
+    supabase.from("therapist_profiles").select("*").eq("id", id).single(),
+    createAdminClient()
+      .from("therapist_availability")
+      .select("*")
+      .eq("therapist_id", id)
+      .order("day_of_week")
+      .order("start_time"),
+  ]);
 
   const displayName = profile?.name || id;
 
@@ -46,6 +52,14 @@ export default async function MemberEditPage({ params }: Props) {
           <p className="font-sans text-xs text-muted mt-0.5">{profile.title}</p>
         )}
       </div>
+
+      <TherapistAvailability
+        therapistId={id}
+        initialSlots={(availability ?? []) as {
+          id: string; therapist_id: string; day_of_week: number;
+          start_time: string; end_time: string; is_active: boolean;
+        }[]}
+      />
 
       <TherapistProfileEditor
         therapistId={id}

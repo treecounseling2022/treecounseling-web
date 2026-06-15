@@ -18,6 +18,7 @@ export async function POST(
     scheduled_at?: string;
     session_fee?: number;
     plan_id?: string;
+    is_online?: boolean;
   };
 
   if (!body.therapist_id) {
@@ -55,12 +56,19 @@ export async function POST(
   }
 
   if (!clientId) {
+    const formData = (inquiry.form_data as Record<string, unknown>) ?? {};
+    const GENDER_MAP: Record<string, string> = { "男": "male", "女": "female", "其他": "other" };
+    const rawGender = formData.gender as string | undefined;
+
     const { data: newClient, error: clientErr } = await db
       .from("clients")
       .insert({
         full_name: inquiry.name ?? "未知",
         email: inquiry.email ?? null,
         phone: inquiry.phone ?? null,
+        dob: (formData.birthday as string) || null,
+        gender: rawGender ? (GENDER_MAP[rawGender] ?? null) : null,
+        intake_notes: inquiry.concern ?? null,
         is_active: true,
       })
       .select("id")
@@ -70,6 +78,14 @@ export async function POST(
     }
     clientId = newClient.id;
   }
+
+  // Auto-detect intake: first ever appointment for this client
+  const { count: existingApptCount } = await db
+    .from("appointments")
+    .select("id", { count: "exact", head: true })
+    .eq("client_id", clientId)
+    .neq("booking_status", "cancelled");
+  const sessionType = (existingApptCount ?? 0) === 0 ? "intake" : "followup";
 
   // Create appointment in pending_therapist state
   const { data: appt, error: apptErr } = await db
@@ -81,8 +97,9 @@ export async function POST(
       scheduled_at: body.scheduled_at ?? null,
       session_fee: body.session_fee ?? null,
       plan_id: body.plan_id ?? null,
+      is_online: body.is_online ?? false,
       booking_status: "pending_therapist",
-      service_type: inquiry.service_type ?? null,
+      session_type: sessionType,
     })
     .select()
     .single();
@@ -90,10 +107,10 @@ export async function POST(
     return NextResponse.json({ error: `建立預約失敗：${apptErr.message}` }, { status: 500 });
   }
 
-  // Mark inquiry as converted
+  // Mark inquiry as converted and store created client/appointment links
   await db
     .from("booking_inquiries")
-    .update({ status: "converted" })
+    .update({ status: "converted", client_id: clientId, appointment_id: appt.id })
     .eq("id", id);
 
   return NextResponse.json({ success: true, appointment_id: appt.id, client_id: clientId }, { status: 201 });

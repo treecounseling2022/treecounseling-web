@@ -9,6 +9,7 @@ type EmergencyContact = { name: string; phone: string; relationship: string };
 
 type ClientData = {
   id?: string;
+  client_code: string;
   full_name: string;
   name_en: string;
   dob: string;
@@ -30,6 +31,17 @@ const GENDER_OPTIONS = [
   { value: "prefer_not_to_say", label: "不願透露" },
 ];
 
+function calcAge(dob: string | null | undefined): string {
+  if (!dob) return "—";
+  const birth = new Date(dob);
+  if (isNaN(birth.getTime())) return "—";
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const m = today.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+  return `${age} 歲`;
+}
+
 export default function ClientEditor({
   initialData,
   therapists,
@@ -43,6 +55,7 @@ export default function ClientEditor({
   const isNew = !initialData.id;
 
   const [form, setForm] = useState<ClientData>({
+    client_code: (initialData as { client_code?: string }).client_code ?? "",
     full_name: initialData.full_name ?? "",
     name_en: initialData.name_en ?? "",
     dob: initialData.dob ?? "",
@@ -57,8 +70,23 @@ export default function ClientEditor({
   });
 
   const [saving, setSaving] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const [err, setErr] = useState("");
   const [saved, setSaved] = useState(false);
+
+  async function generateCode() {
+    setGenerating(true);
+    try {
+      const res = await fetch("/api/admin/clients/generate-code");
+      const data = await res.json();
+      if (res.ok && data.code) {
+        setField("client_code", data.code);
+        setSaved(false);
+      }
+    } finally {
+      setGenerating(false);
+    }
+  }
 
   function setField<K extends keyof ClientData>(key: K, value: ClientData[K]) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -80,6 +108,7 @@ export default function ClientEditor({
     try {
       const payload = {
         ...form,
+        client_code: form.client_code.trim() || null,
         assigned_therapist_id: form.assigned_therapist_id || null,
         dob: form.dob || null,
         gender: form.gender || null,
@@ -111,12 +140,109 @@ export default function ClientEditor({
   const inputCls = `w-full border border-sand/30 px-3 py-2 font-sans text-sm text-deep focus:outline-none focus:border-forest/50${readonly ? " bg-sand/5 cursor-default" : ""}`;
   const labelCls = "font-sans text-[11px] text-muted block mb-1";
   const sectionCls = "space-y-4 pt-6 border-t border-sand/20";
+  const roLabelCls = "font-sans text-[11px] text-muted mb-1";
+  const roValueCls = "font-sans text-sm text-deep";
+
+  // ── Therapist read-only view ──────────────────────────────────────────────
+  if (readonly) {
+    const genderLabel = GENDER_OPTIONS.find((o) => o.value === form.gender)?.label;
+    return (
+      <div className="space-y-6">
+        {/* 基本資料 */}
+        <div className="space-y-4">
+          <h2 className="font-serif text-deep text-base">基本資料</h2>
+          {form.client_code && (
+            <div>
+              <p className={roLabelCls}>個案編號</p>
+              <p className="font-sans text-sm text-deep font-mono">{form.client_code}</p>
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className={roLabelCls}>年齡</p>
+              <p className={roValueCls}>{calcAge(form.dob)}</p>
+            </div>
+            <div>
+              <p className={roLabelCls}>性別</p>
+              <p className={roValueCls}>{genderLabel && genderLabel !== "（未填寫）" ? genderLabel : "—"}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* 聯絡方式 */}
+        <div className="pt-6 border-t border-sand/20 space-y-4">
+          <h2 className="font-serif text-deep text-base">聯絡方式</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <p className={roLabelCls}>電話</p>
+              <p className={roValueCls}>{form.phone || "—"}</p>
+            </div>
+            <div>
+              <p className={roLabelCls}>Email</p>
+              <p className={roValueCls}>{form.email || "—"}</p>
+            </div>
+          </div>
+          <div>
+            <p className={roLabelCls}>緊急聯絡人</p>
+            {form.emergency_contact.name ? (
+              <p className={roValueCls}>
+                {form.emergency_contact.name}
+                {form.emergency_contact.relationship && `（${form.emergency_contact.relationship}）`}
+                {form.emergency_contact.phone && ` · ${form.emergency_contact.phone}`}
+              </p>
+            ) : (
+              <p className="font-sans text-sm text-muted/40">—</p>
+            )}
+          </div>
+        </div>
+
+        {/* 初次申請說明 */}
+        {form.intake_notes && (
+          <div className="pt-6 border-t border-sand/20 space-y-2">
+            <h2 className="font-serif text-deep text-base">初次申請說明</h2>
+            <p className="font-sans text-sm text-deep bg-sand/10 px-4 py-3 leading-relaxed whitespace-pre-wrap">
+              {form.intake_notes}
+            </p>
+          </div>
+        )}
+
+        <a href="/admin/clients" className="font-sans text-xs text-muted hover:text-deep transition-colors">
+          ← 返回列表
+        </a>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       {/* 基本資料 */}
       <div className="space-y-4">
         <h2 className="font-serif text-deep text-base">基本資料</h2>
+
+        {/* 個案編號 */}
+        <div>
+          <label className={labelCls}>個案編號</label>
+          <div className="flex gap-2">
+            <input
+              value={form.client_code}
+              onChange={(e) => setField("client_code", e.target.value)}
+              className={inputCls + " font-mono"}
+              placeholder="留空則不指定編號"
+              disabled={readonly}
+            />
+            {!readonly && (
+              <button
+                type="button"
+                onClick={generateCode}
+                disabled={generating}
+                className="flex-shrink-0 font-sans text-xs px-3 py-2 border border-sand/30 text-muted hover:bg-sand/10 disabled:opacity-40 transition-colors whitespace-nowrap"
+              >
+                {generating ? "…" : "自動產生"}
+              </button>
+            )}
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className={labelCls}>姓名 *</label>

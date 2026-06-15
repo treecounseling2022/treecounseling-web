@@ -3,16 +3,21 @@ import { createClient } from "@/lib/supabase/server";
 import { requireAuth } from "@/lib/auth-role";
 import SessionNoteEditor from "../SessionNoteEditor";
 
-export default async function NewSessionPage() {
+interface Props {
+  searchParams: Promise<{ appointment_id?: string }>;
+}
+
+export default async function NewSessionPage({ searchParams }: Props) {
   const auth = await requireAuth();
   if (auth.role !== "therapist" || !auth.profileId) redirect("/admin/sessions");
 
+  const { appointment_id: preselectedId } = await searchParams;
   const supabase = await createClient();
 
   // Get therapist's confirmed/locked appointments without a note yet
   const { data: appointments } = await supabase
     .from("appointments")
-    .select("id, scheduled_at, clients(full_name)")
+    .select("id, scheduled_at, session_type, clients(full_name)")
     .eq("therapist_id", auth.profileId)
     .in("booking_status", ["confirmed", "locked"])
     .order("scheduled_at", { ascending: false })
@@ -46,9 +51,11 @@ export default async function NewSessionPage() {
 
       <SessionNoteEditor
         therapistId={auth.profileId}
+        defaultAppointmentId={preselectedId}
         availableAppointments={available.map((a) => ({
           id: a.id,
           scheduled_at: a.scheduled_at,
+          sessionType: (a.session_type as string | null) ?? "followup",
           clientName: (() => {
             const c = a.clients as { full_name: string } | { full_name: string }[] | null | undefined;
             return (Array.isArray(c) ? c[0]?.full_name : c?.full_name) ?? "未知";

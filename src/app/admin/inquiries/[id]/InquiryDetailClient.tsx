@@ -15,6 +15,8 @@ type Inquiry = {
   status: string;
   admin_notes: string | null;
   created_at: string;
+  client_id: string | null;
+  appointment_id: string | null;
 };
 
 type TherapistService = { name?: string; fee?: string | number; duration?: string; note?: string };
@@ -291,6 +293,7 @@ export default function InquiryDetailClient({
         room_id: assignForm.room_id || undefined,
         scheduled_at: assignForm.scheduled_at || undefined,
         session_fee: assignForm.session_fee ? Number(assignForm.session_fee) : undefined,
+        is_online: assignForm.is_online,
       }),
     });
     const data = await res.json();
@@ -320,7 +323,8 @@ export default function InquiryDetailClient({
     setDriveUrl(data.url);
   }
 
-  const canAssign = inquiry.status !== "converted" && inquiry.status !== "closed";
+  const CLINICAL_TYPES = new Set(["individual", "couple", "hoarding"]);
+  const canAssign = inquiry.status !== "converted" && inquiry.status !== "closed" && CLINICAL_TYPES.has(inquiry.service_type);
 
   return (
     <div className="space-y-6 pt-4 max-w-3xl">
@@ -353,6 +357,22 @@ export default function InquiryDetailClient({
           >
             派案 →
           </button>
+        )}
+        {inquiry.client_id && (
+          <a
+            href={`/admin/clients/${inquiry.client_id}`}
+            className="font-sans text-xs px-4 py-2 bg-green-50 text-green-700 hover:bg-green-100 border border-green-200 transition-colors"
+          >
+            查看個案 →
+          </a>
+        )}
+        {inquiry.appointment_id && (
+          <a
+            href={`/admin/appointments`}
+            className="font-sans text-xs px-4 py-2 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition-colors"
+          >
+            查看預約 →
+          </a>
         )}
         <a
           href={`/admin/inquiries/${inquiry.id}/print`}
@@ -513,40 +533,29 @@ export default function InquiryDetailClient({
                 </select>
               </div>
 
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <label className="font-sans text-xs text-muted">諮商空間（選填）</label>
-                  <label className="ml-auto flex items-center gap-1.5 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={assignForm.is_online}
-                      onChange={(e) => {
-                        const online = e.target.checked;
-                        const onlineRoom = rooms.find((r) => r.is_online);
-                        setAssignForm((f) => ({
-                          ...f,
-                          is_online: online,
-                          room_id: online ? (onlineRoom?.id ?? "") : "",
-                        }));
-                      }}
-                      className="accent-forest"
-                    />
-                    <span className="font-sans text-xs text-muted">線上諮商</span>
-                  </label>
-                </div>
-                {!assignForm.is_online && (
-                  <select
-                    value={assignForm.room_id}
-                    onChange={(e) => setAssignForm((f) => ({ ...f, room_id: e.target.value }))}
-                    className="w-full border border-sand/30 px-3 py-2 font-sans text-sm text-deep focus:outline-none focus:border-forest/50 bg-white"
-                  >
-                    <option value="">— 待定 —</option>
-                    {rooms.filter((r) => !r.is_online).map((r) => (
-                      <option key={r.id} value={r.id}>{r.name}</option>
-                    ))}
-                  </select>
-                )}
+              <div>
+                <label className="font-sans text-xs text-muted block mb-1">諮商空間（選填）</label>
+                <select
+                  value={assignForm.room_id}
+                  onChange={(e) => setAssignForm((f) => ({ ...f, room_id: e.target.value }))}
+                  className="w-full border border-sand/30 px-3 py-2 font-sans text-sm text-deep focus:outline-none focus:border-forest/50 bg-white"
+                >
+                  <option value="">— 待定 —</option>
+                  {rooms.filter((r) => !r.is_online).map((r) => (
+                    <option key={r.id} value={r.id}>{r.name}</option>
+                  ))}
+                </select>
               </div>
+
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={assignForm.is_online}
+                  onChange={(e) => setAssignForm((f) => ({ ...f, is_online: e.target.checked }))}
+                  className="accent-forest w-4 h-4"
+                />
+                <span className="font-sans text-sm text-deep">線上諮商</span>
+              </label>
 
               <div>
                 <label className="font-sans text-xs text-muted block mb-1">預計時間（選填）</label>

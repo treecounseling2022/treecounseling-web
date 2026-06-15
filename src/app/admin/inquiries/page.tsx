@@ -139,6 +139,7 @@ export default function InquiriesPage() {
         room_id: assignForm.room_id || undefined,
         scheduled_at: assignForm.scheduled_at || undefined,
         session_fee: assignForm.session_fee ? Number(assignForm.session_fee) : undefined,
+        is_online: assignForm.is_online,
       }),
     });
     const data = await res.json();
@@ -195,7 +196,8 @@ export default function InquiriesPage() {
       {/* List */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {filtered.map((inq) => {
-          const canAssign = inq.status !== "converted" && inq.status !== "closed";
+          const CLINICAL_TYPES = new Set(["individual", "couple", "hoarding"]);
+          const canAssign = inq.status !== "converted" && inq.status !== "closed" && CLINICAL_TYPES.has(inq.service_type);
           return (
             <div key={inq.id} className="bg-white border border-sand/20 p-4 space-y-3 hover:border-sand/40 transition-colors">
               <div className="flex items-start justify-between gap-2">
@@ -320,18 +322,28 @@ export default function InquiriesPage() {
               </div>
 
               <div>
-                <label className="font-sans text-xs text-muted block mb-1">診室（選填）</label>
+                <label className="font-sans text-xs text-muted block mb-1">諮商空間（選填）</label>
                 <select
                   value={assignForm.room_id}
                   onChange={(e) => setAssignForm((f) => ({ ...f, room_id: e.target.value }))}
                   className="w-full border border-sand/30 px-3 py-2 font-sans text-sm text-deep focus:outline-none focus:border-forest/50 bg-white"
                 >
                   <option value="">— 待定 —</option>
-                  {rooms.map((r) => (
+                  {rooms.filter((r) => !r.is_online).map((r) => (
                     <option key={r.id} value={r.id}>{r.name}</option>
                   ))}
                 </select>
               </div>
+
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={assignForm.is_online}
+                  onChange={(e) => setAssignForm((f) => ({ ...f, is_online: e.target.checked }))}
+                  className="accent-forest w-4 h-4"
+                />
+                <span className="font-sans text-sm text-deep">線上諮商</span>
+              </label>
 
               <div>
                 <label className="font-sans text-xs text-muted block mb-1">預計時間（選填）</label>

@@ -3,64 +3,144 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { requireAuth } from "@/lib/auth-role";
 
-function fmtDate(iso: string) {
-  return new Date(iso).toLocaleString("zh-TW", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+const PAGE_SIZE = 20;
+
+const RISK_BADGE: Record<string, string> = {
+  low:    "bg-blue-50 text-blue-700",
+  medium: "bg-amber-50 text-amber-700",
+  high:   "bg-red-50 text-red-700",
+};
+const RISK_LABEL: Record<string, string> = {
+  low: "低", medium: "中", high: "高",
+};
+
+interface Props {
+  searchParams: Promise<{ q?: string; date_from?: string; date_to?: string; page?: string }>;
 }
 
-export default async function SessionsPage() {
+export default async function SessionsPage({ searchParams }: Props) {
   const auth = await requireAuth();
   const supabase = await createClient();
 
-  let query = supabase
-    .from("session_notes")
-    .select(`
-      id,
-      content,
-      is_submitted,
-      submitted_at,
-      created_at,
-      updated_at,
-      therapist_id,
-      appointment_id,
-      appointments!inner(
-        id,
-        scheduled_at,
-        clients(full_name)
-      )
-    `)
-    .order("created_at", { ascending: false });
+  const isTherapist = auth.role === "therapist";
+  const isDirector  = auth.role === "director";
 
-  // Therapist only sees their own notes
-  if (auth.role === "therapist") {
-    if (!auth.profileId) redirect("/admin");
-    query = query.eq("therapist_id", auth.profileId);
+  if (isTherapist && !auth.profileId) redirect("/admin");
+
+  const { q, date_from, date_to, page: pageParam } = await searchParams;
+  const page    = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
+  const clientQ = q?.trim() ?? "";
+
+  // ── Step 1: resolve appointment IDs if any filter is active ──────────────
+  const needsApptFilter = !!(dateFrom() || dateTo() || clientQ);
+  let apptIdFilter: string[] | null = null;
+
+  function dateFrom() { return date_from?.trim() || null; }
+  function dateTo()   { return date_to?.trim()   || null; }
+
+  if (needsApptFilter) {
+    let apptQ = supabase.from("appointments").select("id");
+
+    if (dateFrom()) apptQ = apptQ.gte("scheduled_at", `${dateFrom()}T00:00:00+08:00`);
+    if (dateTo())   apptQ = apptQ.lte("scheduled_at", `${dateTo()}T23:59:59+08:00`);
+
+    if (isTherapist) apptQ = apptQ.eq("therapist_id", auth.profileId!);
+
+    if (clientQ) {
+      const { data: matchedClients } = await supabase
+        .from("clients")
+        .select("id")
+        .ilike("full_name", `%${clientQ}%`);
+      const matchedIds = (matchedClients ?? []).map((c) => c.id);
+      if (matchedIds.length === 0) {
+        apptIdFilter = []; // guaranteed empty result
+      } else {
+        apptQ = apptQ.in("client_id", matchedIds);
+      }
+    }
+
+    if (apptIdFilter === null) {
+      const { data: appts } = await apptQ;
+      apptIdFilter = (appts ?? []).map((a) => a.id);
+    }
   }
 
-  const { data: notes } = await query;
+  // ── Step 2: query session_notes ───────────────────────────────────────────
+  let notes: Record<string, unknown>[] = [];
+  let totalCount = 0;
 
-  // Fetch therapist names for admin view
+  if (apptIdFilter === null || apptIdFilter.length > 0) {
+    let q2 = supabase
+      .from("session_notes")
+      .select(
+        `id, risk_level, is_submitted, submitted_at, updated_at, therapist_id, appointment_id,
+         appointments!inner(scheduled_at, clients(full_name))`,
+        { count: "exact" }
+      )
+      .order("created_at", { ascending: false })
+      .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
+
+    if (isTherapist)          q2 = q2.eq("therapist_id", auth.profileId!);
+    if (apptIdFilter !== null) q2 = q2.in("appointment_id", apptIdFilter);
+
+    const { data, count } = await q2;
+    notes     = (data ?? []) as Record<string, unknown>[];
+    totalCount = count ?? 0;
+  }
+
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+
+  // ── Therapist names for admin/director ───────────────────────────────────
   let therapistMap: Record<string, string> = {};
-  if (auth.role !== "therapist" && notes && notes.length > 0) {
-    const therapistIds = [...new Set(notes.map((n) => n.therapist_id).filter(Boolean))] as string[];
-    if (therapistIds.length > 0) {
+  if (!isTherapist && notes.length > 0) {
+    const tIds = [...new Set(notes.map((n) => n.therapist_id as string).filter(Boolean))];
+    if (tIds.length > 0) {
       const { data: therapists } = await supabase
         .from("therapist_profiles")
         .select("id, name")
-        .in("id", therapistIds);
+        .in("id", tIds);
       therapistMap = Object.fromEntries((therapists ?? []).map((t) => [t.id, t.name]));
     }
   }
 
-  const isAdmin = auth.role !== "therapist";
+  // ── Therapist: pending appointments needing notes ─────────────────────────
+  type PendingAppt = { id: string; scheduled_at: string | null; clientName: string };
+  let pendingAppts: PendingAppt[] = [];
+
+  if (isTherapist && auth.profileId && !needsApptFilter) {
+    const { data: appts } = await supabase
+      .from("appointments")
+      .select("id, scheduled_at, clients(full_name)")
+      .eq("therapist_id", auth.profileId)
+      .in("booking_status", ["confirmed", "locked"])
+      .order("scheduled_at", { ascending: false });
+
+    const existingIds = new Set(notes.map((n) => n.appointment_id as string));
+    pendingAppts = (appts ?? [])
+      .filter((a) => !existingIds.has(a.id))
+      .map((a) => {
+        const c = a.clients as { full_name: string } | { full_name: string }[] | null | undefined;
+        return {
+          id: a.id,
+          scheduled_at: a.scheduled_at,
+          clientName: (Array.isArray(c) ? c[0]?.full_name : c?.full_name) ?? "未知個案",
+        };
+      });
+  }
+
+  // ── Build URL helper ──────────────────────────────────────────────────────
+  function pageUrl(p: number) {
+    const sp = new URLSearchParams();
+    if (clientQ)     sp.set("q",         clientQ);
+    if (dateFrom())  sp.set("date_from", dateFrom()!);
+    if (dateTo())    sp.set("date_to",   dateTo()!);
+    sp.set("page", String(p));
+    return `/admin/sessions?${sp.toString()}`;
+  }
 
   return (
-    <div className="space-y-6 pt-4">
+    <div className="space-y-5 pt-4">
+      {/* Header */}
       <div className="flex items-start justify-between">
         <div>
           <p className="font-sans text-xs text-muted mb-1">
@@ -68,10 +148,10 @@ export default async function SessionsPage() {
           </p>
           <h1 className="font-serif text-deep text-2xl">晤談紀錄</h1>
           <p className="font-sans text-xs text-muted mt-0.5">
-            {isAdmin ? "所有晤談紀錄（行政唯讀）" : "我的晤談紀錄"}
+            {isTherapist ? "我的晤談紀錄" : isDirector ? "所有晤談紀錄" : "繳交狀態總覽"}
           </p>
         </div>
-        {!isAdmin && (
+        {isTherapist && (
           <Link
             href="/admin/sessions/new"
             className="font-sans text-xs bg-deep text-paper px-4 py-2 hover:bg-forest transition-colors flex-shrink-0"
@@ -81,81 +161,210 @@ export default async function SessionsPage() {
         )}
       </div>
 
-      <div className="space-y-3">
-        {(notes ?? []).map((note) => {
-          const appt = Array.isArray(note.appointments) ? note.appointments[0] : note.appointments;
-          const rawClients = appt?.clients as { full_name: string } | { full_name: string }[] | null | undefined;
-          const clientName = Array.isArray(rawClients)
-            ? rawClients[0]?.full_name
-            : rawClients?.full_name;
-
-          return (
-            <div key={note.id} className="bg-white border border-sand/20 p-4">
-              <div className="flex items-start justify-between gap-2 mb-3">
-                <div>
-                  <p className="font-serif text-deep">
-                    {clientName ?? "（未知個案）"}
-                    {appt?.scheduled_at && (
-                      <span className="font-sans text-sm text-muted ml-2">
-                        {new Date(appt.scheduled_at).toLocaleDateString("zh-TW")}
-                      </span>
-                    )}
-                  </p>
-                  {isAdmin && note.therapist_id && (
-                    <p className="font-sans text-xs text-muted/70 mt-0.5">
-                      心理師：{therapistMap[note.therapist_id] ?? note.therapist_id}
-                    </p>
+      {/* Pending notice for therapists */}
+      {isTherapist && pendingAppts.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 p-4 space-y-2">
+          <p className="font-sans text-xs font-medium text-amber-800">以下預約尚未填寫晤談紀錄：</p>
+          <div className="space-y-1.5">
+            {pendingAppts.map((a) => (
+              <div key={a.id} className="flex items-center justify-between gap-3">
+                <span className="font-sans text-xs text-amber-700">
+                  {a.clientName}
+                  {a.scheduled_at && (
+                    <span className="ml-2 text-amber-600">
+                      {new Date(a.scheduled_at).toLocaleDateString("zh-TW")}
+                    </span>
                   )}
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <span
-                    className={`font-sans text-[10px] px-2 py-0.5 ${
-                      note.is_submitted
-                        ? "bg-green-50 text-green-700"
-                        : "bg-amber-50 text-amber-700"
-                    }`}
-                  >
-                    {note.is_submitted ? "已提交" : "草稿"}
-                  </span>
-                  {!isAdmin && (
-                    <Link
-                      href={`/admin/sessions/${note.id}`}
-                      className="font-sans text-[11px] text-forest hover:underline"
-                    >
-                      {note.is_submitted ? "查看" : "編輯"} →
-                    </Link>
-                  )}
-                </div>
+                </span>
+                <Link
+                  href={`/admin/sessions/new?appointment_id=${a.id}`}
+                  className="font-sans text-[11px] bg-amber-600 text-white px-3 py-1 hover:bg-amber-700 transition-colors flex-shrink-0"
+                >
+                  填寫 →
+                </Link>
               </div>
+            ))}
+          </div>
+        </div>
+      )}
 
-              {note.content ? (
-                <p className="font-sans text-xs text-muted leading-relaxed line-clamp-3">
-                  {note.content}
-                </p>
-              ) : (
-                <p className="font-sans text-xs text-muted/40 italic">（尚未填寫內容）</p>
+      {/* Filters */}
+      <form method="GET" className="flex flex-wrap gap-2 items-end">
+        <div>
+          <label className="font-sans text-[10px] text-muted block mb-0.5">搜尋個案</label>
+          <input
+            name="q"
+            defaultValue={clientQ}
+            placeholder="姓名…"
+            className="border border-sand/30 px-3 py-1.5 font-sans text-xs text-deep focus:outline-none focus:border-forest/50 w-36"
+          />
+        </div>
+        <div>
+          <label className="font-sans text-[10px] text-muted block mb-0.5">晤談日期從</label>
+          <input
+            type="date"
+            name="date_from"
+            defaultValue={dateFrom() ?? ""}
+            className="border border-sand/30 px-3 py-1.5 font-sans text-xs text-deep focus:outline-none focus:border-forest/50"
+          />
+        </div>
+        <div>
+          <label className="font-sans text-[10px] text-muted block mb-0.5">至</label>
+          <input
+            type="date"
+            name="date_to"
+            defaultValue={dateTo() ?? ""}
+            className="border border-sand/30 px-3 py-1.5 font-sans text-xs text-deep focus:outline-none focus:border-forest/50"
+          />
+        </div>
+        <button
+          type="submit"
+          className="font-sans text-xs px-4 py-1.5 bg-sand/20 text-muted hover:bg-sand/30 transition-colors"
+        >
+          篩選
+        </button>
+        {(clientQ || dateFrom() || dateTo()) && (
+          <a
+            href="/admin/sessions"
+            className="font-sans text-xs px-3 py-1.5 text-muted/60 hover:text-muted transition-colors"
+          >
+            清除
+          </a>
+        )}
+      </form>
+
+      {/* Table */}
+      <div className="bg-white border border-sand/20 overflow-hidden">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-sand/20">
+              <th className="font-sans text-[11px] text-muted text-left px-4 py-3">個案</th>
+              <th className="font-sans text-[11px] text-muted text-left px-4 py-3">晤談日期</th>
+              {!isTherapist && (
+                <th className="font-sans text-[11px] text-muted text-left px-4 py-3 hidden md:table-cell">心理師</th>
               )}
+              <th className="font-sans text-[11px] text-muted text-left px-4 py-3">風險</th>
+              <th className="font-sans text-[11px] text-muted text-left px-4 py-3">狀態</th>
+              {(isTherapist || isDirector) && (
+                <th className="px-4 py-3" />
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {notes.map((note, i) => {
+              const appt = Array.isArray(note.appointments)
+                ? (note.appointments as Record<string, unknown>[])[0]
+                : note.appointments as Record<string, unknown> | null;
+              const rawClients = appt?.clients as { full_name: string } | { full_name: string }[] | null | undefined;
+              const clientName = Array.isArray(rawClients)
+                ? rawClients[0]?.full_name
+                : rawClients?.full_name;
+              const scheduledAt = appt?.scheduled_at as string | null;
+              const riskLevel   = note.risk_level as string | null;
+              const isSubmitted = note.is_submitted as boolean;
 
-              <p className="font-sans text-[10px] text-muted/40 mt-2">
-                {note.is_submitted && note.submitted_at
-                  ? `提交於 ${fmtDate(note.submitted_at)}`
-                  : `更新於 ${fmtDate(note.updated_at)}`}
-              </p>
-            </div>
-          );
-        })}
+              return (
+                <tr
+                  key={note.id as string}
+                  className={`border-b border-sand/10 hover:bg-sand/5 transition-colors ${i % 2 !== 0 ? "bg-sand/5" : ""}`}
+                >
+                  <td className="px-4 py-3 font-sans text-sm text-deep">
+                    {clientName ?? "—"}
+                  </td>
+                  <td className="px-4 py-3 font-sans text-xs text-muted whitespace-nowrap">
+                    {scheduledAt
+                      ? new Date(scheduledAt).toLocaleDateString("zh-TW", {
+                          year: "numeric", month: "short", day: "numeric",
+                        })
+                      : "—"}
+                  </td>
+                  {!isTherapist && (
+                    <td className="px-4 py-3 font-sans text-xs text-muted hidden md:table-cell">
+                      {note.therapist_id ? therapistMap[note.therapist_id as string] ?? "—" : "—"}
+                    </td>
+                  )}
+                  <td className="px-4 py-3">
+                    {riskLevel && riskLevel !== "none" ? (
+                      <span className={`font-sans text-[10px] px-1.5 py-0.5 ${RISK_BADGE[riskLevel] ?? ""}`}>
+                        {RISK_LABEL[riskLevel] ?? riskLevel}
+                      </span>
+                    ) : (
+                      <span className="font-sans text-[10px] text-muted/30">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`font-sans text-[10px] px-2 py-0.5 ${
+                      isSubmitted ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-700"
+                    }`}>
+                      {isSubmitted ? "已提交" : "草稿"}
+                    </span>
+                  </td>
+                  {(isTherapist || isDirector) && (
+                    <td className="px-4 py-3 text-right">
+                      <Link
+                        href={`/admin/sessions/${note.id as string}`}
+                        className="font-sans text-[11px] text-forest hover:underline whitespace-nowrap"
+                      >
+                        {isTherapist && !isSubmitted ? "編輯" : "查看"} →
+                      </Link>
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
 
-        {(notes ?? []).length === 0 && (
-          <div className="text-center py-16 font-sans text-xs text-muted/40">
-            {isAdmin ? "尚未有任何晤談紀錄。" : "您尚未建立任何晤談紀錄。"}
+        {notes.length === 0 && (
+          <div className="text-center py-12 font-sans text-xs text-muted/40">
+            {needsApptFilter ? "找不到符合條件的紀錄。" : isTherapist ? "您尚未建立任何晤談紀錄。" : "尚未有任何晤談紀錄。"}
           </div>
         )}
       </div>
 
-      {!isAdmin && (
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between font-sans text-xs text-muted">
+          <span>共 {totalCount} 筆，第 {page} / {totalPages} 頁</span>
+          <div className="flex gap-1">
+            {page > 1 && (
+              <a href={pageUrl(page - 1)} className="px-3 py-1.5 border border-sand/30 hover:bg-sand/10 transition-colors">
+                ‹ 上一頁
+              </a>
+            )}
+            {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+              const p = totalPages <= 7
+                ? i + 1
+                : page <= 4 ? i + 1
+                : page >= totalPages - 3 ? totalPages - 6 + i
+                : page - 3 + i;
+              return (
+                <a
+                  key={p}
+                  href={pageUrl(p)}
+                  className={`px-3 py-1.5 border transition-colors ${
+                    p === page
+                      ? "border-deep bg-deep text-paper"
+                      : "border-sand/30 hover:bg-sand/10"
+                  }`}
+                >
+                  {p}
+                </a>
+              );
+            })}
+            {page < totalPages && (
+              <a href={pageUrl(page + 1)} className="px-3 py-1.5 border border-sand/30 hover:bg-sand/10 transition-colors">
+                下一頁 ›
+              </a>
+            )}
+          </div>
+        </div>
+      )}
+
+      {isTherapist && (
         <div className="bg-sand/10 border border-sand/20 px-4 py-3">
           <p className="font-sans text-[11px] text-muted">
-            晤談紀錄提交後即無法修改。草稿狀態下可隨時編輯。行政人員可查看所有已提交的紀錄。
+            晤談紀錄提交後即無法修改。草稿狀態下可隨時編輯。所長可查看已提交紀錄的完整內容。
           </p>
         </div>
       )}

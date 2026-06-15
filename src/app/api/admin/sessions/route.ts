@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
   }
   const body = await req.json();
   if (!body.appointment_id) return NextResponse.json({ error: "請選擇預約" }, { status: 400 });
-  if (!body.content?.trim()) return NextResponse.json({ error: "請填寫內容" }, { status: 400 });
+  if (!body.content?.trim()) return NextResponse.json({ error: "請填寫晤談摘要" }, { status: 400 });
 
   const db = createAdminClient();
   // Ensure therapist owns this appointment

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAuthInfo, isAdminLevel } from "@/lib/auth-role";
+import { checkTimeConflict } from "@/lib/appointments";
 import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -33,6 +34,17 @@ export async function PATCH(
     // Admin assigns therapist/room/time → pending_therapist
     if (!isAdminLevel(auth.role)) return NextResponse.json({ error: "未授權" }, { status: 403 });
     if (!body.therapist_id) return NextResponse.json({ error: "請選擇心理師" }, { status: 400 });
+    // Conflict check when both therapist and time are specified
+    if (body.scheduled_at) {
+      const conflict = await checkTimeConflict(
+        db,
+        body.therapist_id as string,
+        body.scheduled_at as string,
+        (body.duration_minutes as number | undefined) ?? appt.duration_minutes ?? 50,
+        id,
+      );
+      if (conflict) return NextResponse.json({ error: conflict }, { status: 409 });
+    }
     update = {
       therapist_id: body.therapist_id,
       room_id: body.room_id ?? null,
@@ -43,6 +55,12 @@ export async function PATCH(
       booking_status: "pending_therapist",
       rejection_reason: null,
     };
+    // Sync client's assigned_therapist_id so therapist sees this client immediately
+    const { error: assignClientErr } = await db
+      .from("clients")
+      .update({ assigned_therapist_id: body.therapist_id })
+      .eq("id", appt.client_id);
+    if (assignClientErr) console.error("assign: clients update failed", assignClientErr.message);
   } else if (action === "confirm") {
     // Therapist confirms their appointment
     if (
@@ -52,6 +70,14 @@ export async function PATCH(
       return NextResponse.json({ error: "未授權" }, { status: 403 });
     }
     update = { booking_status: "confirmed" };
+    // Sync assigned_therapist_id in case assign step didn't persist
+    if (appt.therapist_id && appt.client_id) {
+      const { error: confirmClientErr } = await db
+        .from("clients")
+        .update({ assigned_therapist_id: appt.therapist_id })
+        .eq("id", appt.client_id);
+      if (confirmClientErr) console.error("confirm: clients update failed", confirmClientErr.message);
+    }
     // Send confirmation email to client after update (handled below)
   } else if (action === "reject") {
     // Therapist rejects → back to pending_admin

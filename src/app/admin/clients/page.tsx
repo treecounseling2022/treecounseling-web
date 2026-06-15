@@ -26,10 +26,27 @@ export default async function ClientsPage({
     .eq("is_active", true)
     .order("created_at", { ascending: false });
 
-  // Therapists only see their own assigned clients
+  // Therapists see assigned clients + clients with confirmed/locked appointments
   if (!isAdmin) {
     if (!auth.profileId) return <div className="pt-4 font-sans text-xs text-muted">帳號尚未連結至心理師資料。</div>;
-    query = query.eq("assigned_therapist_id", auth.profileId);
+
+    const { data: apptClients } = await supabase
+      .from("appointments")
+      .select("client_id")
+      .eq("therapist_id", auth.profileId)
+      .in("booking_status", ["confirmed", "locked"]);
+
+    const apptClientIds = [
+      ...new Set((apptClients ?? []).map((a) => a.client_id).filter(Boolean)),
+    ] as string[];
+
+    if (apptClientIds.length > 0) {
+      query = query.or(
+        `assigned_therapist_id.eq.${auth.profileId},id.in.(${apptClientIds.join(",")})`
+      );
+    } else {
+      query = query.eq("assigned_therapist_id", auth.profileId);
+    }
   }
 
   if (q?.trim()) query = query.ilike("full_name", `%${q.trim()}%`);
