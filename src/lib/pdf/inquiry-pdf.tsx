@@ -9,7 +9,6 @@ import {
   renderToBuffer,
 } from "@react-pdf/renderer";
 
-// Font served from public/ — accessible via HTTP on both dev and Vercel
 const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ??
   (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
@@ -22,59 +21,73 @@ Font.register({
 const S = StyleSheet.create({
   page: {
     fontFamily: "NotoSansSC",
-    padding: "48 52",
+    padding: "44 52 60 52",
     fontSize: 10.5,
-    color: "#333",
+    color: "#111",
     lineHeight: 1.65,
+    backgroundColor: "#ffffff",
   },
-  header: { borderBottom: "1.5pt solid #2d4a38", paddingBottom: 10, marginBottom: 18 },
-  title: { fontSize: 17, color: "#2d4a38", marginBottom: 3 },
-  subtitle: { fontSize: 9, color: "#999" },
-  section: { marginBottom: 14 },
+  header: {
+    borderBottom: "2pt solid #111",
+    paddingBottom: 10,
+    marginBottom: 20,
+  },
+  title: { fontSize: 17, color: "#000", fontWeight: "bold", marginBottom: 3 },
+  subtitle: { fontSize: 9, color: "#666" },
+  section: { marginBottom: 16 },
   sectionTitle: {
-    fontSize: 9,
-    color: "#5a8a6a",
-    letterSpacing: 0.8,
-    marginBottom: 6,
-    borderBottom: "0.5pt solid #e8e4dc",
+    fontSize: 9.5,
+    color: "#000",
+    fontWeight: "bold",
+    letterSpacing: 0.5,
+    marginBottom: 7,
+    borderBottom: "1pt solid #ccc",
     paddingBottom: 3,
   },
-  row: { flexDirection: "row", marginBottom: 4 },
-  label: { width: 88, color: "#888", fontSize: 9.5 },
-  value: { flex: 1, color: "#333" },
+  row: { flexDirection: "row", marginBottom: 5 },
+  label: { width: 90, color: "#666", fontSize: 9.5 },
+  value: { flex: 1, color: "#111" },
+  valueBold: { flex: 1, color: "#000", fontWeight: "bold" },
   concernBox: {
-    backgroundColor: "#f7f5ef",
+    backgroundColor: "#f5f5f5",
     padding: "10 12",
-    borderLeft: "3pt solid #5a8a6a",
+    borderLeft: "3pt solid #555",
     marginTop: 4,
-    lineHeight: 1.75,
+    lineHeight: 1.8,
     fontSize: 10,
   },
   partnerBox: {
-    backgroundColor: "#f9f8f5",
-    border: "0.5pt solid #e8e4dc",
-    padding: 10,
+    border: "0.75pt solid #ccc",
+    padding: "10 12",
     marginBottom: 8,
   },
-  partnerTitle: { fontSize: 9.5, color: "#444", marginBottom: 6 },
+  partnerTitle: { fontSize: 10, color: "#000", fontWeight: "bold", marginBottom: 6 },
   tagRow: { flexDirection: "row", flexWrap: "wrap", marginTop: 2 },
   tag: {
-    backgroundColor: "#e8f0eb",
-    color: "#2d4a38",
+    backgroundColor: "#eeeeee",
+    color: "#222",
+    fontSize: 9,
+    padding: "2 6",
+    marginRight: 4,
+    marginBottom: 4,
+  },
+  tagSub: {
+    backgroundColor: "#f8f8f8",
+    color: "#444",
     fontSize: 8.5,
     padding: "2 5",
     marginRight: 3,
     marginBottom: 3,
+    border: "0.5pt solid #ddd",
   },
-  tagSecondary: { backgroundColor: "#f0ede8", color: "#666" },
   footer: {
     position: "absolute",
-    bottom: 26,
+    bottom: 24,
     left: 52,
     right: 52,
-    borderTop: "0.5pt solid #e0ddd8",
+    borderTop: "0.5pt solid #ccc",
     paddingTop: 6,
-    color: "#bbb",
+    color: "#aaa",
     fontSize: 7.5,
   },
 });
@@ -101,11 +114,38 @@ const MEETING_LABEL: Record<string, string> = {
   face: "面談", online: "線上晤談",
 };
 
+const MAIN_CATEGORY_LABEL: Record<string, string> = {
+  addiction: "成癮問題",
+  self_explore: "自我探索",
+  family: "家庭關係",
+  couple_rel: "伴侶關係",
+  parenting: "親子關係",
+  work_press: "工作壓力",
+  academic: "學業 / 生涯",
+  interpersonal: "人際關係",
+  emotion: "情緒困擾",
+  other_issue: "其他困擾",
+};
+
+function calcAgeStr(dob?: string): string | null {
+  if (!dob) return null;
+  try {
+    const birth = new Date(dob);
+    if (isNaN(birth.getTime())) return null;
+    const today = new Date();
+    let age = today.getFullYear() - birth.getFullYear();
+    const m = today.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+    return age >= 0 ? `${dob}（${age} 歲）` : dob;
+  } catch {
+    return dob ?? null;
+  }
+}
+
 export type InquiryPDFData = {
   serviceType: string;
   preferredTimes?: string;
   submittedAt: string;
-  // Individual / Hoarding
   name?: string;
   gender?: string;
   birthday?: string;
@@ -123,7 +163,6 @@ export type InquiryPDFData = {
     counselingDetails?: string;
     therapistRequirements?: string;
   };
-  // Couple
   coupleDetails?: {
     partnerA?: { name?: string; gender?: string; birthday?: string; language?: string };
     partnerB?: { name?: string; gender?: string; birthday?: string; language?: string };
@@ -132,7 +171,6 @@ export type InquiryPDFData = {
     children?: string;
     meetingType?: string;
   };
-  // Workshop / Other
   otherDetails?: {
     companyName?: string;
     contactPerson?: string;
@@ -140,29 +178,34 @@ export type InquiryPDFData = {
   };
 };
 
-function Row({ label, value }: { label: string; value?: string | null }) {
+function Row({ label, value, bold }: { label: string; value?: string | null; bold?: boolean }) {
   if (!value) return null;
   return (
     <View style={S.row}>
       <Text style={S.label}>{label}</Text>
-      <Text style={S.value}>{value}</Text>
+      <Text style={bold ? S.valueBold : S.value}>{value}</Text>
     </View>
   );
 }
 
 function SectionTitle({ children }: { children: string }) {
-  return <Text style={S.sectionTitle}>{children}</Text>;
+  return <Text style={S.sectionTitle}>{children.toUpperCase()}</Text>;
 }
 
 function IndividualContent({ data }: { data: InquiryPDFData }) {
   const d = data.individualDetails;
+  const mainCats = (d?.mainCategories ?? []).map(
+    (id) => MAIN_CATEGORY_LABEL[id] ?? id
+  );
+  const subCats = d?.subCategories ?? [];
+
   return (
     <>
       <View style={S.section}>
         <SectionTitle>個人基本資料</SectionTitle>
-        <Row label="姓名" value={data.name} />
+        <Row label="姓名" value={data.name} bold />
         <Row label="性別" value={GENDER_LABEL[data.gender ?? ""] ?? data.gender} />
-        <Row label="出生日期" value={data.birthday} />
+        <Row label="出生日期" value={calcAgeStr(data.birthday)} />
         <Row label="居住城市" value={data.city} />
         <Row label="晤談方式" value={MEETING_LABEL[data.meetingType ?? ""] ?? data.meetingType} />
         <Row label="母語" value={LANG_LABEL[data.nativeLanguage ?? ""] ?? data.nativeLanguage} />
@@ -171,18 +214,18 @@ function IndividualContent({ data }: { data: InquiryPDFData }) {
         )}
       </View>
 
-      {d && (d.mainCategories?.length ?? 0) > 0 && (
+      {mainCats.length > 0 && (
         <View style={S.section}>
           <SectionTitle>困擾類型</SectionTitle>
           <View style={S.tagRow}>
-            {(d.mainCategories ?? []).map((c) => (
+            {mainCats.map((c) => (
               <Text key={c} style={S.tag}>{c}</Text>
             ))}
           </View>
-          {(d.subCategories?.length ?? 0) > 0 && (
-            <View style={[S.tagRow, { marginTop: 4 }]}>
-              {(d.subCategories ?? []).map((s) => (
-                <Text key={s} style={[S.tag, S.tagSecondary]}>{s}</Text>
+          {subCats.length > 0 && (
+            <View style={[S.tagRow, { marginTop: 5 }]}>
+              {subCats.map((s) => (
+                <Text key={s} style={S.tagSub}>{s}</Text>
               ))}
             </View>
           )}
@@ -211,17 +254,17 @@ function CoupleContent({ data }: { data: InquiryPDFData }) {
       <View style={S.section}>
         <SectionTitle>雙方基本資料</SectionTitle>
         <View style={S.partnerBox}>
-          <Text style={S.partnerTitle}>「A」</Text>
-          <Row label="姓名" value={c.partnerA?.name} />
+          <Text style={S.partnerTitle}>伴侶 A</Text>
+          <Row label="姓名" value={c.partnerA?.name} bold />
           <Row label="性別" value={GENDER_LABEL[c.partnerA?.gender ?? ""] ?? c.partnerA?.gender} />
-          <Row label="出生日期" value={c.partnerA?.birthday} />
+          <Row label="出生日期" value={calcAgeStr(c.partnerA?.birthday)} />
           <Row label="母語" value={LANG_LABEL[c.partnerA?.language ?? ""] ?? c.partnerA?.language} />
         </View>
         <View style={S.partnerBox}>
-          <Text style={S.partnerTitle}>「B」</Text>
-          <Row label="姓名" value={c.partnerB?.name} />
+          <Text style={S.partnerTitle}>伴侶 B</Text>
+          <Row label="姓名" value={c.partnerB?.name} bold />
           <Row label="性別" value={GENDER_LABEL[c.partnerB?.gender ?? ""] ?? c.partnerB?.gender} />
-          <Row label="出生日期" value={c.partnerB?.birthday} />
+          <Row label="出生日期" value={calcAgeStr(c.partnerB?.birthday)} />
           <Row label="母語" value={LANG_LABEL[c.partnerB?.language ?? ""] ?? c.partnerB?.language} />
         </View>
       </View>
@@ -232,7 +275,7 @@ function CoupleContent({ data }: { data: InquiryPDFData }) {
         {c.children && <Row label="子女" value={c.children} />}
         <Row label="晤談方式" value={MEETING_LABEL[c.meetingType ?? ""] ?? c.meetingType} />
         {(c.issues?.length ?? 0) > 0 && (
-          <View style={[S.row, { marginTop: 2 }]}>
+          <View style={[S.row, { marginTop: 3 }]}>
             <Text style={S.label}>遇到的狀況</Text>
             <View style={[S.tagRow, { flex: 1 }]}>
               {(c.issues ?? []).map((i) => (
@@ -252,7 +295,7 @@ function OtherContent({ data }: { data: InquiryPDFData }) {
   return (
     <View style={S.section}>
       <SectionTitle>機構與合作資料</SectionTitle>
-      <Row label="機構名稱" value={o.companyName} />
+      <Row label="機構名稱" value={o.companyName} bold />
       <Row label="聯絡人" value={o.contactPerson} />
       {o.theme && <Row label="項目主題" value={o.theme} />}
     </View>
@@ -283,7 +326,6 @@ function InquiryDocument({ data }: { data: InquiryPDFData }) {
   return (
     <Document title={`預約申請 - ${displayName}`}>
       <Page size="A4" style={S.page}>
-        {/* Header */}
         <View style={S.header}>
           <Text style={S.title}>預約申請資料表</Text>
           <Text style={S.subtitle}>
@@ -291,17 +333,15 @@ function InquiryDocument({ data }: { data: InquiryPDFData }) {
           </Text>
         </View>
 
-        {/* Preferred times */}
         {data.preferredTimes && (
           <View style={S.section}>
             <SectionTitle>可行時段</SectionTitle>
-            <Text style={{ color: "#555", lineHeight: 1.6, fontSize: 10 }}>
+            <Text style={{ color: "#333", lineHeight: 1.7, fontSize: 10 }}>
               {data.preferredTimes}
             </Text>
           </View>
         )}
 
-        {/* Type-specific content */}
         {(data.serviceType === "individual" || data.serviceType === "hoarding") && (
           <IndividualContent data={data} />
         )}
@@ -310,7 +350,6 @@ function InquiryDocument({ data }: { data: InquiryPDFData }) {
           data.serviceType !== "hoarding" &&
           data.serviceType !== "couple" && <OtherContent data={data} />}
 
-        {/* Concern */}
         {data.concern && (
           <View style={S.section}>
             <SectionTitle>{concernLabel}</SectionTitle>
@@ -318,7 +357,6 @@ function InquiryDocument({ data }: { data: InquiryPDFData }) {
           </View>
         )}
 
-        {/* Footer */}
         <Text style={S.footer}>
           此文件由樹心理工作室系統自動生成，僅供內部評估使用。個案聯絡方式請查閱後台管理系統。
         </Text>
