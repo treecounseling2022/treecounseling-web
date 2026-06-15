@@ -521,8 +521,8 @@ export default function AppointmentsPage() {
                 </label>
               </div>
               <div>
-                <label className="font-sans text-[11px] text-muted block mb-1">預定時間</label>
-                <input type="datetime-local" value={assignForm.scheduled_at} onChange={(e) => setAssignForm((f) => ({ ...f, scheduled_at: e.target.value }))} className={inputCls} />
+                <label className="font-sans text-[11px] text-muted block mb-1">預定時間（今天之後）</label>
+                <input type="datetime-local" value={assignForm.scheduled_at} min={new Date().toISOString().slice(0, 16)} onChange={(e) => setAssignForm((f) => ({ ...f, scheduled_at: e.target.value }))} className={inputCls} />
               </div>
               <div>
                 <label className="font-sans text-[11px] text-muted block mb-1">收費（MOP）</label>

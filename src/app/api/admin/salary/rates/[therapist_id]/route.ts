@@ -16,8 +16,13 @@ export async function GET(
   _: NextRequest,
   { params }: { params: Promise<{ therapist_id: string }> }
 ) {
-  if (!(await adminGuard())) return NextResponse.json({ error: "未授權" }, { status: 403 });
+  const auth = await getAuthInfo();
+  if (!auth) return NextResponse.json({ error: "未授權" }, { status: 403 });
   const { therapist_id } = await params;
+  // Therapists can only view their own rates
+  if (!isAdminLevel(auth.role) && auth.profileId !== therapist_id) {
+    return NextResponse.json({ error: "未授權" }, { status: 403 });
+  }
   const db = createAdminClient();
 
   // Return ALL rules (current + historical) so the UI can show a timeline

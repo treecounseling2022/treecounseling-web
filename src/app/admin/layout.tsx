@@ -60,7 +60,7 @@ export default async function AdminLayout({
   }
 
   return (
-    <div className="min-h-screen bg-[#f8f7f4]">
+    <div className="min-h-screen bg-slate-100">
       {auth && (
         <header className="bg-deep text-paper h-12 flex items-center px-6 gap-6">
           <span className="font-serif text-sm mr-4">樹心理後台</span>
@@ -134,6 +134,9 @@ export default async function AdminLayout({
                 </Link>
                 <Link href="/admin/sessions" className="hover:text-paper transition-colors">
                   晤談紀錄
+                </Link>
+                <Link href="/admin/my-salary" className="hover:text-paper transition-colors">
+                  我的薪酬
                 </Link>
               </>
             ) : (

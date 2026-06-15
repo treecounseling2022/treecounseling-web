@@ -187,16 +187,16 @@ export async function POST(request: Request) {
         </div>
       `;
 
-      for (const recipient of clientRecipients) {
-        await resend.emails
-          .send({
+      await Promise.allSettled(
+        clientRecipients.map((recipient) =>
+          resend.emails.send({
             from: FROM,
             to: recipient.email,
             subject: "【樹心理工作室】已收到您的預約申請",
             html: confirmHtml(recipient.name),
           })
-          .catch(console.error);
-      }
+        )
+      );
     }
 
     return NextResponse.json({ success: true });

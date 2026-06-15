@@ -260,6 +260,13 @@ export default function BookingForm() {
   const [signature, setSignature] = useState<string | null>(null);
   const [consent, setConsent] = useState(false);
 
+  // 出生日期最大值：18 歲前（不服務 18 歲以下）
+  const maxBirthdate = (() => {
+    const d = new Date();
+    d.setFullYear(d.getFullYear() - 18);
+    return d.toISOString().slice(0, 10);
+  })();
+
   // ================= MUTATORS =================
 
   const toggleDevice = (dev: string) => {
@@ -327,7 +334,11 @@ export default function BookingForm() {
         errs.birthday = "請選擇出生日期";
       } else {
         const year = birthday.split("-")[0];
-        if (year.length !== 4) errs.birthday = "年份必須為 4 位數";
+        if (year.length !== 4) {
+          errs.birthday = "年份必須為 4 位數";
+        } else if (birthday > maxBirthdate) {
+          errs.birthday = "申請人須年滿 18 歲，工作室暫不服務未成年人士";
+        }
       }
       if (!contactId.trim()) errs.contactId = "請輸入聯絡帳號/ID";
       if (!email.trim() || !email.includes("@")) errs.email = "請輸入有效的電郵地址";
@@ -358,7 +369,11 @@ export default function BookingForm() {
         errs.birthdayA = "[A] 生日為必填";
       } else {
         const year = birthdayA.split("-")[0];
-        if (year.length !== 4) errs.birthdayA = "[A] 年份必須為 4 位數";
+        if (year.length !== 4) {
+          errs.birthdayA = "[A] 年份必須為 4 位數";
+        } else if (birthdayA > maxBirthdate) {
+          errs.birthdayA = "[A] 申請人須年滿 18 歲";
+        }
       }
       if (!nameB.trim()) errs.nameB = "[B] 姓名為必填";
       if (!genderB) errs.genderB = "[B] 性別為必填";
@@ -366,7 +381,11 @@ export default function BookingForm() {
         errs.birthdayB = "[B] 生日為必填";
       } else {
         const year = birthdayB.split("-")[0];
-        if (year.length !== 4) errs.birthdayB = "[B] 年份必須為 4 位數";
+        if (year.length !== 4) {
+          errs.birthdayB = "[B] 年份必須為 4 位數";
+        } else if (birthdayB > maxBirthdate) {
+          errs.birthdayB = "[B] 申請人須年滿 18 歲";
+        }
       }
       if (coupleIssues.length === 0) errs.coupleIssues = "請至少選擇一項遇到的狀況";
       if (!relationshipDuration.trim()) errs.relationshipDuration = "請填寫關係時長";
@@ -689,11 +708,11 @@ export default function BookingForm() {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <Field label="出生日期" required error={formErrors.birthday}>
+                  <Field label="出生日期" required error={formErrors.birthday} hint="服務對象為 18 歲或以上">
                     <input
                       type="date"
                       min="1900-01-01"
-                      max="9999-12-31"
+                      max={maxBirthdate}
                       value={birthday}
                       onChange={(e) => setBirthday(e.target.value)}
                       className={inputClass(!!formErrors.birthday)}
@@ -1087,11 +1106,11 @@ export default function BookingForm() {
                     </Field>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <Field label="出生日期" required error={formErrors.birthdayA}>
+                    <Field label="出生日期" required error={formErrors.birthdayA} hint="18 歲或以上">
                       <input
                         type="date"
                         min="1900-01-01"
-                        max="9999-12-31"
+                        max={maxBirthdate}
                         value={birthdayA}
                         onChange={(e) => setBirthdayA(e.target.value)}
                         className={inputClass(!!formErrors.birthdayA)}
@@ -1133,11 +1152,11 @@ export default function BookingForm() {
                     </Field>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <Field label="出生日期" required error={formErrors.birthdayB}>
+                    <Field label="出生日期" required error={formErrors.birthdayB} hint="18 歲或以上">
                       <input
                         type="date"
                         min="1900-01-01"
-                        max="9999-12-31"
+                        max={maxBirthdate}
                         value={birthdayB}
                         onChange={(e) => setBirthdayB(e.target.value)}
                         className={inputClass(!!formErrors.birthdayB)}

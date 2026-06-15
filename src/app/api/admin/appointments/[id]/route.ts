@@ -95,6 +95,7 @@ export async function PATCH(
       scheduled_at: null,
       rejection_reason: body.rejection_reason ?? null,
     };
+    // Notify admin of rejection (handled after DB update below)
   } else if (action === "lock") {
     if (!isAdminLevel(auth.role)) return NextResponse.json({ error: "未授權" }, { status: 403 });
     update = { booking_status: "locked" };
@@ -119,6 +120,14 @@ export async function PATCH(
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+  const FROM = process.env.RESEND_FROM_EMAIL ?? "noreply@treecounseling.com";
+  const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://treecounseling-web.vercel.app";
+  const ADMIN_EMAIL = process.env.ADMIN_NOTIFICATION_EMAIL;
+  const WHATSAPP_LINK = "https://wa.me/85362772234";
+
+  const tdL = `style="color:#333;padding:8px 18px 8px 0;border-bottom:1px solid #e0e0e0;white-space:nowrap;font-size:14px;font-weight:600"`;
+  const tdR = `style="padding:8px 0;border-bottom:1px solid #e0e0e0;font-size:14px;color:#111"`;
+
   // After admin assigns, send email to therapist
   if (action === "assign" && data?.therapist_id && process.env.RESEND_API_KEY) {
     const [{ data: therapistProfile }, { data: clientData }] = await Promise.all([
@@ -128,63 +137,118 @@ export async function PATCH(
         : Promise.resolve({ data: null }),
     ]);
     if (therapistProfile?.email) {
-      const adminUrl = `${process.env.NEXT_PUBLIC_SITE_URL ?? "https://treecounseling-web.vercel.app"}/admin/appointments`;
-      const tdL = `style="color:#555;padding:6px 16px 6px 0;border-bottom:1px solid #eee;white-space:nowrap;font-size:0.88rem"`;
-      const tdR = `style="padding:6px 0;border-bottom:1px solid #eee;font-size:0.9rem;color:#111"`;
+      const adminUrl = `${SITE}/admin/appointments`;
       await resend.emails.send({
-        from: process.env.RESEND_FROM_EMAIL ?? "noreply@treecounseling.com",
+        from: FROM,
         to: therapistProfile.email,
         subject: "【樹心理工作室】新派案通知",
         html: `
-          <div style="font-family:sans-serif;max-width:500px;margin:0 auto;color:#111;line-height:1.7">
-            <h2 style="font-size:1.1rem;border-bottom:2px solid #111;padding-bottom:8px;margin-bottom:16px">新派案通知</h2>
-            <p style="margin:0 0 4px">您好，${therapistProfile.name ?? ""}，</p>
-            <p style="margin:0 0 16px;color:#444">行政已為您安排一個新個案，請登入後台確認是否接案。</p>
-            <table style="width:100%;border-collapse:collapse;margin:0 0 20px">
-              <tr><td ${tdL}>個案</td><td ${tdR}><strong>${clientData?.full_name ?? "—"}</strong></td></tr>
-              ${data.scheduled_at ? `<tr><td ${tdL}>預計時間</td><td ${tdR}>${new Date(data.scheduled_at).toLocaleString("zh-TW", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Macau" })}</td></tr>` : ""}
-            </table>
-            <p><a href="${adminUrl}" style="color:#111;font-weight:bold;text-decoration:underline">前往後台確認 →</a></p>
-            <p style="color:#888;font-size:0.8rem;margin-top:24px;border-top:1px solid #eee;padding-top:10px">樹心理工作室　Tree Counseling Studio</p>
+          <div style="font-family:sans-serif;max-width:520px;margin:0 auto;color:#111;line-height:1.75;font-size:14px">
+            <div style="background:#2d4a38;padding:24px 32px 20px">
+              <p style="margin:0 0 4px;color:#a8c5b0;font-size:11px;letter-spacing:1.5px">TREE COUNSELING STUDIO</p>
+              <p style="margin:0;color:#fff;font-size:18px;font-weight:600">新派案通知</p>
+            </div>
+            <div style="background:#fff;padding:28px 32px">
+              <p style="margin:0 0 12px">您好，<strong>${therapistProfile.name ?? ""}</strong>，</p>
+              <p style="margin:0 0 20px;color:#444">行政已為您安排一個新個案，請登入後台確認是否接案。</p>
+              <table style="width:100%;border-collapse:collapse;margin:0 0 24px">
+                <tr><td ${tdL}>個案</td><td ${tdR}><strong>${clientData?.full_name ?? "—"}</strong></td></tr>
+                ${data.scheduled_at ? `<tr><td ${tdL}>預計時間</td><td ${tdR}>${new Date(data.scheduled_at).toLocaleString("zh-TW", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Macau" })}</td></tr>` : ""}
+              </table>
+              <p><a href="${adminUrl}" style="display:inline-block;background:#2d4a38;color:#fff;padding:10px 22px;text-decoration:none;font-size:13px;font-weight:600">前往後台確認 →</a></p>
+            </div>
+            <div style="background:#f7f5ef;padding:14px 32px;text-align:center">
+              <p style="margin:0;color:#999;font-size:11px">樹心理工作室　Tree Counseling Studio</p>
+            </div>
           </div>
         `,
       }).catch(console.error);
     }
   }
 
-  // After therapist confirms, send email to client
+  // After therapist rejects, notify admin
+  if (action === "reject" && process.env.RESEND_API_KEY && ADMIN_EMAIL) {
+    const [{ data: therapistProfile }, { data: clientData }] = await Promise.all([
+      appt.therapist_id
+        ? db.from("therapist_profiles").select("name").eq("id", appt.therapist_id).single()
+        : Promise.resolve({ data: null }),
+      appt.client_id
+        ? db.from("clients").select("full_name").eq("id", appt.client_id).single()
+        : Promise.resolve({ data: null }),
+    ]);
+    const adminUrl = `${SITE}/admin/appointments`;
+    await resend.emails.send({
+      from: FROM,
+      to: ADMIN_EMAIL,
+      subject: "【樹心理工作室】心理師拒絕接案通知",
+      html: `
+        <div style="font-family:sans-serif;max-width:520px;margin:0 auto;color:#111;line-height:1.75;font-size:14px">
+          <div style="background:#7f1d1d;padding:24px 32px 20px">
+            <p style="margin:0 0 4px;color:#fca5a5;font-size:11px;letter-spacing:1.5px">TREE COUNSELING STUDIO</p>
+            <p style="margin:0;color:#fff;font-size:18px;font-weight:600">心理師拒絕接案</p>
+          </div>
+          <div style="background:#fff;padding:28px 32px">
+            <p style="margin:0 0 20px;color:#444">以下預約已被心理師拒絕，請重新安排派案。</p>
+            <table style="width:100%;border-collapse:collapse;margin:0 0 24px">
+              <tr><td ${tdL}>個案</td><td ${tdR}><strong>${clientData?.full_name ?? "—"}</strong></td></tr>
+              <tr><td ${tdL}>原心理師</td><td ${tdR}>${therapistProfile?.name ?? "—"}</td></tr>
+              ${body.rejection_reason ? `<tr><td ${tdL}>拒絕原因</td><td ${tdR}>${String(body.rejection_reason)}</td></tr>` : ""}
+            </table>
+            <p><a href="${adminUrl}" style="display:inline-block;background:#7f1d1d;color:#fff;padding:10px 22px;text-decoration:none;font-size:13px;font-weight:600">前往後台重新派案 →</a></p>
+          </div>
+          <div style="background:#f7f5ef;padding:14px 32px;text-align:center">
+            <p style="margin:0;color:#999;font-size:11px">樹心理工作室　Tree Counseling Studio</p>
+          </div>
+        </div>
+      `,
+    }).catch(console.error);
+  }
+
+  // After therapist confirms, send email to client with full details
   if (action === "confirm" && data?.client_id && process.env.RESEND_API_KEY) {
-    const { data: client } = await db
-      .from("clients")
-      .select("full_name, email")
-      .eq("id", data.client_id)
-      .single();
+    const [{ data: client }, { data: therapistProfile }] = await Promise.all([
+      db.from("clients").select("full_name, email").eq("id", data.client_id).single(),
+      data.therapist_id
+        ? db.from("therapist_profiles").select("name").eq("id", data.therapist_id).single()
+        : Promise.resolve({ data: null }),
+    ]);
     if (client?.email) {
       const scheduledAt = data.scheduled_at
         ? new Date(data.scheduled_at).toLocaleString("zh-TW", {
             year: "numeric", month: "long", day: "numeric",
-            hour: "2-digit", minute: "2-digit", timeZone: "Asia/Macau",
+            weekday: "long", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Macau",
           })
         : "（待另行通知）";
-      const tdL = `style="color:#555;padding:6px 16px 6px 0;border-bottom:1px solid #eee;white-space:nowrap;font-size:0.88rem"`;
-      const tdR = `style="padding:6px 0;border-bottom:1px solid #eee;font-size:0.9rem;color:#111"`;
       await resend.emails.send({
-        from: process.env.RESEND_FROM_EMAIL ?? "noreply@treecounseling.com",
+        from: FROM,
         to: client.email,
-        subject: "【樹心理工作室】預約確認通知",
+        subject: "【樹心理工作室】諮商晤談預約確認",
         html: `
-          <div style="font-family:sans-serif;max-width:500px;margin:0 auto;color:#111;line-height:1.7">
-            <h2 style="font-size:1.1rem;border-bottom:2px solid #111;padding-bottom:8px;margin-bottom:16px">預約確認通知</h2>
-            <p style="margin:0 0 16px">您好，${client.full_name}，</p>
-            <p style="margin:0 0 16px;color:#444">您的預約已由心理師確認，詳情如下：</p>
-            <table style="width:100%;border-collapse:collapse;margin:0 0 20px">
-              <tr><td ${tdL}>預約時間</td><td ${tdR}>${scheduledAt}</td></tr>
-            </table>
-            <p style="color:#444">如需更改或取消，請儘早與我們聯繫。</p>
-            <p style="color:#888;font-size:0.8rem;margin-top:24px;border-top:1px solid #eee;padding-top:10px">樹心理工作室　Tree Counseling Studio</p>
+          <div style="font-family:sans-serif;max-width:520px;margin:0 auto;color:#111;line-height:1.75;font-size:14px">
+            <div style="background:#2d4a38;padding:24px 32px 20px">
+              <p style="margin:0 0 4px;color:#a8c5b0;font-size:11px;letter-spacing:1.5px">TREE COUNSELING STUDIO</p>
+              <p style="margin:0;color:#fff;font-size:18px;font-weight:600">諮商晤談預約確認</p>
+            </div>
+            <div style="background:#fff;padding:28px 32px">
+              <p style="margin:0 0 12px">您好，<strong>${client.full_name}</strong>，</p>
+              <p style="margin:0 0 20px;color:#444">您的諮商晤談預約已由心理師確認，詳情如下：</p>
+              <table style="width:100%;border-collapse:collapse;margin:0 0 24px">
+                <tr><td ${tdL}>晤談時間</td><td ${tdR}><strong>${scheduledAt}</strong></td></tr>
+                ${therapistProfile?.name ? `<tr><td ${tdL}>晤談人員</td><td ${tdR}>${therapistProfile.name} 心理輔導師</td></tr>` : ""}
+                <tr><td ${tdL}>晤談方式</td><td ${tdR}>${data.is_online ? "線上晤談（視訊）" : "到診面談"}</td></tr>
+              </table>
+              <div style="background:#f0f5f1;border-left:3px solid #5a8a6a;padding:14px 18px;margin:0 0 20px">
+                <p style="margin:0;color:#2d4a38;font-size:13px;line-height:1.7">如需更改時間或取消，請於晤談前 <strong>24 小時</strong> 聯繫行政人員。</p>
+              </div>
+              <p style="margin:0 0 8px;color:#555;font-size:13px">有任何問題，歡迎透過 WhatsApp 聯繫我們：</p>
+              <p><a href="${WHATSAPP_LINK}" style="display:inline-block;background:#25d366;color:#fff;padding:10px 22px;text-decoration:none;font-size:13px;font-weight:600">WhatsApp 聯繫我們 →</a></p>
+            </div>
+            <div style="background:#f7f5ef;padding:14px 32px;text-align:center">
+              <p style="margin:0;color:#999;font-size:11px">樹心理工作室　Tree Counseling Studio</p>
+            </div>
           </div>
         `,
-      });
+      }).catch(console.error);
     }
   }
 

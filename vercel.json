@@ -10,5 +10,11 @@
         { "key": "X-Robots-Tag", "value": "noindex, nofollow" }
       ]
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/appointment-reminders",
+      "schedule": "0 1 * * *"
+    }
   ]
 }
