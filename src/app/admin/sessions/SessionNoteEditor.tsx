@@ -85,7 +85,7 @@ export default function SessionNoteEditor(props: Props) {
 
   // Derive isIntake: for new notes, check selected appointment; for edit, use prop
   const selectedApptIsIntake = !isEdit
-    ? (props.availableAppointments?.find((a) => a.id === appointmentId)?.sessionType === "intake") ?? false
+    ? props.availableAppointments?.find((a) => a.id === appointmentId)?.sessionType === "intake"
     : (props.isIntake ?? false);
   const showIntakeFields = selectedApptIsIntake;
 
