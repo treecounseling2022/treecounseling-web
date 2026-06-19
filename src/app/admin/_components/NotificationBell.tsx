@@ -27,6 +27,8 @@ export function NotificationBell({ pendingInquiries, pendingAppointments, role }
       <button
         onClick={() => setOpen((o) => !o)}
         aria-label="通知"
+        aria-expanded={open}
+        aria-haspopup="true"
         className="relative p-1.5 text-paper/60 hover:text-paper hover:bg-paper/10 rounded transition-colors"
       >
         <svg
@@ -45,7 +47,7 @@ export function NotificationBell({ pendingInquiries, pendingAppointments, role }
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-1.5 w-52 bg-white border border-sand/20 shadow-lg z-50 py-1">
+        <div className="absolute right-0 top-full mt-1.5 w-52 bg-white border border-sand/20 shadow-sm z-50 py-1">
           <p className="font-sans text-[10px] text-muted/60 px-3 py-1.5 border-b border-sand/10 uppercase tracking-wide">
             待處理
           </p>

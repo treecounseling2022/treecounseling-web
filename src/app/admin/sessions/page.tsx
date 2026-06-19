@@ -6,9 +6,9 @@ import { requireAuth } from "@/lib/auth-role";
 const PAGE_SIZE = 20;
 
 const RISK_BADGE: Record<string, string> = {
-  low:    "bg-blue-50 text-blue-700",
-  medium: "bg-amber-50 text-amber-700",
-  high:   "bg-red-50 text-red-700",
+  low:    "adm-badge-neutral",
+  medium: "adm-badge-warning",
+  high:   "adm-badge-danger",
 };
 const RISK_LABEL: Record<string, string> = {
   low: "低", medium: "中", high: "高",
@@ -143,9 +143,6 @@ export default async function SessionsPage({ searchParams }: Props) {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <p className="font-sans text-xs text-muted mb-1">
-            <a href="/admin" className="hover:text-forest">後台</a> / 晤談紀錄
-          </p>
           <h1 className="font-serif text-deep text-2xl">晤談紀錄</h1>
           <p className="font-sans text-xs text-muted mt-0.5">
             {isTherapist ? "我的晤談紀錄" : isDirector ? "所有晤談紀錄" : "繳交狀態總覽"}

@@ -7,7 +7,7 @@ export async function GET() {
   if (!auth) return NextResponse.json({ error: "未授權" }, { status: 403 });
   const db = createAdminClient();
 
-  let query = db.from("therapist_profiles").select("id, name, name_en, services").order("name");
+  let query = db.from("therapist_profiles").select("id, name, name_en, services, google_meet_link").order("name");
   if (auth.role === "therapist") {
     if (!auth.profileId) return NextResponse.json([], { status: 200 });
     query = query.eq("id", auth.profileId);

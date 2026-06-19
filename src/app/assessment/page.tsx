@@ -235,7 +235,7 @@ export default function AssessmentPage() {
                   {analysis.suicidalWarning && (
                     <div className="p-6 border border-red-800/20 bg-red-500/5 text-red-800/90 space-y-2">
                       <p className="font-sans text-sm font-bold">⚠️ 安全提示</p>
-                      <p className="font-sans text-xs leading-relaxed">
+                      <p className="font-sans text-sm leading-relaxed">
                         {analysis.suicidalWarning}
                       </p>
                     </div>
@@ -272,7 +272,7 @@ export default function AssessmentPage() {
 
                   {/* Disclaimer */}
                   <div className="pt-4 text-center">
-                    <p className="text-[10px] font-sans text-muted/40 leading-relaxed">
+                    <p className="text-xs font-sans text-muted/40 leading-relaxed">
                       聲明：本心理自評結果僅供參考，不能替代專業的心理諮商或輔導評估。<br />
                       如遇到即時性的生命威脅或緊急危機，請立即致電澳門生命熱線：2852 5777 或求助警方。
                     </p>

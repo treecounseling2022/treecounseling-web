@@ -102,7 +102,7 @@ export default async function TeamPage() {
                     <div className="flex flex-col justify-between h-full space-y-4">
                       <div className="space-y-2">
                         <div className="space-y-0.5">
-                          <p className="font-sans text-[10px] text-sand tracking-widest uppercase">
+                          <p className="font-sans text-xs text-sand tracking-widest uppercase">
                             {member.title}
                           </p>
                           <h2 className="font-serif text-deep text-xl group-hover:text-forest transition-colors">
@@ -113,7 +113,7 @@ export default async function TeamPage() {
                           )}
                         </div>
 
-                        <p className="font-sans text-muted text-xs leading-relaxed line-clamp-3">
+                        <p className="font-sans text-muted text-sm leading-relaxed line-clamp-3">
                           {member.bio}
                         </p>
                       </div>

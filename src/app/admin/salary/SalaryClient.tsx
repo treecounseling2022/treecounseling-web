@@ -269,9 +269,6 @@ export default function SalaryClient() {
   return (
     <div className="space-y-6 pt-4">
       <div>
-        <p className="font-sans text-xs text-muted mb-1">
-          <a href="/admin" className="hover:text-forest">後台</a> / 薪酬系統
-        </p>
         <h1 className="font-serif text-deep text-2xl">薪酬計算</h1>
         <p className="font-sans text-xs text-muted mt-0.5">
           依各心理師抽成設定，計算當月分成（含諮商及講座）。
@@ -354,7 +351,7 @@ export default function SalaryClient() {
               </div>
               <div className="grid grid-cols-5 gap-4 text-right font-sans text-sm">
                 <div>
-                  <p className="text-[10px] text-muted">諮商堂</p>
+                  <p className="text-[10px] text-muted">諮商次數</p>
                   <p className="text-deep">{row.sessions}</p>
                 </div>
                 <div>

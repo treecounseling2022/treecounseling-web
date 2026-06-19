@@ -6,7 +6,7 @@ import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-type Action = "assign" | "confirm" | "reject" | "lock" | "cancel" | "complete";
+type Action = "assign" | "confirm" | "reject" | "lock" | "cancel" | "complete" | "reschedule";
 
 export async function PATCH(
   req: NextRequest,
@@ -53,6 +53,7 @@ export async function PATCH(
       plan_id: body.plan_id ?? null,
       arrangement_type: body.arrangement_type ?? null,
       is_online: (body.is_online as boolean | undefined) ?? false,
+      meeting_link: (body.meeting_link as string | null | undefined) ?? null,
       booking_status: "pending_therapist",
       rejection_reason: null,
     };
@@ -96,6 +97,24 @@ export async function PATCH(
       rejection_reason: body.rejection_reason ?? null,
     };
     // Notify admin of rejection (handled after DB update below)
+  } else if (action === "reschedule") {
+    // Admin reschedules an existing confirmed/locked appointment
+    if (!isAdminLevel(auth.role)) return NextResponse.json({ error: "未授權" }, { status: 403 });
+    if (!body.scheduled_at) return NextResponse.json({ error: "請選擇新時間" }, { status: 400 });
+    if (appt.therapist_id) {
+      const conflict = await checkTimeConflict(
+        db,
+        appt.therapist_id,
+        body.scheduled_at as string,
+        (body.duration_minutes as number | undefined) ?? appt.duration_minutes ?? 50,
+        id,
+      );
+      if (conflict) return NextResponse.json({ error: conflict }, { status: 409 });
+    }
+    update = {
+      scheduled_at: body.scheduled_at,
+      ...(body.room_id !== undefined ? { room_id: body.room_id || null } : {}),
+    };
   } else if (action === "lock") {
     if (!isAdminLevel(auth.role)) return NextResponse.json({ error: "未授權" }, { status: 403 });
     update = { booking_status: "locked" };
@@ -254,6 +273,7 @@ export async function PATCH(
                 <tr><td ${tdL}>晤談時間</td><td ${tdR}><strong>${scheduledAt}</strong></td></tr>
                 ${therapistProfile?.name ? `<tr><td ${tdL}>晤談人員</td><td ${tdR}>${therapistProfile.name} 心理輔導師</td></tr>` : ""}
                 <tr><td ${tdL}>晤談方式</td><td ${tdR}>${data.is_online ? "線上晤談（視訊）" : "到診面談"}</td></tr>
+                ${data.is_online && data.meeting_link ? `<tr><td ${tdL}>視訊連結</td><td ${tdR}><a href="${data.meeting_link}" style="color:#2d4a38;word-break:break-all">${data.meeting_link}</a></td></tr>` : ""}
               </table>
               <div style="background:#f0f5f1;border-left:3px solid #5a8a6a;padding:14px 18px;margin:0 0 20px">
                 <p style="margin:0;color:#2d4a38;font-size:13px;line-height:1.7">如需更改時間或取消，請於晤談前 <strong>24 小時</strong> 聯繫行政人員。</p>

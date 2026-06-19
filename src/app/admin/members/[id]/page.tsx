@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { TEAM } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { requireAuth, isAdminLevel } from "@/lib/auth-role";
+import { requireAuth } from "@/lib/auth-role";
 import TherapistProfileEditor from "./TherapistProfileEditor";
 import TherapistAvailability from "./TherapistAvailability";
 
@@ -36,17 +36,6 @@ export default async function MemberEditPage({ params }: Props) {
   return (
     <div className="space-y-6 pt-4">
       <div>
-        <p className="font-sans text-xs text-muted mb-1">
-          {isAdminLevel(auth.role) ? (
-            <a href="/admin/members" className="hover:text-forest">
-              成員資料
-            </a>
-          ) : (
-            "我的資料"
-          )}
-          {" / "}
-          {displayName}
-        </p>
         <h1 className="font-serif text-deep text-2xl">{displayName}</h1>
         {profile?.title && (
           <p className="font-sans text-xs text-muted mt-0.5">{profile.title}</p>

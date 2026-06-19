@@ -173,7 +173,7 @@ export default function AdminAppointmentPayments({
           onClick={() => setModal(null)}
         >
           <div
-            className="bg-white p-6 w-full max-w-sm space-y-4 shadow-lg"
+            className="bg-white p-6 w-full max-w-sm space-y-4 shadow-sm"
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="font-serif text-deep text-lg">登記收款</h3>

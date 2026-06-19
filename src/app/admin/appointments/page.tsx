@@ -23,6 +23,8 @@ type Appointment = {
   session_fee: number | null;
   currency: string;
   is_first_session: boolean;
+  is_online: boolean;
+  meeting_link: string | null;
   client_intake_notes: string | null;
   arrangement_type: string | null;
   rejection_reason: string | null;
@@ -34,7 +36,7 @@ type Appointment = {
 
 type Client = { id: string; full_name: string; phone: string | null };
 type Room = { id: string; name: string; color: string; is_active: boolean };
-type Therapist = { id: string; name: string };
+type Therapist = { id: string; name: string; google_meet_link: string | null };
 type ServicePlan = { id: string; name: string; price_per_session: number; currency: string };
 
 // ─── Status config ───────────────────────────────────────────
@@ -47,12 +49,12 @@ const STATUS_LABEL: Record<BookingStatus, string> = {
   cancelled: "已取消",
 };
 const STATUS_COLOR: Record<BookingStatus, string> = {
-  pending_admin: "bg-amber-50 text-amber-700",
-  pending_therapist: "bg-blue-50 text-blue-700",
-  confirmed: "bg-green-50 text-green-700",
-  rejected: "bg-red-50 text-red-700",
-  locked: "bg-gray-100 text-gray-500",
-  cancelled: "bg-gray-50 text-gray-400",
+  pending_admin:    "adm-badge-warning",
+  pending_therapist:"adm-badge-info",
+  confirmed:        "adm-badge-success",
+  rejected:         "adm-badge-danger",
+  locked:           "adm-badge-neutral",
+  cancelled:        "adm-badge-faded",
 };
 
 // ─── Helpers ─────────────────────────────────────────────────
@@ -88,6 +90,8 @@ export default function AppointmentsPage() {
   const [assignModal, setAssignModal] = useState<Appointment | null>(null);
   const [rejectModal, setRejectModal] = useState<Appointment | null>(null);
   const [detailModal, setDetailModal] = useState<Appointment | null>(null);
+  const [rescheduleModal, setRescheduleModal] = useState<Appointment | null>(null);
+  const [rescheduleForm, setRescheduleForm] = useState({ scheduled_at: "", room_id: "" });
 
   // New appointment form
   const [newForm, setNewForm] = useState({
@@ -103,10 +107,15 @@ export default function AppointmentsPage() {
     therapist_id: "",
     room_id: "",
     is_online: false,
+    meeting_link: "",
+    use_custom_link: false,
     scheduled_at: "",
     session_fee: "",
     arrangement_type: "",
   });
+
+  const getTherapistMeetLink = (therapistId: string) =>
+    therapists.find((t) => t.id === therapistId)?.google_meet_link ?? "";
 
   const [rejectReason, setRejectReason] = useState("");
   const [working, setWorking] = useState(false);
@@ -205,17 +214,31 @@ export default function AppointmentsPage() {
       therapist_id: assignForm.therapist_id,
       room_id: assignForm.room_id || null,
       is_online: assignForm.is_online,
+      meeting_link: assignForm.is_online ? (assignForm.meeting_link || null) : null,
       scheduled_at: assignForm.scheduled_at || null,
       session_fee: assignForm.session_fee ? +assignForm.session_fee : null,
       arrangement_type: assignForm.arrangement_type || null,
     });
-    if (ok) { setAssignModal(null); setAssignForm({ therapist_id: "", room_id: "", is_online: false, scheduled_at: "", session_fee: "", arrangement_type: "" }); }
+    if (ok) {
+      setAssignModal(null);
+      setAssignForm({ therapist_id: "", room_id: "", is_online: false, meeting_link: "", use_custom_link: false, scheduled_at: "", session_fee: "", arrangement_type: "" });
+    }
   }
 
   async function doReject() {
     if (!rejectModal) return;
     const ok = await action(rejectModal.id, { action: "reject", rejection_reason: rejectReason });
     if (ok) { setRejectModal(null); setRejectReason(""); }
+  }
+
+  async function doReschedule() {
+    if (!rescheduleModal || !rescheduleForm.scheduled_at) { setErr("請選擇新的預約時間"); return; }
+    const ok = await action(rescheduleModal.id, {
+      action: "reschedule",
+      scheduled_at: rescheduleForm.scheduled_at,
+      room_id: rescheduleForm.room_id || null,
+    });
+    if (ok) { setRescheduleModal(null); setRescheduleForm({ scheduled_at: "", room_id: "" }); }
   }
 
   const inputCls = "w-full border border-sand/30 px-3 py-2 font-sans text-sm text-deep focus:outline-none focus:border-forest/50";
@@ -274,6 +297,8 @@ export default function AppointmentsPage() {
                   therapist_id: appt.therapist_id ?? "",
                   room_id: appt.room_id ?? "",
                   is_online: false,
+                  meeting_link: "",
+                  use_custom_link: false,
                   scheduled_at: appt.scheduled_at ? new Date(appt.scheduled_at).toISOString().slice(0,16) : "",
                   session_fee: appt.session_fee?.toString() ?? "",
                   arrangement_type: appt.arrangement_type ?? "",
@@ -306,12 +331,43 @@ export default function AppointmentsPage() {
           ) : null}
 
           {!isTherapist && appt.booking_status === "confirmed" ? (
+            <>
+              <button
+                onClick={() => action(appt.id, { action: "lock" })}
+                disabled={working}
+                className="font-sans text-[11px] px-3 py-1.5 bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40 transition-colors"
+              >
+                鎖定
+              </button>
+              <button
+                onClick={() => {
+                  setRescheduleForm({
+                    scheduled_at: appt.scheduled_at ? new Date(appt.scheduled_at).toISOString().slice(0, 16) : "",
+                    room_id: appt.room_id ?? "",
+                  });
+                  setErr("");
+                  setRescheduleModal(appt);
+                }}
+                className="font-sans text-[11px] px-3 py-1.5 bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors"
+              >
+                修改時間
+              </button>
+            </>
+          ) : null}
+
+          {!isTherapist && appt.booking_status === "locked" ? (
             <button
-              onClick={() => action(appt.id, { action: "lock" })}
-              disabled={working}
-              className="font-sans text-[11px] px-3 py-1.5 bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40 transition-colors"
+              onClick={() => {
+                setRescheduleForm({
+                  scheduled_at: appt.scheduled_at ? new Date(appt.scheduled_at).toISOString().slice(0, 16) : "",
+                  room_id: appt.room_id ?? "",
+                });
+                setErr("");
+                setRescheduleModal(appt);
+              }}
+              className="font-sans text-[11px] px-3 py-1.5 bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors"
             >
-              鎖定
+              修改時間
             </button>
           ) : null}
 
@@ -341,9 +397,6 @@ export default function AppointmentsPage() {
     <div className="space-y-6 pt-4">
       <div className="flex items-start justify-between">
         <div>
-          <p className="font-sans text-xs text-muted mb-1">
-            <a href="/admin" className="hover:text-forest">後台</a> / {isTherapist ? "我的預約" : "預約派案"}
-          </p>
           <h1 className="font-serif text-deep text-2xl">
             {isTherapist ? "我的預約" : "預約派案"}
           </h1>
@@ -414,7 +467,7 @@ export default function AppointmentsPage() {
       {/* ── New Appointment Modal ── */}
       {newModal && (
         <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50 p-4" onClick={() => setNewModal(false)}>
-          <div className="bg-white p-6 w-full max-w-md space-y-4 shadow-lg" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white p-6 w-full max-w-md space-y-4 shadow-sm" onClick={(e) => e.stopPropagation()}>
             <h2 className="font-serif text-deep text-lg">新增預約申請</h2>
 
             <div className="space-y-3">
@@ -491,13 +544,23 @@ export default function AppointmentsPage() {
       {/* ── Assign Modal ── */}
       {assignModal && (
         <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50 p-4" onClick={() => setAssignModal(null)}>
-          <div className="bg-white p-6 w-full max-w-md space-y-4 shadow-lg" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white p-6 w-full max-w-md space-y-4 shadow-sm" onClick={(e) => e.stopPropagation()}>
             <h2 className="font-serif text-deep text-lg">排案 — {assignModal.clients?.full_name}</h2>
 
             <div className="space-y-3">
               <div>
                 <label className="font-sans text-[11px] text-muted block mb-1">心理師 *</label>
-                <select value={assignForm.therapist_id} onChange={(e) => setAssignForm((f) => ({ ...f, therapist_id: e.target.value }))} className={inputCls}>
+                <select
+                  value={assignForm.therapist_id}
+                  onChange={(e) => setAssignForm((f) => ({
+                    ...f,
+                    therapist_id: e.target.value,
+                    ...(f.is_online && !f.use_custom_link
+                      ? { meeting_link: getTherapistMeetLink(e.target.value) }
+                      : {}),
+                  }))}
+                  className={inputCls}
+                >
                   <option value="">請選擇…</option>
                   {therapists.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
@@ -509,16 +572,74 @@ export default function AppointmentsPage() {
                   {rooms.filter((r) => r.is_active).map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
                 </select>
               </div>
-              <div className="border-t border-sand/20 pt-3">
+              <div className="border-t border-sand/20 pt-3 space-y-3">
                 <label className="flex items-center gap-2 cursor-pointer select-none">
                   <input
                     type="checkbox"
                     checked={assignForm.is_online}
-                    onChange={(e) => setAssignForm((f) => ({ ...f, is_online: e.target.checked, room_id: e.target.checked ? "" : f.room_id }))}
+                    onChange={(e) => setAssignForm((f) => ({
+                      ...f,
+                      is_online: e.target.checked,
+                      room_id: e.target.checked ? "" : f.room_id,
+                      meeting_link: e.target.checked ? getTherapistMeetLink(f.therapist_id) : "",
+                      use_custom_link: false,
+                    }))}
                     className="accent-forest w-4 h-4"
                   />
                   <span className="font-sans text-sm text-deep">線上諮商</span>
                 </label>
+
+                {assignForm.is_online && (
+                  <div className="pl-6 border-l-2 border-forest/20 space-y-2">
+                    {!assignForm.use_custom_link ? (
+                      <div>
+                        <p className="font-sans text-[11px] text-muted mb-1">視訊連結（Google Meet）</p>
+                        {assignForm.meeting_link ? (
+                          <p className="font-sans text-[11px] text-forest/80 bg-sand/10 px-3 py-2 break-all leading-relaxed">
+                            {assignForm.meeting_link}
+                          </p>
+                        ) : (
+                          <p className="font-sans text-[11px] text-amber-600 bg-amber-50 px-3 py-2">
+                            ⚠ 此心理師尚未設定 Google Meet 連結，請至「成員管理」設定，或勾選下方改用其他連結。
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <div>
+                        <label className="font-sans text-[11px] text-muted block mb-1">視訊連結（請貼上）</label>
+                        <input
+                          value={assignForm.meeting_link}
+                          onChange={(e) => setAssignForm((f) => ({ ...f, meeting_link: e.target.value }))}
+                          className={inputCls}
+                          placeholder="https://..."
+                          autoFocus
+                        />
+                        {assignForm.meeting_link ? (
+                          <p className="font-sans text-[10px] text-forest mt-1">
+                            ✓ 個案將收到此視訊連結。
+                          </p>
+                        ) : (
+                          <p className="font-sans text-[10px] text-amber-600 mt-1">
+                            如未填入連結，將交由行政手動處理。
+                          </p>
+                        )}
+                      </div>
+                    )}
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={assignForm.use_custom_link}
+                        onChange={(e) => setAssignForm((f) => ({
+                          ...f,
+                          use_custom_link: e.target.checked,
+                          meeting_link: e.target.checked ? "" : getTherapistMeetLink(f.therapist_id),
+                        }))}
+                        className="accent-amber-600 w-3 h-3"
+                      />
+                      <span className="font-sans text-[11px] text-muted/70">不使用 Google Meet，改用其他連結</span>
+                    </label>
+                  </div>
+                )}
               </div>
               <div>
                 <label className="font-sans text-[11px] text-muted block mb-1">預定時間（今天之後）</label>
@@ -549,7 +670,7 @@ export default function AppointmentsPage() {
       {/* ── Reject Modal ── */}
       {rejectModal && (
         <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50 p-4" onClick={() => setRejectModal(null)}>
-          <div className="bg-white p-6 w-full max-w-sm space-y-4 shadow-lg" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white p-6 w-full max-w-sm space-y-4 shadow-sm" onClick={(e) => e.stopPropagation()}>
             <h2 className="font-serif text-deep text-lg">拒絕派案</h2>
             <p className="font-sans text-xs text-muted">拒絕後，此預約將退回「待排案」佇列。</p>
             <div>
@@ -574,10 +695,57 @@ export default function AppointmentsPage() {
         </div>
       )}
 
+      {/* ── Reschedule Modal ── */}
+      {rescheduleModal && (
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50 p-4" onClick={() => setRescheduleModal(null)}>
+          <div className="bg-white p-6 w-full max-w-sm space-y-4 shadow-sm" onClick={(e) => e.stopPropagation()}>
+            <div>
+              <h2 className="font-serif text-deep text-lg">修改預約時間</h2>
+              <p className="font-sans text-xs text-muted mt-1">
+                個案：{rescheduleModal.clients?.full_name}
+                {rescheduleModal.therapist_id && ` · 心理師：${data.therapistMap[rescheduleModal.therapist_id] ?? "—"}`}
+              </p>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="font-sans text-xs text-muted block mb-1">新的預約時間</label>
+                <input
+                  type="datetime-local"
+                  value={rescheduleForm.scheduled_at}
+                  onChange={(e) => setRescheduleForm((f) => ({ ...f, scheduled_at: e.target.value }))}
+                  className={inputCls}
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="font-sans text-xs text-muted block mb-1">諮商室（選填）</label>
+                <select
+                  value={rescheduleForm.room_id}
+                  onChange={(e) => setRescheduleForm((f) => ({ ...f, room_id: e.target.value }))}
+                  className={inputCls}
+                >
+                  <option value="">（維持原設定）</option>
+                  {rooms.filter((r) => r.is_active).map((r) => (
+                    <option key={r.id} value={r.id}>{r.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            {err && <p className="font-sans text-xs text-red-500">{err}</p>}
+            <div className="flex gap-2 pt-1">
+              <button onClick={() => setRescheduleModal(null)} className="flex-1 font-sans text-xs py-2 border border-sand/30 text-muted hover:bg-sand/10 transition-colors">取消</button>
+              <button onClick={doReschedule} disabled={working} className="flex-1 font-sans text-xs py-2 bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-40 transition-colors">
+                {working ? "更新中…" : "確認修改"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Detail Modal ── */}
       {detailModal && (
         <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50 p-4" onClick={() => setDetailModal(null)}>
-          <div className="bg-white p-6 w-full max-w-md space-y-3 shadow-lg max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white p-6 w-full max-w-md space-y-3 shadow-sm max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <h2 className="font-serif text-deep text-lg">{detailModal.clients?.full_name}</h2>
               <span className={`font-sans text-[10px] px-2 py-0.5 ${STATUS_COLOR[detailModal.booking_status]}`}>
@@ -591,6 +759,15 @@ export default function AppointmentsPage() {
               {detailModal.scheduled_at && <p>時間：{fmtDate(detailModal.scheduled_at)}</p>}
               {detailModal.session_fee && <p>費用：{detailModal.session_fee} {detailModal.currency}</p>}
               {detailModal.is_first_session && <p className="text-forest">首次晤談</p>}
+              {detailModal.is_online && (
+                <p className="text-forest font-medium">
+                  線上晤談
+                  {detailModal.meeting_link
+                    ? <> — <a href={detailModal.meeting_link} target="_blank" rel="noopener noreferrer" className="underline break-all">{detailModal.meeting_link}</a></>
+                    : <span className="text-amber-600 font-normal"> — ⚠ 尚未設定視訊連結</span>
+                  }
+                </p>
+              )}
             </div>
             {detailModal.client_intake_notes && (
               <div>

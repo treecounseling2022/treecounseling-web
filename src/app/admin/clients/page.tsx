@@ -75,9 +75,6 @@ export default async function ClientsPage({
     <div className="space-y-6 pt-4">
       <div className="flex items-start justify-between">
         <div>
-          <p className="font-sans text-xs text-muted mb-1">
-            <a href="/admin" className="hover:text-forest">後台</a> / 個案
-          </p>
           <h1 className="font-serif text-deep text-2xl">
             {isAdmin ? "個案管理" : "我的個案"}
           </h1>

@@ -20,7 +20,7 @@ export default function AdminLoginPage() {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
-      setError("電郵或密碼錯誤");
+      setError("認證失敗，請確認登入資訊");
       setLoading(false);
       return;
     }

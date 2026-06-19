@@ -8,14 +8,14 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 const notoSerifTC = Noto_Serif_TC({
   variable: "--font-noto-serif-tc",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: ["400", "600"],
   display: "swap",
 });
 
 const notoSansTC = Noto_Sans_TC({
   variable: "--font-noto-sans-tc",
   subsets: ["latin"],
-  weight: ["300", "400", "500"],
+  weight: ["400", "500"],
   display: "swap",
 });
 
@@ -52,6 +52,12 @@ export default function RootLayout({
       className={`${notoSerifTC.variable} ${notoSansTC.variable} ${ebGaramond.variable}`}
     >
       <body className="min-h-screen flex flex-col">
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:bg-forest focus:text-paper focus:text-sm focus:font-sans focus:rounded-sm"
+        >
+          跳至主要內容
+        </a>
         <ThemeProvider>
           <PublicShell>{children}</PublicShell>
         </ThemeProvider>

@@ -124,9 +124,6 @@ export default function CalendarPage() {
   return (
     <div className="space-y-6 pt-4">
       <div>
-        <p className="font-sans text-xs text-muted mb-1">
-          <a href="/admin" className="hover:text-forest">後台</a> / 行事曆
-        </p>
         <h1 className="font-serif text-deep text-2xl">行事曆</h1>
         <p className="font-sans text-xs text-muted mt-0.5">
           顯示所有已排定的預約時間。
@@ -166,9 +163,18 @@ export default function CalendarPage() {
             return (
               <div
                 key={idx}
+                role={day ? "button" : undefined}
+                tabIndex={day ? 0 : undefined}
                 onClick={() => {
                   if (!day) return;
                   setSelected(isSelected ? null : new Date(year, month, day));
+                }}
+                onKeyDown={(e) => {
+                  if (!day) return;
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setSelected(isSelected ? null : new Date(year, month, day));
+                  }
                 }}
                 className={`min-h-[72px] border-b border-r border-sand/10 p-1.5 transition-colors ${
                   day
@@ -218,7 +224,7 @@ export default function CalendarPage() {
                             title={`講座：${w.title}`}
                           >
                             {new Date(w.scheduled_at).toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit" })}
-                            {" "}🎤 {w.title}
+                            {" "}♦ {w.title}
                           </div>
                         );
                       })}
@@ -283,7 +289,7 @@ export default function CalendarPage() {
                   <span className="text-deep font-medium">
                     {new Date(w.scheduled_at).toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit" })}
                   </span>
-                  <span className="text-muted">🎤 {w.title}</span>
+                  <span className="text-muted">♦ {w.title}</span>
                   <span className="font-sans text-[10px] bg-violet-50 text-violet-600 px-1.5 py-0.5 ml-auto">講座</span>
                 </div>
               );
@@ -299,7 +305,7 @@ export default function CalendarPage() {
           onClick={() => setDetailAppt(null)}
         >
           <div
-            className="bg-white border border-sand/20 w-full max-w-sm shadow-xl"
+            className="bg-white border border-sand/20 w-full max-w-sm shadow-sm"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between px-5 py-4 border-b border-sand/10">
@@ -369,7 +375,7 @@ export default function CalendarPage() {
 
       {/* Google Calendar sync notice */}
       <div className="bg-sand/10 border border-sand/20 px-4 py-3 flex items-start gap-3">
-        <span className="text-lg flex-shrink-0">📅</span>
+        <span className="font-sans text-xs text-muted/50 flex-shrink-0 pt-0.5">▸</span>
         <div>
           <p className="font-sans text-xs text-deep font-medium">Google Calendar 同步</p>
           <p className="font-sans text-[11px] text-muted mt-0.5">

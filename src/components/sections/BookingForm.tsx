@@ -314,6 +314,8 @@ export default function BookingForm() {
 
   // ================= VALIDATION LOGIC =================
 
+  const isValidEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
+
   // 驗證整份表單
   const validateForm = () => {
     const errs: Record<string, string> = {};
@@ -341,7 +343,7 @@ export default function BookingForm() {
         }
       }
       if (!contactId.trim()) errs.contactId = "請輸入聯絡帳號/ID";
-      if (!email.trim() || !email.includes("@")) errs.email = "請輸入有效的電郵地址";
+      if (!isValidEmail(email)) errs.email = "請輸入有效的電郵地址";
       if (!phone.trim()) errs.phone = "請輸入手機號碼";
       if (serviceType === "individual" && selectedMainIssues.length === 0) {
         errs.mainIssues = "請至少選擇一項困擾類型";
@@ -392,8 +394,8 @@ export default function BookingForm() {
       if (!coupleConcern.trim()) errs.coupleConcern = "請填寫目前遇到的狀況";
       if (!contactIdA.trim()) errs.contactIdA = "[A] 聯絡帳號為必填";
       if (!contactIdB.trim()) errs.contactIdB = "[B] 聯絡帳號為必填";
-      if (!emailA.trim() || !emailA.includes("@")) errs.emailA = "[A] 電郵格式不正確";
-      if (!emailB.trim() || !emailB.includes("@")) errs.emailB = "[B] 電郵格式不正確";
+      if (!isValidEmail(emailA)) errs.emailA = "[A] 電郵格式不正確";
+      if (!isValidEmail(emailB)) errs.emailB = "[B] 電郵格式不正確";
       if (!phoneA.trim()) errs.phoneA = "[A] 手機為必填";
       if (!phoneB.trim()) errs.phoneB = "[B] 手機為必填";
 
@@ -406,7 +408,7 @@ export default function BookingForm() {
       if (!companyName.trim()) errs.companyName = "請填寫單位或機構名稱";
       if (!contactPerson.trim()) errs.contactPerson = "請填寫聯絡人姓名";
       if (!contactIdOther.trim()) errs.contactIdOther = "請填寫聯絡帳號";
-      if (!emailOther.trim() || !emailOther.includes("@")) errs.emailOther = "請填寫有效的聯絡電郵";
+      if (!isValidEmail(emailOther)) errs.emailOther = "請填寫有效的聯絡電郵";
       if (!phoneOther.trim()) errs.phoneOther = "請填寫聯絡電話";
       if (!otherConcern.trim()) errs.otherConcern = "請填寫需求細節說明";
     }
@@ -1431,7 +1433,7 @@ export default function BookingForm() {
                       可聯絡與可晤談時間 <span className="text-sand ml-1">*</span>
                     </label>
                     <p className="text-xs text-muted/70 mt-1">請至少選擇 3 個可行的時段，勾選越多，行政越容易為您成功媒合排班。</p>
-                    <p className="text-[10px] text-sand/80 font-medium">* 以澳門 / 北京 / 台灣時間為準 (UTC+8)</p>
+                    <p className="text-xs text-sand/80 font-medium">* 以澳門 / 北京 / 台灣時間為準 (UTC+8)</p>
                   </div>
                   
                   {/* 15x7 時間網格 */}
@@ -1450,7 +1452,7 @@ export default function BookingForm() {
                       <tbody>
                         {TIME_SLOTS.map((slot) => (
                           <tr key={slot} className="border-b border-sand/10 hover:bg-forest/5 transition-colors">
-                            <td className="py-2 px-2 border-r border-sand/20 font-sans text-muted text-[10px] whitespace-nowrap">{slot}</td>
+                            <td className="py-2 px-2 border-r border-sand/20 font-sans text-muted text-xs whitespace-nowrap">{slot}</td>
                             {DAYS_OF_WEEK.map((day) => {
                               const key = `${day}-${slot}`;
                               const checked = !!selectedTimesGrid[key];

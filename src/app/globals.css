@@ -7,7 +7,7 @@
   --color-sand:      #c9b88a;
   --color-paper:     #f5f1ea;
   --color-soft:      #faf8f4;
-  --color-muted:     #6b7c6b;
+  --color-muted:     #4d634d;  /* Contrast 5.7:1 on white — WCAG AA ✓ */
 
   /* Semantic */
   --color-background: var(--color-paper);
@@ -39,18 +39,216 @@
   --foreground: #e2e9e2;
 }
 
-/* Admin dark mode: make white cards dark */
-.dark .bg-white {
-  background-color: #1a2520 !important;
+/* ── Admin layout: light mode (default) ─────────────────────────────────────
+   Warm cream canvas, white cards, readable text scale.
+   ─────────────────────────────────────────────────────────────────────────── */
+.admin-layout {
+  background-color: #EAE5DA;
+  color: #1A1F2B;
+  font-size: 16px;
+  line-height: 1.65;
 }
-.dark .bg-white\/80 {
-  background-color: rgba(26, 37, 32, 0.8) !important;
+
+/* ── Heading tracking ────────────────────────────────────────────────────── */
+.admin-layout h1 { letter-spacing: -0.015em; line-height: 1.2; }
+.admin-layout h2 { letter-spacing: -0.01em; }
+
+/* ── Readable font size scale (override Tailwind utilities) ──────────────── */
+.admin-layout .text-\[10px\]  { font-size: 0.8125rem; }   /* 13px */
+.admin-layout .text-\[11px\]  { font-size: 0.8125rem; }   /* 13px */
+.admin-layout .text-xs        { font-size: 0.8125rem; }   /* 13px */
+.admin-layout .text-sm        { font-size: 0.875rem; }    /* 14px */
+
+/* ── Light: text colors ──────────────────────────────────────────────────── */
+.admin-layout .text-deep             { color: #1A1F2B; }
+.admin-layout .text-muted            { color: #374151; }
+.admin-layout .text-muted\/60        { color: rgba(55,65,81,0.8); }
+.admin-layout .text-muted\/40        { color: rgba(55,65,81,0.65); }
+.admin-layout .text-muted\/50        { color: rgba(55,65,81,0.72); }
+.admin-layout .text-sand             { color: #6B7280; }
+.admin-layout .text-forest           { color: #1F2937; }
+.admin-layout .hover\:text-forest:hover { color: #111827; }
+.admin-layout .text-forest\/70       { color: rgba(31,41,55,0.75); }
+.admin-layout .font-serif            { color: inherit; }
+
+/* ── Light: surfaces ─────────────────────────────────────────────────────── */
+.admin-layout .bg-white              { background-color: #FFFFFF; }
+.admin-layout .bg-white\/80          { background-color: rgba(255,255,255,0.85); }
+.admin-layout .bg-slate-50,
+.admin-layout .bg-slate-100          { background-color: #F0EBE2; }
+.admin-layout .bg-sand\/5            { background-color: #F5F2EC; }
+.admin-layout .bg-sand\/10           { background-color: #EDE7DC; }
+.admin-layout .bg-sand\/20           { background-color: #E4DDD2; }
+.admin-layout .bg-sand\/30           { background-color: #D9D2C5; }
+.admin-layout .bg-forest             { background-color: #1F2937; }
+.admin-layout .hover\:bg-forest:hover { background-color: #111827; }
+.admin-layout .bg-forest\/10         { background-color: rgba(31,41,55,0.08); }
+.admin-layout .bg-deep               { background-color: #1A1F2B; }
+.admin-layout .bg-paper              { background-color: #FFFFFF; }
+
+/* ── Light: borders ──────────────────────────────────────────────────────── */
+.admin-layout .border-sand\/20       { border-color: #CEC8BC; }
+.admin-layout .border-sand\/10       { border-color: #DDD8D0; }
+.admin-layout .border-sand\/30       { border-color: #BFB8AC; }
+.admin-layout .border-forest         { border-color: #1F2937; }
+.admin-layout .border-forest\/20     { border-color: rgba(31,41,55,0.25); }
+.admin-layout .hover\:border-forest\/40:hover { border-color: rgba(31,41,55,0.45); }
+
+/* ── Light: card hover ───────────────────────────────────────────────────── */
+.admin-layout .hover\:shadow-sm:hover {
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.09);
+  transition: box-shadow 200ms ease, border-color 200ms ease;
 }
-/* Slate background in dark */
-.dark .bg-slate-50,
-.dark .bg-slate-100 {
-  background-color: #0f1912 !important;
+
+/* ── Light: table ────────────────────────────────────────────────────────── */
+.admin-layout table thead th {
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: #6B7280;
+  background-color: #E2DDD3;
 }
+.admin-layout table tbody tr:nth-child(even) { background-color: #F5F1EB; }
+.admin-layout table tbody tr:hover { background-color: #EDE7DC; }
+
+/* ── Light: focus ring ───────────────────────────────────────────────────── */
+.admin-layout :focus-visible {
+  outline: 2px solid #4B5563;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* ── Light: inputs ───────────────────────────────────────────────────────── */
+.admin-layout input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),
+.admin-layout select,
+.admin-layout textarea {
+  background-color: #FFFFFF;
+  border: 1px solid #C8C2B7;
+  color: #1A1F2B;
+  border-radius: 4px;
+}
+.admin-layout input::placeholder,
+.admin-layout textarea::placeholder { color: #9CA3AF; }
+.admin-layout select:focus,
+.admin-layout input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):focus,
+.admin-layout textarea:focus {
+  border-color: #374151;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(55,65,81,0.12);
+}
+
+/* ── Admin shell background (outer wrapper) ──────────────────────────────── */
+.admin-shell                              { background-color: #EAE5DA; }
+[data-admin-theme="dark"] .admin-shell   { background-color: #1A1A1A; }
+
+/* ══ Admin dark mode ══════════════════════════════════════════════════════════
+   Activated by AdminThemeProvider writing data-admin-theme="dark" on <html>.
+   Isolated from the public site — does NOT set class="dark" on <html>.
+   ══════════════════════════════════════════════════════════════════════════ */
+[data-admin-theme="dark"] .admin-layout {
+  background-color: #1A1A1A;
+  color: #EBEBEB;
+}
+
+/* Dark: text */
+[data-admin-theme="dark"] .admin-layout .text-deep             { color: #F0F0EE; }
+[data-admin-theme="dark"] .admin-layout .text-muted            { color: #9CA3AF; }
+[data-admin-theme="dark"] .admin-layout .text-muted\/60        { color: rgba(156,163,175,0.6); }
+[data-admin-theme="dark"] .admin-layout .text-muted\/40        { color: rgba(156,163,175,0.4); }
+[data-admin-theme="dark"] .admin-layout .text-muted\/50        { color: rgba(156,163,175,0.5); }
+[data-admin-theme="dark"] .admin-layout .text-sand             { color: #6B7280; }
+[data-admin-theme="dark"] .admin-layout .text-forest           { color: #34D399; }
+[data-admin-theme="dark"] .admin-layout .hover\:text-forest:hover { color: #6EE7B7; }
+[data-admin-theme="dark"] .admin-layout .text-forest\/70       { color: rgba(52,211,153,0.7); }
+[data-admin-theme="dark"] .admin-layout .font-serif            { color: inherit; }
+
+/* Dark: surfaces */
+[data-admin-theme="dark"] .admin-layout .bg-white              { background-color: #242424; }
+[data-admin-theme="dark"] .admin-layout .bg-white\/80          { background-color: rgba(36,36,36,0.8); }
+[data-admin-theme="dark"] .admin-layout .bg-slate-50,
+[data-admin-theme="dark"] .admin-layout .bg-slate-100          { background-color: #1A1A1A; }
+[data-admin-theme="dark"] .admin-layout .bg-sand\/5            { background-color: rgba(255,255,255,0.03); }
+[data-admin-theme="dark"] .admin-layout .bg-sand\/10           { background-color: rgba(255,255,255,0.05); }
+[data-admin-theme="dark"] .admin-layout .bg-sand\/20           { background-color: rgba(255,255,255,0.08); }
+[data-admin-theme="dark"] .admin-layout .bg-sand\/30           { background-color: rgba(255,255,255,0.1); }
+[data-admin-theme="dark"] .admin-layout .bg-forest             { background-color: #064E3B; }
+[data-admin-theme="dark"] .admin-layout .hover\:bg-forest:hover { background-color: #065F46; }
+[data-admin-theme="dark"] .admin-layout .bg-forest\/10         { background-color: rgba(52,211,153,0.1); }
+[data-admin-theme="dark"] .admin-layout .bg-deep               { background-color: #F0F0EE; }
+[data-admin-theme="dark"] .admin-layout .bg-paper              { background-color: #242424; }
+
+/* Dark: borders */
+[data-admin-theme="dark"] .admin-layout .border-sand\/20       { border-color: #2F2F2F; }
+[data-admin-theme="dark"] .admin-layout .border-sand\/10       { border-color: #272727; }
+[data-admin-theme="dark"] .admin-layout .border-sand\/30       { border-color: #383838; }
+[data-admin-theme="dark"] .admin-layout .border-forest         { border-color: #34D399; }
+[data-admin-theme="dark"] .admin-layout .border-forest\/20     { border-color: rgba(52,211,153,0.2); }
+[data-admin-theme="dark"] .admin-layout .hover\:border-forest\/40:hover { border-color: rgba(52,211,153,0.45); }
+
+/* Dark: card hover */
+[data-admin-theme="dark"] .admin-layout .hover\:shadow-sm:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+/* Dark: inputs */
+[data-admin-theme="dark"] .admin-layout input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),
+[data-admin-theme="dark"] .admin-layout select,
+[data-admin-theme="dark"] .admin-layout textarea {
+  background-color: #1A1A1A;
+  color: #EBEBEB;
+  border-color: #2F2F2F;
+}
+[data-admin-theme="dark"] .admin-layout input::placeholder,
+[data-admin-theme="dark"] .admin-layout textarea::placeholder { color: #4B5563; }
+[data-admin-theme="dark"] .admin-layout select:focus,
+[data-admin-theme="dark"] .admin-layout input:focus,
+[data-admin-theme="dark"] .admin-layout textarea:focus {
+  border-color: #34D399;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(52,211,153,0.12);
+}
+
+/* Dark: table */
+[data-admin-theme="dark"] .admin-layout table thead th       { color: #4B5563; }
+[data-admin-theme="dark"] .admin-layout table tbody tr:hover { background-color: rgba(255,255,255,0.03); }
+
+/* Dark: focus ring */
+[data-admin-theme="dark"] .admin-layout :focus-visible {
+  outline-color: rgba(52,211,153,0.45);
+}
+
+/* ── Semantic badge classes ───────────────────────────────────────────────────
+   Replaces Tailwind dark: prefix (which hooks into html.dark, not data-admin-theme).
+   Use these classes instead of bg-amber-50/text-amber-700 etc. in admin pages.
+   ──────────────────────────────────────────────────────────────────────────── */
+.adm-badge-warning { background-color: #FBF3DB; color: #956400; }
+.adm-badge-info    { background-color: #E1F3FE; color: #1F6C9F; }
+.adm-badge-success { background-color: #EDF3EC; color: #346538; }
+.adm-badge-danger  { background-color: #FDEBEC; color: #9F2F2D; }
+.adm-badge-neutral { background-color: #F1F5F9; color: #64748B; }
+.adm-badge-faded   { background-color: #F8FAFC; color: #94A3B8; }
+
+[data-admin-theme="dark"] .adm-badge-warning { background-color: #2A2000; color: #F6C90E; }
+[data-admin-theme="dark"] .adm-badge-info    { background-color: #001A2E; color: #60A5FA; }
+[data-admin-theme="dark"] .adm-badge-success { background-color: #0A2218; color: #34D399; }
+[data-admin-theme="dark"] .adm-badge-danger  { background-color: #2A0A0A; color: #F87171; }
+[data-admin-theme="dark"] .adm-badge-neutral { background-color: #1C1C1C; color: #6B7280; }
+[data-admin-theme="dark"] .adm-badge-faded   { background-color: #161616; color: #4B5563; }
+
+/* Dashboard urgent card border */
+.adm-card-urgent       { border-color: #FBBF24; }
+.adm-card-urgent:hover { border-color: #D97706; }
+[data-admin-theme="dark"] .adm-card-urgent       { border-color: #1F3A2C; }
+[data-admin-theme="dark"] .adm-card-urgent:hover { border-color: #2D5440; }
+
+/* Urgent count tag inside dashboard card */
+.adm-urgent-tag       { background-color: #FEF3C7; color: #92400E; }
+[data-admin-theme="dark"] .adm-urgent-tag { background-color: #1A3025; color: #34D399; }
+
+/* Urgent stat text at card bottom */
+.adm-urgent-stat       { color: #B45309; }
+[data-admin-theme="dark"] .adm-urgent-stat { color: #34D399; }
 
 html {
   scroll-behavior: smooth;
@@ -62,6 +260,18 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* 全域鍵盤焦點樣式 — 只在鍵盤導覽時顯示 */
+:focus-visible {
+  outline: 2px solid var(--color-sand);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+/* 後台使用灰色 focus ring */
+.admin-layout :focus-visible {
+  outline-color: #6b7280;
 }
 
 /* Headings use serif */

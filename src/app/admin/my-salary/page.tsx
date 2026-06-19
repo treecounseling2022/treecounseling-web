@@ -160,9 +160,6 @@ export default function MySalaryPage() {
     <div className="pt-4 space-y-6">
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
-          <p className="font-sans text-xs text-muted mb-1">
-            <a href="/admin" className="hover:text-forest">後台</a> / 我的薪酬
-          </p>
           <h1 className="font-serif text-deep text-2xl">我的薪酬</h1>
           <p className="font-sans text-xs text-muted mt-0.5">查看指定月份的諮商費用及抽成明細。</p>
         </div>
@@ -177,7 +174,7 @@ export default function MySalaryPage() {
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
-          { label: "諮商堂數", value: `${sessions.length} 堂`, sub: `${month.replace("-", " 年 ")} 月` },
+          { label: "諮商次數", value: `${sessions.length} 次`, sub: `${month.replace("-", " 年 ")} 月` },
           { label: "個案收費總額", value: `MOP ${gross.toLocaleString()}`, sub: "（全部費用）" },
           { label: "工作室抽成", value: `MOP ${total.toLocaleString()}`, sub: rate ? COMMISSION_TYPE_LABEL[rate.commission_type] : "未設定" },
         ].map((c) => (

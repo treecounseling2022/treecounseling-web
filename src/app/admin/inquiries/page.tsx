@@ -37,10 +37,10 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 const STATUS_CLS: Record<string, string> = {
-  new: "bg-amber-50 text-amber-700",
-  contacted: "bg-blue-50 text-blue-700",
-  converted: "bg-green-50 text-green-700",
-  closed: "bg-gray-100 text-gray-400",
+  new:       "adm-badge-warning",
+  contacted: "adm-badge-info",
+  converted: "adm-badge-success",
+  closed:    "adm-badge-faded",
 };
 
 function fmtDate(iso: string) {
@@ -172,9 +172,6 @@ export default function InquiriesPage() {
   return (
     <div className="space-y-6 pt-4">
       <div>
-        <p className="font-sans text-xs text-muted mb-1">
-          <a href="/admin" className="hover:text-forest">後台</a> / 預約申請佇列
-        </p>
         <h1 className="font-serif text-deep text-2xl">預約申請佇列</h1>
         <p className="font-sans text-xs text-muted mt-0.5">
           來自公開預約表單的申請，處理後再建立個案與正式預約。
@@ -301,7 +298,7 @@ export default function InquiriesPage() {
           onClick={() => setAssignTarget(null)}
         >
           <div
-            className="bg-white p-6 w-full max-w-md space-y-4 shadow-xl"
+            className="bg-white p-6 w-full max-w-md space-y-4 shadow-sm"
             onClick={(e) => e.stopPropagation()}
           >
             <div>
@@ -412,7 +409,7 @@ export default function InquiriesPage() {
           onClick={() => setDetail(null)}
         >
           <div
-            className="bg-white p-6 w-full max-w-lg space-y-4 shadow-lg max-h-[85vh] overflow-y-auto"
+            className="bg-white p-6 w-full max-w-lg space-y-4 shadow-sm max-h-[85vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between">

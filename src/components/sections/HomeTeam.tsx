@@ -36,15 +36,14 @@ export default function HomeTeam() {
                     src={member.photo}
                     alt={member.name}
                     fill
-                    className="object-cover object-top filter grayscale contrast-[0.95] brightness-[1.02] transition-all duration-500 group-hover:scale-102 group-hover:grayscale-0"
+                    className="object-cover object-top filter grayscale contrast-[0.95] brightness-[1.02] transition-[transform,filter] duration-500 group-hover:scale-102 group-hover:grayscale-0"
                     sizes="(max-width: 768px) 50vw, 25vw"
-                    unoptimized
                   />
                   {/* Subtle paper-like grain filter overlay */}
-                  <div className="absolute inset-0 bg-deep/5 opacity-0 group-hover:opacity-10 transition-all duration-300" />
+                  <div className="absolute inset-0 bg-deep/5 opacity-0 group-hover:opacity-10 transition-opacity duration-300" />
                 </div>
                 <div className="space-y-1">
-                  <p className="font-sans text-[10px] text-sand tracking-widest uppercase">
+                  <p className="font-sans text-xs text-sand tracking-widest uppercase">
                     {member.title}
                   </p>
                   <h3 className="font-serif text-deep text-base group-hover:text-forest transition-colors">

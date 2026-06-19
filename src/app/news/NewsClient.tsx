@@ -55,7 +55,7 @@ export default function NewsClient({ articles }: { articles: Article[] }) {
                         <span className="font-garamond text-sand/40 text-2xl">樹</span>
                       </div>
                     )}
-                    <div className="absolute top-4 left-4 bg-paper/90 backdrop-blur-sm text-forest text-[10px] font-sans px-3 py-1 tracking-widest uppercase">
+                    <div className="absolute top-4 left-4 bg-paper/90 backdrop-blur-sm text-forest text-xs font-sans px-3 py-1 tracking-widest uppercase">
                       {article.category}
                     </div>
                   </div>

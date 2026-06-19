@@ -505,7 +505,7 @@ export default function InquiryDetailClient({
           onClick={() => setShowAssign(false)}
         >
           <div
-            className="bg-white p-6 w-full max-w-md space-y-4 shadow-xl"
+            className="bg-white p-6 w-full max-w-md space-y-4 shadow-sm"
             onClick={(e) => e.stopPropagation()}
           >
             <h2 className="font-serif text-deep text-lg">派案</h2>

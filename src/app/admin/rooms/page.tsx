@@ -88,9 +88,6 @@ export default function RoomsPage() {
     <div className="space-y-6 pt-4">
       <div className="flex items-start justify-between">
         <div>
-          <p className="font-sans text-xs text-muted mb-1">
-            <a href="/admin" className="hover:text-forest">後台</a> / 空間管理
-          </p>
           <h1 className="font-serif text-deep text-2xl">諮商空間管理</h1>
           <p className="font-sans text-xs text-muted mt-0.5">管理諮商室名稱、顏色與容量，供排案時選用。</p>
         </div>
@@ -160,7 +157,7 @@ export default function RoomsPage() {
           onClick={() => setModal({ mode: "closed" })}
         >
           <div
-            className="bg-white p-6 w-full max-w-sm space-y-4 shadow-lg"
+            className="bg-white p-6 w-full max-w-sm space-y-4 shadow-sm"
             onClick={(e) => e.stopPropagation()}
           >
             <h2 className="font-serif text-deep text-lg">

@@ -1,5 +1,6 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth-role";
 import ArticleEditor from "../ArticleEditor";
 
 interface Props {
@@ -8,7 +9,9 @@ interface Props {
 
 export default async function EditArticlePage({ params }: Props) {
   const { id } = await params;
+  const auth = await requireAuth();
   const supabase = await createClient();
+
   const { data: article } = await supabase
     .from("articles")
     .select("*")
@@ -17,15 +20,27 @@ export default async function EditArticlePage({ params }: Props) {
 
   if (!article) notFound();
 
+  let lockedAuthor: string | undefined;
+
+  if (auth.role === "therapist" && auth.profileId) {
+    const { data: profile } = await supabase
+      .from("therapist_profiles")
+      .select("name")
+      .eq("id", auth.profileId)
+      .single();
+
+    if (!profile?.name || article.author !== profile.name) {
+      redirect("/admin/articles");
+    }
+    lockedAuthor = profile.name;
+  }
+
   return (
     <div className="space-y-6 pt-4">
       <div>
-        <p className="font-sans text-xs text-muted mb-1">
-          <a href="/admin/articles" className="hover:text-forest">文章管理</a> / 編輯
-        </p>
         <h1 className="font-serif text-deep text-2xl truncate">{article.title}</h1>
       </div>
-      <ArticleEditor isNew={false} initialData={article} />
+      <ArticleEditor isNew={false} lockedAuthor={lockedAuthor} initialData={article} />
     </div>
   );
 }

@@ -12,25 +12,28 @@ type Props = {
   defaultClientId?: string;
   rooms: Room[];
   plans: Plan[];
+  therapistMeetLink?: string;
 };
 
-export default function TherapistNewApptForm({ clients, defaultClientId, rooms, plans }: Props) {
+export default function TherapistNewApptForm({ clients, defaultClientId, rooms, plans, therapistMeetLink = "" }: Props) {
   const router = useRouter();
 
   const defaultPlan = plans[0] ?? null;
   const today = new Date().toISOString().slice(0, 10);
 
-  const [clientId,  setClientId]  = useState(defaultClientId ?? "");
-  const [date,      setDate]      = useState("");
-  const [time,      setTime]      = useState("10:00");
-  const [planId,    setPlanId]    = useState(defaultPlan?.id ?? "");
-  const [fee,       setFee]       = useState(defaultPlan?.price_per_session?.toString() ?? "");
-  const [currency,  setCurrency]  = useState(defaultPlan?.currency ?? "MOP");
-  const [roomId,    setRoomId]    = useState("");
-  const [isOnline,  setIsOnline]  = useState(false);
-  const [notes,     setNotes]     = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [err,       setErr]       = useState("");
+  const [clientId,       setClientId]       = useState(defaultClientId ?? "");
+  const [date,           setDate]           = useState("");
+  const [time,           setTime]           = useState("10:00");
+  const [planId,         setPlanId]         = useState(defaultPlan?.id ?? "");
+  const [fee,            setFee]            = useState(defaultPlan?.price_per_session?.toString() ?? "");
+  const [currency,       setCurrency]       = useState(defaultPlan?.currency ?? "MOP");
+  const [roomId,         setRoomId]         = useState("");
+  const [isOnline,       setIsOnline]       = useState(false);
+  const [meetingLink,    setMeetingLink]    = useState("");
+  const [useCustomLink,  setUseCustomLink]  = useState(false);
+  const [notes,          setNotes]          = useState("");
+  const [submitting,     setSubmitting]     = useState(false);
+  const [err,            setErr]            = useState("");
 
   function handlePlanChange(id: string) {
     setPlanId(id);
@@ -42,8 +45,14 @@ export default function TherapistNewApptForm({ clients, defaultClientId, rooms, 
   function handleRoomChange(id: string) {
     setRoomId(id);
     const room = rooms.find((r) => r.id === id);
-    if (room?.is_online) setIsOnline(true);
-    else if (id) setIsOnline(false);
+    if (room?.is_online) {
+      setIsOnline(true);
+      if (!useCustomLink) setMeetingLink(therapistMeetLink);
+    } else if (id) {
+      setIsOnline(false);
+      setMeetingLink("");
+      setUseCustomLink(false);
+    }
   }
 
   async function submit(e: React.FormEvent) {
@@ -67,6 +76,7 @@ export default function TherapistNewApptForm({ clients, defaultClientId, rooms, 
           plan_id:      planId  || null,
           session_fee:  fee     ? parseFloat(fee) : null,
           is_online:    isOnline,
+          meeting_link: isOnline ? (meetingLink || null) : null,
           admin_notes:  notes   || null,
         }),
       });
@@ -195,22 +205,80 @@ export default function TherapistNewApptForm({ clients, defaultClientId, rooms, 
       </div>
 
       {/* is_online */}
-      <label className="flex items-center gap-3 cursor-pointer group">
-        <input
-          type="checkbox"
-          checked={isOnline}
-          onChange={(e) => setIsOnline(e.target.checked)}
-          className="w-4 h-4 accent-forest"
-        />
-        <span className="font-sans text-sm text-deep group-hover:text-forest transition-colors">
-          線上諮商輔導
-        </span>
-        {isOnline && (
-          <span className="font-sans text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5">
-            視訊進行
+      <div className="space-y-3">
+        <label className="flex items-center gap-3 cursor-pointer group">
+          <input
+            type="checkbox"
+            checked={isOnline}
+            onChange={(e) => {
+              const on = e.target.checked;
+              setIsOnline(on);
+              if (on) {
+                setMeetingLink(therapistMeetLink);
+                setUseCustomLink(false);
+              } else {
+                setMeetingLink("");
+                setUseCustomLink(false);
+              }
+            }}
+            className="w-4 h-4 accent-forest"
+          />
+          <span className="font-sans text-sm text-deep group-hover:text-forest transition-colors">
+            線上諮商輔導
           </span>
+        </label>
+
+        {isOnline && (
+          <div className="pl-6 border-l-2 border-forest/20 space-y-2">
+            {!useCustomLink ? (
+              <div>
+                <p className="font-sans text-[11px] text-muted mb-1">視訊連結（Google Meet）</p>
+                {meetingLink ? (
+                  <p className="font-sans text-[11px] text-forest/80 bg-sand/10 px-3 py-2 break-all leading-relaxed">
+                    {meetingLink}
+                  </p>
+                ) : (
+                  <p className="font-sans text-[11px] text-amber-600 bg-amber-50 px-3 py-2">
+                    ⚠ 尚未設定 Google Meet 連結，請至「成員管理 → 基本資料」設定，或勾選下方改用其他連結。
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div>
+                <label className="font-sans text-[11px] text-muted block mb-1">視訊連結（請貼上）</label>
+                <input
+                  type="url"
+                  value={meetingLink}
+                  onChange={(e) => setMeetingLink(e.target.value)}
+                  placeholder="https://..."
+                  className={inputCls}
+                />
+                {meetingLink ? (
+                  <p className="font-sans text-[10px] text-forest mt-1">
+                    ✓ 個案將收到此視訊連結。
+                  </p>
+                ) : (
+                  <p className="font-sans text-[10px] text-amber-600 mt-1">
+                    如未填入連結，將交由行政手動處理。
+                  </p>
+                )}
+              </div>
+            )}
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={useCustomLink}
+                onChange={(e) => {
+                  setUseCustomLink(e.target.checked);
+                  setMeetingLink(e.target.checked ? "" : therapistMeetLink);
+                }}
+                className="w-3 h-3 accent-amber-600"
+              />
+              <span className="font-sans text-[11px] text-muted/70">不使用 Google Meet，改用其他連結</span>
+            </label>
+          </div>
         )}
-      </label>
+      </div>
 
       {/* Notes */}
       <div>

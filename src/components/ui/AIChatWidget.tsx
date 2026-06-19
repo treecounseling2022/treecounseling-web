@@ -10,6 +10,14 @@ interface Message {
   parts: { text: string }[];
 }
 
+function renderInline(line: string) {
+  return line.split(/(\*\*[^*]+\*\*)/g).map((part, i) =>
+    part.startsWith("**") && part.endsWith("**")
+      ? <strong key={i}>{part.slice(2, -2)}</strong>
+      : part
+  );
+}
+
 const SHORTCUT_QUESTIONS = [
   "伴侶輔導收費多少？",
   "如何付款與付款方式？",
@@ -145,7 +153,7 @@ export default function AIChatWidget() {
                   >
                     {msg.parts[0].text.split("\n").map((line, lIdx) => (
                       <p key={lIdx} className={cn(line.trim() === "" ? "h-2" : "min-h-[1rem]")}>
-                        {line}
+                        {renderInline(line)}
                       </p>
                     ))}
 
@@ -233,47 +241,69 @@ export default function AIChatWidget() {
       </AnimatePresence>
 
       {/* Floating Action Button */}
-      <motion.button
-        whileHover={{ scale: 1.1 }}
-        whileTap={{ scale: 0.95 }}
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-14 h-14 bg-forest text-paper shadow-lg flex items-center justify-center cursor-pointer border border-paper/10 relative group"
-        aria-label="Toggle AI Assistant"
-      >
-        <AnimatePresence mode="wait">
-          {!isOpen ? (
-            <motion.div
-              key="chat-icon"
-              initial={{ rotate: -45, opacity: 0 }}
-              animate={{ rotate: 0, opacity: 1 }}
-              exit={{ rotate: 45, opacity: 0 }}
-              transition={{ duration: 0.2 }}
-            >
-              {/* 大樹葉盆栽造型 icon */}
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m0-12.728l.707.707m12.728 12.728l.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z" />
-              </svg>
-            </motion.div>
-          ) : (
-            <motion.div
-              key="close-icon"
-              initial={{ rotate: 45, opacity: 0 }}
-              animate={{ rotate: 0, opacity: 1 }}
-              exit={{ rotate: -45, opacity: 0 }}
-              transition={{ duration: 0.2 }}
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </motion.div>
-          )}
-        </AnimatePresence>
-        
-        {/* 微浮動紅點提示，提示個案這是一個在線的 AI */}
-        {!isOpen && messages.length === 0 && (
-          <span className="absolute top-0 right-0 w-3 h-3 bg-red-500 border-2 border-paper rounded-full" />
+      <div className="flex flex-col items-center gap-1.5">
+        {!isOpen && (
+          <motion.span
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="font-sans text-[10px] text-paper bg-forest/80 px-2 py-0.5 rounded-full shadow whitespace-nowrap"
+          >
+            AI 客服
+          </motion.span>
         )}
-      </motion.button>
+        <motion.button
+          whileHover={{ scale: 1.08 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={() => setIsOpen(!isOpen)}
+          className="w-14 h-14 bg-forest text-paper shadow-xl rounded-full flex items-center justify-center cursor-pointer border-2 border-paper/20 relative"
+          aria-label="Toggle AI Assistant"
+        >
+          <AnimatePresence mode="wait">
+            {!isOpen ? (
+              <motion.div
+                key="chat-icon"
+                initial={{ scale: 0.7, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.7, opacity: 0 }}
+                transition={{ duration: 0.15 }}
+              >
+                {/* Chat bubble with sparkle — clearly AI customer service */}
+                <svg className="w-7 h-7" viewBox="0 0 28 28" fill="none">
+                  <path
+                    d="M4 6C4 4.895 4.895 4 6 4H22C23.105 4 24 4.895 24 6V18C24 19.105 23.105 20 22 20H8L4 24V6Z"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinejoin="round"
+                    fill="none"
+                  />
+                  <circle cx="10" cy="13" r="1.2" fill="currentColor" />
+                  <circle cx="14" cy="13" r="1.2" fill="currentColor" />
+                  <circle cx="18" cy="13" r="1.2" fill="currentColor" />
+                  {/* Sparkle top-right */}
+                  <path d="M19 7 L19.5 8.5 L21 7 L19.5 5.5 Z" fill="currentColor" opacity="0.7" />
+                </svg>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="close-icon"
+                initial={{ scale: 0.7, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.7, opacity: 0 }}
+                transition={{ duration: 0.15 }}
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Online indicator dot */}
+          {!isOpen && (
+            <span className="absolute top-0.5 right-0.5 w-3 h-3 bg-emerald-400 border-2 border-paper rounded-full" />
+          )}
+        </motion.button>
+      </div>
     </div>
   );
 }

@@ -104,6 +104,7 @@ export async function POST(req: NextRequest) {
         plan_id: body.plan_id ?? null,
         duration_minutes: body.duration_minutes ?? 50,
         is_online: body.is_online ?? false,
+        meeting_link: body.is_online ? (body.meeting_link ?? null) : null,
         admin_notes: body.admin_notes ?? null,
         booking_status: "confirmed",
         session_type: sessionType,

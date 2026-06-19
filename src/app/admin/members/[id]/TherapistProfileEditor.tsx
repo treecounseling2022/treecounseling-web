@@ -19,6 +19,7 @@ type ProfileData = {
   name?: string;
   name_en?: string;
   email?: string;
+  google_meet_link?: string;
   bio?: string;
   photo_url?: string;
   title?: string;
@@ -116,8 +117,8 @@ function describeRule(rule: RuleFromDB): string {
     return `${Math.round((rule.commission_rate ?? 0) * 100)}%`;
   }
   if (rule.commission_type === "flat_per_session") {
-    const free = (rule.free_sessions ?? 0) > 0 ? `，前 ${rule.free_sessions} 堂免費` : "";
-    return `MOP ${rule.flat_amount}/堂${free}`;
+    const free = (rule.free_sessions ?? 0) > 0 ? `，前 ${rule.free_sessions} 次免費` : "";
+    return `MOP ${rule.flat_amount}/次${free}`;
   }
   if (rule.commission_type === "tiered" || rule.commission_type === "tiered_per_client") {
     return `${(rule.tier_config ?? []).length} 個階梯`;
@@ -435,6 +436,17 @@ export default function TherapistProfileEditor({ therapistId, initialData, userR
               placeholder="例如：therapist@example.com"
               className={inputCls}
             />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="block font-sans text-xs text-muted mb-1">Google Meet 永久連結（線上晤談用）</label>
+            <input
+              type="url"
+              value={data.google_meet_link ?? ""}
+              onChange={(e) => setData((p) => ({ ...p, google_meet_link: e.target.value }))}
+              placeholder="https://meet.google.com/xxx-xxx-xxx"
+              className={inputCls}
+            />
+            <p className="font-sans text-[10px] text-muted/50 mt-1">在 Google Meet 首頁點「使用個人會議室」即可取得永久連結。</p>
           </div>
         </div>
 
@@ -778,7 +790,7 @@ export default function TherapistProfileEditor({ therapistId, initialData, userR
                   >
                     <option value="">（未設定）</option>
                     <option value="percentage">固定比例</option>
-                    <option value="tiered">階梯式 — 依當月所有個案累計總堂數</option>
+                    <option value="tiered">階梯式 — 依當月所有個案累計總次數</option>
                     <option value="tiered_per_client">階梯式 — 依個案與本師的歷史總次數</option>
                     <option value="flat_per_session">每次固定金額</option>
                   </select>
@@ -811,7 +823,7 @@ export default function TherapistProfileEditor({ therapistId, initialData, userR
               {addSessionForm.commission_type === "flat_per_session" && (
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block font-sans text-xs text-muted mb-1">每堂固定金額（MOP）</label>
+                    <label className="block font-sans text-xs text-muted mb-1">每次固定金額（MOP）</label>
                     <input
                       type="number"
                       min={0}
@@ -822,7 +834,7 @@ export default function TherapistProfileEditor({ therapistId, initialData, userR
                     />
                   </div>
                   <div>
-                    <label className="block font-sans text-xs text-muted mb-1">前 N 堂免費（0 = 每堂計算）</label>
+                    <label className="block font-sans text-xs text-muted mb-1">前 N 次免費（0 = 每次計算）</label>
                     <input
                       type="number"
                       min={0}
@@ -839,7 +851,7 @@ export default function TherapistProfileEditor({ therapistId, initialData, userR
                 <div className="space-y-3">
                   <p className="font-sans text-[11px] text-muted/70">
                     {addSessionForm.commission_type === "tiered"
-                      ? <>以<strong>當月所有個案的累計總堂數</strong>決定適用比例（跨個案合計）。</>
+                      ? <>以<strong>當月所有個案的累計總次數</strong>決定適用比例（跨個案合計）。</>
                       : <>以<strong>該個案與本心理師的歷史累計次數</strong>決定適用比例（每位個案獨立計算）。</>
                     }
                   </p>
@@ -860,7 +872,7 @@ export default function TherapistProfileEditor({ therapistId, initialData, userR
                           placeholder="10"
                         />
                         <span className="font-sans text-[11px] text-muted flex-shrink-0">
-                          {addSessionForm.commission_type === "tiered_per_client" ? "次後，心理師得" : "堂後，心理師得"}
+                          {"次後，心理師得"}
                         </span>
                         <input
                           type="number"
@@ -905,7 +917,7 @@ export default function TherapistProfileEditor({ therapistId, initialData, userR
                         .sort((a, b) => a.threshold - b.threshold)
                         .map((t, i, sorted) => {
                           const next = sorted[i + 1];
-                          const unit = addSessionForm.commission_type === "tiered_per_client" ? "次" : "堂";
+                          const unit = "次";
                           return (
                             <p key={i}>
                               第 {t.threshold} {unit}起{next ? `（至第 ${next.threshold - 1} ${unit}）` : "（含以後）"}：心理師得 {t.rate}%

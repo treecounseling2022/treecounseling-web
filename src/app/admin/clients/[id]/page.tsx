@@ -26,18 +26,20 @@ export default async function ClientDetailPage({ params }: Props) {
 
   const { id } = await params;
   const supabase = await createClient();
+  const db = createAdminClient();
 
-  const { data: client } = await supabase
+  // Use RLS client for initial auth check (respects row-level security)
+  const { data: clientRLS } = await supabase
     .from("clients")
-    .select("*")
+    .select("id, assigned_therapist_id, is_active")
     .eq("id", id)
     .single();
 
-  if (!client) notFound();
+  if (!clientRLS) notFound();
 
   // Therapists may view clients assigned to them OR with confirmed/locked appointments
   if (!isAdmin) {
-    const assignedToMe = client.assigned_therapist_id === auth.profileId;
+    const assignedToMe = clientRLS.assigned_therapist_id === auth.profileId;
     if (!assignedToMe && auth.profileId) {
       const { data: appt } = await supabase
         .from("appointments")
@@ -52,6 +54,16 @@ export default async function ClientDetailPage({ params }: Props) {
       notFound();
     }
   }
+
+  // Re-fetch full data with admin client (bypasses RLS column restrictions)
+  // so therapists can see contact info (phone, email, emergency_contact)
+  const { data: client } = await db
+    .from("clients")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (!client) notFound();
 
   const therapists = isAdmin
     ? ((await supabase.from("therapist_profiles").select("id, name").order("name")).data ?? [])
@@ -177,16 +189,23 @@ export default async function ClientDetailPage({ params }: Props) {
     .filter((a) => a.scheduled_at && new Date(a.scheduled_at) > new Date())
     .sort((a, b) => new Date(a.scheduled_at!).getTime() - new Date(b.scheduled_at!).getTime())[0];
 
-  // Partner name for couple clients
-  let partnerName: string | null = null;
+  // Partner data for couple clients
+  type PartnerData = {
+    id: string;
+    full_name: string;
+    dob: string | null;
+    gender: string | null;
+    phone: string | null;
+    email: string | null;
+  };
+  let partnerData: PartnerData | null = null;
   if (clientExt.service_type === "couple" && clientExt.couple_partner_id) {
-    const db2 = createAdminClient();
-    const { data: partner } = await db2
+    const { data: p } = await db
       .from("clients")
-      .select("full_name")
+      .select("id, full_name, dob, gender, phone, email")
       .eq("id", clientExt.couple_partner_id)
       .single();
-    partnerName = partner?.full_name ?? null;
+    partnerData = (p as PartnerData | null);
   }
 
   const clientsLabel = isAdmin ? "個案管理" : "我的個案";
@@ -209,15 +228,8 @@ export default async function ClientDetailPage({ params }: Props) {
             </span>
           )}
         </div>
-        <p className="font-sans text-[11px] text-muted mt-0.5">
+        <p className="font-sans text-xs text-muted mt-0.5">
           建立於 {new Date(client.created_at).toLocaleDateString("zh-TW")}
-          {partnerName && (
-            <span> · 配偶：
-              <Link href={`/admin/clients/${clientExt.couple_partner_id}`} className="text-forest hover:underline">
-                {partnerName}
-              </Link>
-            </span>
-          )}
         </p>
       </div>
 
@@ -225,7 +237,7 @@ export default async function ClientDetailPage({ params }: Props) {
       {isAdmin && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
-            { label: "已確認堂數", value: String(totalSessions), sub: "確認 + 鎖定" },
+            { label: "已確認次數", value: String(totalSessions), sub: "確認 + 鎖定" },
             { label: "總諮商費用", value: `MOP ${totalFees.toLocaleString()}`, sub: "全部累計" },
             { label: "已付款", value: `MOP ${paidTotal.toLocaleString()}`, sub: "付款記錄總計" },
             {
@@ -244,6 +256,57 @@ export default async function ClientDetailPage({ params }: Props) {
               <p className="font-sans text-[10px] text-muted/50 mt-0.5">{c.sub}</p>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Couple partner info — shown for both admin and therapist */}
+      {clientExt.service_type === "couple" && partnerData && (
+        <div className="bg-white border border-rose-100 rounded-sm overflow-hidden">
+          <div className="bg-rose-50 px-5 py-3 flex items-center gap-2 border-b border-rose-100">
+            <span className="font-sans text-xs text-rose-600 font-medium">伴侶諮商 — 配偶資料</span>
+            <Link
+              href={`/admin/clients/${partnerData.id}`}
+              className="ml-auto font-sans text-xs text-forest hover:underline flex-shrink-0"
+            >
+              查看配偶頁面 →
+            </Link>
+          </div>
+          <div className="px-5 py-4 grid grid-cols-2 sm:grid-cols-3 gap-4">
+            <div>
+              <p className="font-sans text-xs text-muted mb-1">姓名</p>
+              <p className="font-sans text-sm text-deep font-medium">{partnerData.full_name}</p>
+            </div>
+            <div>
+              <p className="font-sans text-xs text-muted mb-1">出生日期</p>
+              <p className="font-sans text-sm text-deep">
+                {partnerData.dob
+                  ? (() => {
+                      const birth = new Date(partnerData.dob!);
+                      const age = new Date().getFullYear() - birth.getFullYear();
+                      return `${partnerData.dob} （${age} 歲）`;
+                    })()
+                  : "—"}
+              </p>
+            </div>
+            <div>
+              <p className="font-sans text-xs text-muted mb-1">性別</p>
+              <p className="font-sans text-sm text-deep">
+                {partnerData.gender === "male" ? "男"
+                  : partnerData.gender === "female" ? "女"
+                  : partnerData.gender === "other" ? "其他"
+                  : partnerData.gender === "prefer_not_to_say" ? "不透露"
+                  : "—"}
+              </p>
+            </div>
+            <div>
+              <p className="font-sans text-xs text-muted mb-1">電話</p>
+              <p className="font-sans text-sm text-deep">{partnerData.phone || "—"}</p>
+            </div>
+            <div>
+              <p className="font-sans text-xs text-muted mb-1">Email</p>
+              <p className="font-sans text-sm text-deep">{partnerData.email || "—"}</p>
+            </div>
+          </div>
         </div>
       )}
 

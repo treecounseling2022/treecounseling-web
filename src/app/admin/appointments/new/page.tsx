@@ -45,8 +45,8 @@ export default async function NewAppointmentPage({ searchParams }: Props) {
 
   const { data: clients } = await clientQuery;
 
-  // Fetch rooms + service plans in parallel
-  const [{ data: rooms }, { data: plans }] = await Promise.all([
+  // Fetch rooms, service plans, and therapist's own Meet link in parallel
+  const [{ data: rooms }, { data: plans }, { data: therapistProfile }] = await Promise.all([
     supabase
       .from("rooms")
       .select("id, name, color, is_online")
@@ -57,6 +57,11 @@ export default async function NewAppointmentPage({ searchParams }: Props) {
       .select("id, name, price_per_session, currency")
       .eq("is_active", true)
       .order("sort_order"),
+    supabase
+      .from("therapist_profiles")
+      .select("google_meet_link")
+      .eq("id", auth.profileId)
+      .maybeSingle(),
   ]);
 
   return (
@@ -77,6 +82,7 @@ export default async function NewAppointmentPage({ searchParams }: Props) {
         defaultClientId={preselectedClientId}
         rooms={rooms ?? []}
         plans={plans ?? []}
+        therapistMeetLink={therapistProfile?.google_meet_link ?? ""}
       />
     </div>
   );

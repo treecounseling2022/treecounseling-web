@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -31,6 +31,8 @@ export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [teamOpen, setTeamOpen] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLLIElement>(null);
   const pathname = usePathname();
   const isHome = pathname === "/";
 
@@ -43,7 +45,19 @@ export default function Navbar() {
   useEffect(() => {
     setMenuOpen(false);
     setTeamOpen(false);
+    setDropdownOpen(false);
   }, [pathname]);
+
+  // 點擊外部關閉桌面版下拉選單
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const navBg = isHome && !scrolled
     ? "bg-transparent"
@@ -71,49 +85,58 @@ export default function Navbar() {
         <div className="hidden md:flex items-center gap-8 ml-auto">
           <ul className="flex items-center gap-6">
             {NAV_LINKS.map((link) => (
-              <li key={link.href} className="relative group">
+              <li key={link.href} ref={link.children ? dropdownRef : undefined} className="relative">
                 {link.children ? (
                   <>
-                    <Link
-                      href={link.href}
+                    <button
+                      type="button"
+                      aria-haspopup="true"
+                      aria-expanded={dropdownOpen}
+                      onClick={() => setDropdownOpen((o) => !o)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Escape") setDropdownOpen(false);
+                      }}
                       className={cn(
-                        "text-xs font-sans tracking-widest transition-colors duration-200 relative inline-flex items-center gap-1",
-                        textColor,
-                        isTeamActive ? "text-sand" : "hover:text-sand"
+                        "text-[13px] font-sans tracking-widest transition-colors duration-200 relative inline-flex items-center gap-1 cursor-pointer bg-transparent border-0 p-0",
+                        isTeamActive ? "text-sand" : textColor,
+                        !isTeamActive && "hover:text-sand"
                       )}
                     >
                       {link.label}
                       <svg
-                        className="w-2.5 h-2.5 transition-transform duration-200 group-hover:rotate-180"
+                        className={cn("w-2.5 h-2.5 transition-transform duration-200", dropdownOpen && "rotate-180")}
                         viewBox="0 0 10 6"
                         fill="none"
                         stroke="currentColor"
                         strokeWidth="1.5"
+                        aria-hidden="true"
                       >
                         <path d="M1 1l4 4 4-4" />
                       </svg>
                       <span
                         className={cn(
                           "absolute -bottom-0.5 left-0 h-px bg-sand transition-all duration-300",
-                          isTeamActive ? "w-full" : "w-0 group-hover:w-full"
+                          isTeamActive || dropdownOpen ? "w-[calc(100%-1rem)]" : "w-0"
                         )}
-                        style={{ right: "1rem" }}
                       />
-                    </Link>
+                    </button>
 
                     {/* Dropdown */}
                     <div
+                      role="menu"
+                      aria-hidden={!dropdownOpen}
                       className={cn(
-                        "absolute top-full left-1/2 -translate-x-1/2 pt-3 opacity-0 pointer-events-none",
-                        "group-hover:opacity-100 group-hover:pointer-events-auto",
-                        "transition-all duration-200"
+                        "absolute top-full left-1/2 -translate-x-1/2 pt-3 transition-all duration-200",
+                        dropdownOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
                       )}
                     >
                       <div className="bg-paper/98 backdrop-blur-sm border border-sand/20 shadow-lg min-w-[140px] py-2">
-                        {/* 全部成員 */}
                         <Link
                           href="/team"
-                          className="block px-5 py-2 text-[11px] font-sans tracking-widest text-muted hover:text-forest hover:bg-soft transition-colors border-b border-sand/10"
+                          role="menuitem"
+                          onClick={() => setDropdownOpen(false)}
+                          onKeyDown={(e) => { if (e.key === "Escape") setDropdownOpen(false); }}
+                          className="block px-5 py-2 text-xs font-sans tracking-widest text-muted hover:text-forest hover:bg-soft transition-colors border-b border-sand/10"
                         >
                           所有成員
                         </Link>
@@ -121,8 +144,11 @@ export default function Navbar() {
                           <Link
                             key={child.href}
                             href={child.href}
+                            role="menuitem"
+                            onClick={() => setDropdownOpen(false)}
+                            onKeyDown={(e) => { if (e.key === "Escape") setDropdownOpen(false); }}
                             className={cn(
-                              "block px-5 py-2.5 text-[11px] font-sans tracking-wide transition-colors",
+                              "block px-5 py-2.5 text-xs font-sans tracking-wide transition-colors",
                               pathname === child.href
                                 ? "text-forest bg-soft"
                                 : "text-deep hover:text-forest hover:bg-soft"
@@ -130,7 +156,7 @@ export default function Navbar() {
                           >
                             <span className="block">{child.label}</span>
                             {child.sub && (
-                              <span className="block font-garamond text-[10px] text-muted/70 mt-0.5">
+                              <span className="block font-garamond text-xs text-muted/70 mt-0.5">
                                 {child.sub}
                               </span>
                             )}
@@ -143,7 +169,7 @@ export default function Navbar() {
                   <Link
                     href={link.href}
                     className={cn(
-                      "text-xs font-sans tracking-widest transition-colors duration-200 relative group",
+                      "text-[13px] font-sans tracking-widest transition-colors duration-200 relative group",
                       textColor,
                       pathname === link.href ? "text-sand" : "hover:text-sand"
                     )}
@@ -179,6 +205,7 @@ export default function Navbar() {
           className={cn("md:hidden p-2 cursor-pointer", textColor)}
           aria-label={menuOpen ? "關閉選單" : "開啟選單"}
           aria-expanded={menuOpen}
+          aria-controls="mobile-nav-menu"
         >
           <span className="block w-5 h-px bg-current mb-1.5 transition-all" />
           <span className={cn("block w-5 h-px bg-current mb-1.5 transition-all", menuOpen && "opacity-0")} />
@@ -188,6 +215,7 @@ export default function Navbar() {
 
       {/* Mobile Menu */}
       <div
+        id="mobile-nav-menu"
         className={cn(
           "md:hidden overflow-hidden transition-all duration-300 bg-paper border-t border-sand/20",
           menuOpen ? "max-h-[560px] opacity-100" : "max-h-0 opacity-0"
@@ -200,6 +228,8 @@ export default function Navbar() {
                 <div>
                   <button
                     onClick={() => setTeamOpen(!teamOpen)}
+                    aria-expanded={teamOpen}
+                    aria-controls="mobile-team-submenu"
                     className={cn(
                       "flex items-center justify-between w-full text-sm font-sans transition-colors",
                       isTeamActive ? "text-sand" : "text-deep hover:text-sand"
@@ -220,6 +250,7 @@ export default function Navbar() {
                     </svg>
                   </button>
                   <div
+                    id="mobile-team-submenu"
                     className={cn(
                       "overflow-hidden transition-all duration-200",
                       teamOpen ? "max-h-60 mt-2" : "max-h-0"

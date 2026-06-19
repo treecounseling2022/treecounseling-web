@@ -9,7 +9,7 @@ export default function HomeCTA() {
       
       {/* Decorative subtle ring seal at the end of the letter */}
       <div className="absolute right-10 bottom-10 opacity-5 pointer-events-none">
-        <svg className="animate-[spin_40s_linear_infinite]" width="200" height="200" viewBox="0 0 120 120" fill="none" stroke="#3a4a3a" strokeWidth="0.8" xmlns="http://www.w3.org/2000/svg">
+        <svg className="animate-[spin_40s_linear_infinite]" width="200" height="200" viewBox="0 0 120 120" fill="none" stroke="#3a4a3a" strokeWidth="0.8" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
           {[50, 40, 30, 20, 10].map((r) => (
             <circle key={r} cx="60" cy="60" r={r} strokeDasharray="4 4" />
           ))}
@@ -50,7 +50,7 @@ export default function HomeCTA() {
                 透過 WhatsApp 聯絡行政查詢 →
               </a>
             </div>
-            <p className="text-[10px] font-sans text-muted/40">
+            <p className="text-xs font-sans text-muted/40">
               所有填寫的資料皆以專業倫理標準嚴格保密，請安心填寫。
             </p>
           </FadeIn>

@@ -22,6 +22,11 @@ export default function FadeIn({
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setVisible(true);
+      return;
+    }
+
     const el = ref.current;
     if (!el) return;
 
@@ -53,7 +58,7 @@ export default function FadeIn({
     <div
       ref={ref}
       className={cn(
-        "transition-all ease-out",
+        "transition-[transform,opacity] ease-out",
         visible ? "opacity-100 translate-x-0 translate-y-0" : `opacity-0 ${translateMap[direction]}`,
         className
       )}

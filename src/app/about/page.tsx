@@ -114,7 +114,7 @@ export default function AboutPage() {
                         <span className="font-garamond text-sand text-lg font-light">{v.number}</span>
                         <h3 className="font-serif text-deep text-lg">{v.title}</h3>
                       </div>
-                      <p className="font-sans text-muted text-xs leading-relaxed">{v.description}</p>
+                      <p className="font-sans text-muted text-sm leading-relaxed">{v.description}</p>
                     </div>
                   </div>
                 </FadeIn>

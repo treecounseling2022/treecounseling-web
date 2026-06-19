@@ -137,9 +137,6 @@ export default function ServicePlansPage() {
     <div className="space-y-6 pt-4">
       <div className="flex items-start justify-between">
         <div>
-          <p className="font-sans text-xs text-muted mb-1">
-            <a href="/admin" className="hover:text-forest">後台</a> / 服務方案
-          </p>
           <h1 className="font-serif text-deep text-2xl">服務方案設定</h1>
           <p className="font-sans text-xs text-muted mt-0.5">
             管理諮商收費方案，可在預約派案時指定方案。
@@ -175,7 +172,7 @@ export default function ServicePlansPage() {
               <tr className="border-b border-sand/20 bg-sand/5">
                 <th className="text-left text-muted px-4 py-3 font-normal">方案名稱</th>
                 <th className="text-right text-muted px-4 py-3 font-normal">每次收費</th>
-                <th className="text-center text-muted px-4 py-3 font-normal">堂數</th>
+                <th className="text-center text-muted px-4 py-3 font-normal">次數</th>
                 <th className="text-center text-muted px-4 py-3 font-normal">年齡限制</th>
                 <th className="text-center text-muted px-4 py-3 font-normal">狀態</th>
                 <th className="px-4 py-3"></th>
@@ -194,7 +191,7 @@ export default function ServicePlansPage() {
                     {p.currency} {p.price_per_session.toLocaleString()}
                   </td>
                   <td className="px-4 py-3 text-center text-muted">
-                    {p.session_count != null ? `${p.session_count} 堂` : "不限"}
+                    {p.session_count != null ? `${p.session_count} 次` : "不限"}
                   </td>
                   <td className="px-4 py-3 text-center text-muted">
                     {p.age_min != null || p.age_max != null
@@ -232,7 +229,7 @@ export default function ServicePlansPage() {
       {/* Modal */}
       {modal.mode !== "closed" && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white w-full max-w-md space-y-4 p-6 shadow-lg">
+          <div className="bg-white w-full max-w-md space-y-4 p-6 shadow-sm">
             <div className="flex items-center justify-between">
               <h2 className="font-serif text-deep text-lg">
                 {modal.mode === "add" ? "新增方案" : "編輯方案"}
@@ -294,7 +291,7 @@ export default function ServicePlansPage() {
 
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="block font-sans text-xs text-muted mb-1">總堂數</label>
+                  <label className="block font-sans text-xs text-muted mb-1">總次數</label>
                   <input
                     type="number"
                     min={1}

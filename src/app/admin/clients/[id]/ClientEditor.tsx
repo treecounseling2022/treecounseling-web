@@ -332,9 +332,9 @@ export default function ClientEditor({
         </div>
         {!readonly && (
           <div>
-            <label className={labelCls}>舊系統已完成諮商堂數</label>
+            <label className={labelCls}>舊系統已完成諮商次數</label>
             <p className="font-sans text-[11px] text-muted/60 mb-1">
-              使用新系統前已完成的諮商堂數，用於計算階梯式抽成的累計起始值。新個案填 0。
+              使用新系統前已完成的諮商次數，用於計算階梯式抽成的累計起始值。新個案填 0。
             </p>
             <input
               type="number"

@@ -1,19 +1,40 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth-role";
 
 export default async function ArticlesAdminPage() {
+  const auth = await requireAuth();
   const supabase = await createClient();
-  const { data: articles } = await supabase
+
+  let therapistName: string | null = null;
+  if (auth.role === "therapist" && auth.profileId) {
+    const { data: profile } = await supabase
+      .from("therapist_profiles")
+      .select("name")
+      .eq("id", auth.profileId)
+      .single();
+    therapistName = profile?.name ?? null;
+  }
+
+  const baseQuery = supabase
     .from("articles")
     .select("id, title, category, date, author, published")
     .order("date", { ascending: false });
+
+  const { data: articles } = await (therapistName
+    ? baseQuery.eq("author", therapistName)
+    : baseQuery);
 
   return (
     <div className="space-y-6 pt-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-serif text-deep text-2xl mb-1">文章管理</h1>
-          <p className="font-sans text-xs text-muted">管理最新消息與心理知識文章。</p>
+          <h1 className="font-serif text-deep text-2xl mb-1">
+            {therapistName ? "我的文章" : "文章管理"}
+          </h1>
+          <p className="font-sans text-xs text-muted">
+            {therapistName ? "管理你發布的文章。" : "管理最新消息與心理知識文章。"}
+          </p>
         </div>
         <Link
           href="/admin/articles/new"

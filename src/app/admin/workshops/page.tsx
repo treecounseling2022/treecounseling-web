@@ -39,9 +39,9 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 const STATUS_CLS: Record<string, string> = {
-  scheduled: "bg-blue-50 text-blue-700",
-  completed: "bg-green-50 text-green-700",
-  cancelled: "bg-sand/20 text-muted",
+  scheduled: "adm-badge-info",
+  completed: "adm-badge-success",
+  cancelled: "adm-badge-faded",
 };
 
 function emptyForm(therapists: Therapist[]): FormData {
@@ -181,9 +181,6 @@ export default function WorkshopsPage() {
     <div className="space-y-6 pt-4">
       <div className="flex items-start justify-between">
         <div>
-          <p className="font-sans text-xs text-muted mb-1">
-            <a href="/admin" className="hover:text-forest">後台</a> / 講座 / 工作坊
-          </p>
           <h1 className="font-serif text-deep text-2xl">講座 / 工作坊</h1>
           <p className="font-sans text-xs text-muted mt-0.5">
             記錄每場活動的時薪、時數與總費用，薪酬頁面自動計算心理師分成。

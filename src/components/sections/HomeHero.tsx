@@ -10,18 +10,22 @@ export default function HomeHero() {
   const [hasScrolled, setHasScrolled] = useState(false);
   const [showMist, setShowMist] = useState(true);
 
-  // 監聽滾輪與觸控滑動：在雲霧消散前鎖定網頁滾動
+  // 監聽滾輪、觸控、鍵盤：在雲霧消散前鎖定網頁滾動
   useEffect(() => {
     if (!showMist) return;
 
+    const triggerScroll = () => {
+      if (!hasScrolled) setHasScrolled(true);
+    };
+
     const handleWheel = (e: WheelEvent) => {
-      // 偵測向下滾動
-      if (!hasScrolled && e.deltaY > 0) {
-        setHasScrolled(true);
-      }
-      // 在雲霧未完全移走前，阻止預設的滾動行為
-      if (showMist) {
-        e.preventDefault();
+      if (e.deltaY > 0) triggerScroll();
+      if (showMist) e.preventDefault();
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (["ArrowDown", "Space", "PageDown"].includes(e.code)) {
+        triggerScroll();
       }
     };
 
@@ -31,26 +35,19 @@ export default function HomeHero() {
     };
 
     const handleTouchMove = (e: TouchEvent) => {
-      const currentY = e.touches[0].clientY;
-      const diffY = startY - currentY;
-      
-      // 偵測向上滑動 (向下滾動)
-      if (!hasScrolled && diffY > 8) {
-        setHasScrolled(true);
-      }
-      // 在雲霧未完全移走前，阻止觸控滾動
-      if (showMist) {
-        e.preventDefault();
-      }
+      const diffY = startY - e.touches[0].clientY;
+      if (diffY > 8) triggerScroll();
+      if (showMist) e.preventDefault();
     };
 
-    // 必須使用 { passive: false } 才能成功 preventDefault
     window.addEventListener("wheel", handleWheel, { passive: false });
+    window.addEventListener("keydown", handleKeyDown);
     window.addEventListener("touchstart", handleTouchStart, { passive: true });
     window.addEventListener("touchmove", handleTouchMove, { passive: false });
 
     return () => {
       window.removeEventListener("wheel", handleWheel);
+      window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("touchstart", handleTouchStart);
       window.removeEventListener("touchmove", handleTouchMove);
     };
@@ -85,16 +82,22 @@ export default function HomeHero() {
                 <span className="font-serif text-forest text-xl sm:text-3xl tracking-[6px] pl-1 opacity-70">
                   歡迎來到 樹心理工作室
                 </span>
-                {/* Micro-arrow icon */}
-                <svg 
-                  className="w-4 h-4 text-forest opacity-50" 
-                  fill="none" 
-                  stroke="currentColor" 
-                  strokeWidth="1.5" 
+                <svg
+                  className="w-4 h-4 text-forest opacity-50"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
                   viewBox="0 0 24 24"
+                  aria-hidden="true"
                 >
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
                 </svg>
+                <button
+                  onClick={() => setHasScrolled(true)}
+                  className="mt-4 text-[11px] font-sans text-forest/50 hover:text-forest/80 border border-forest/20 hover:border-forest/40 px-3 py-1 transition-colors cursor-pointer"
+                >
+                  跳過動畫
+                </button>
               </div>
             </div>
           )}
@@ -223,7 +226,7 @@ export default function HomeHero() {
           </FadeIn>
 
           <FadeIn direction="up" delay={300}>
-            <div className="max-w-md space-y-4 font-sans text-muted text-xs leading-relaxed">
+            <div className="max-w-md space-y-4 font-sans text-muted text-sm leading-relaxed">
               <p>
                 你好。歡迎來到樹心理工作室。
               </p>

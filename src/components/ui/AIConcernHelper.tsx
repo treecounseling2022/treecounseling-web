@@ -290,7 +290,7 @@ export default function AIConcernHelper({ onComplete, serviceType }: AIConcernHe
                       送出
                     </button>
                   </form>
-                  <p className="text-[10px] text-muted/40 text-center leading-relaxed">
+                  <p className="text-xs text-muted/40 text-center leading-relaxed">
                     AI 助理會問你 2-3 個溫和的問題來收集必要資訊，隨後自動整理成結構化重點供你回填。
                   </p>
                 </div>
