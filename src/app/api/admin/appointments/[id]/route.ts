@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAuthInfo, isAdminLevel } from "@/lib/auth-role";
 import { checkTimeConflict } from "@/lib/appointments";
+import { generateInquiryPDF } from "@/lib/pdf/inquiry-pdf";
 import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -241,14 +242,103 @@ export async function PATCH(
     }).catch(console.error);
   }
 
-  // After therapist confirms, send email to client with full details
+  // After therapist confirms: email client + email therapist with PDF
   if (action === "confirm" && data?.client_id && process.env.RESEND_API_KEY) {
     const [{ data: client }, { data: therapistProfile }] = await Promise.all([
-      db.from("clients").select("full_name, email").eq("id", data.client_id).single(),
+      db.from("clients").select("full_name, email, intake_token, intake_submitted_at").eq("id", data.client_id).single(),
       data.therapist_id
-        ? db.from("therapist_profiles").select("name").eq("id", data.therapist_id).single()
+        ? db.from("therapist_profiles").select("name, email, title").eq("id", data.therapist_id).single()
         : Promise.resolve({ data: null }),
     ]);
+
+    // ── 心理師：附預約查詢 PDF（與派案通知相同格式，字型可靠）──────────────────
+    if (data.therapist_id && therapistProfile) {
+      const tProfile = therapistProfile as typeof therapistProfile & { email?: string | null };
+      if (tProfile.email) {
+        (async () => {
+          const scheduledAt = data.scheduled_at
+            ? new Date(data.scheduled_at).toLocaleString("zh-TW", {
+                year: "numeric", month: "long", day: "numeric",
+                weekday: "long", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Macau",
+              })
+            : "（待另行通知）";
+
+          // 從 booking_inquiries 找回原始申請資料，生成與派案通知相同的 PDF
+          const { data: inquiry } = await db
+            .from("booking_inquiries")
+            .select("*")
+            .eq("appointment_id", id)
+            .maybeSingle();
+
+          let pdfAttachment: { filename: string; content: Buffer } | undefined;
+          if (inquiry) {
+            try {
+              const fd = (inquiry.form_data ?? {}) as Record<string, unknown>;
+              const isCouple = inquiry.service_type === "couple";
+              const cd = isCouple
+                ? (fd.coupleDetails as {
+                    partnerA?: { name?: string; gender?: string; birthday?: string; language?: string };
+                    partnerB?: { name?: string; gender?: string; birthday?: string; language?: string };
+                    meetingType?: string;
+                  } | undefined)
+                : undefined;
+              const pdfBuf = await generateInquiryPDF({
+                serviceType: inquiry.service_type,
+                preferredTimes: inquiry.preferred_times ?? undefined,
+                name: (fd.name as string) ?? inquiry.name ?? undefined,
+                gender: fd.gender as string | undefined,
+                birthday: fd.birthday as string | undefined,
+                city: fd.city as string | undefined,
+                meetingType: fd.meetingType as string | undefined,
+                nativeLanguage: fd.nativeLanguage as string | undefined,
+                preferredTherapist: fd.preferredTherapist as string | undefined,
+                concern: inquiry.concern ?? undefined,
+                individualDetails: fd.individualDetails as Parameters<typeof generateInquiryPDF>[0]["individualDetails"],
+                coupleDetails: cd ? {
+                  partnerA: { name: cd.partnerA?.name, gender: cd.partnerA?.gender, birthday: cd.partnerA?.birthday, language: cd.partnerA?.language },
+                  partnerB: { name: cd.partnerB?.name, gender: cd.partnerB?.gender, birthday: cd.partnerB?.birthday, language: cd.partnerB?.language },
+                  issues: (fd.coupleDetails as Record<string, unknown>)?.issues as string[] | undefined,
+                  duration: (fd.coupleDetails as Record<string, unknown>)?.duration as string | undefined,
+                  children: (fd.coupleDetails as Record<string, unknown>)?.children as string | undefined,
+                  meetingType: cd.meetingType ?? undefined,
+                } : undefined,
+                otherDetails: fd.otherDetails as Parameters<typeof generateInquiryPDF>[0]["otherDetails"],
+                submittedAt: inquiry.created_at ?? new Date().toISOString(),
+              });
+              const dateStr = new Date().toISOString().slice(0, 10);
+              pdfAttachment = { filename: `booking_inquiry_${dateStr}.pdf`, content: pdfBuf };
+            } catch (pdfErr) {
+              console.error("Confirm therapist PDF generation failed:", pdfErr);
+            }
+          }
+
+          await resend.emails.send({
+            from: FROM,
+            to: tProfile.email!,
+            subject: `【個案資料】${client?.full_name ?? ""} — 排案確認`,
+            html: `
+              <div style="font-family:sans-serif;max-width:520px;margin:0 auto;color:#111;font-size:14px;line-height:1.75">
+                <div style="background:#2d4a38;padding:20px 28px">
+                  <p style="margin:0;color:#a8c5b0;font-size:11px;letter-spacing:1.5px">TREE COUNSELING STUDIO</p>
+                  <p style="margin:4px 0 0;color:#fff;font-size:17px;font-weight:600">排案確認 — ${client?.full_name ?? ""}</p>
+                </div>
+                <div style="background:#fff;padding:24px 28px">
+                  <p style="margin:0 0 12px">您好，<strong>${tProfile.name ?? ""}</strong>，</p>
+                  <p style="margin:0 0 16px;color:#444">您已確認接案，個案基本資料請見附件 PDF。</p>
+                  <p style="margin:0 0 4px;color:#333;font-weight:600">晤談時間</p>
+                  <p style="margin:0 0 0;color:#111">${scheduledAt}</p>
+                </div>
+                <div style="background:#f7f5ef;padding:12px 28px;text-align:center">
+                  <p style="margin:0;color:#999;font-size:11px">樹心理工作室　Tree Counseling Studio</p>
+                </div>
+              </div>
+            `,
+            attachments: pdfAttachment ? [pdfAttachment] : [],
+          });
+        })().catch(console.error);
+      }
+    }
+
     if (client?.email) {
       const scheduledAt = data.scheduled_at
         ? new Date(data.scheduled_at).toLocaleString("zh-TW", {
@@ -256,6 +346,20 @@ export async function PATCH(
             weekday: "long", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Macau",
           })
         : "（待另行通知）";
+
+      // Include intake link if this is the first appointment and intake not yet submitted
+      const clientAny = client as typeof client & { intake_token?: string | null; intake_submitted_at?: string | null };
+      const intakeToken = clientAny.intake_token;
+      const intakeSubmitted = !!clientAny.intake_submitted_at;
+      const intakeSection = (intakeToken && !intakeSubmitted)
+        ? `
+          <div style="background:#f7f5ef;border:1px solid #d4c9b0;padding:18px 20px;margin:0 0 20px">
+            <p style="margin:0 0 6px;color:#2d4a38;font-size:13px;font-weight:600">📋 預約前準備（選填）</p>
+            <p style="margin:0 0 12px;color:#555;font-size:13px;line-height:1.7">為讓心理師在第一次晤談前更了解您的狀況，歡迎提前完成線上初談問卷。此步驟為選填，不填寫也不影響您的預約。</p>
+            <a href="${SITE}/intake?token=${intakeToken}" style="display:inline-block;background:#2d4a38;color:#fff;padding:10px 22px;text-decoration:none;font-size:13px;font-weight:600">開始填寫初談問卷 →</a>
+          </div>`
+        : "";
+
       await resend.emails.send({
         from: FROM,
         to: client.email,
@@ -268,13 +372,14 @@ export async function PATCH(
             </div>
             <div style="background:#fff;padding:28px 32px">
               <p style="margin:0 0 12px">您好，<strong>${client.full_name}</strong>，</p>
-              <p style="margin:0 0 20px;color:#444">您的諮商晤談預約已由心理師確認，詳情如下：</p>
+              <p style="margin:0 0 20px;color:#444">您的諮商晤談預約已由心理輔導人員確認，詳情如下：</p>
               <table style="width:100%;border-collapse:collapse;margin:0 0 24px">
                 <tr><td ${tdL}>晤談時間</td><td ${tdR}><strong>${scheduledAt}</strong></td></tr>
-                ${therapistProfile?.name ? `<tr><td ${tdL}>晤談人員</td><td ${tdR}>${therapistProfile.name} 心理輔導師</td></tr>` : ""}
-                <tr><td ${tdL}>晤談方式</td><td ${tdR}>${data.is_online ? "線上晤談（視訊）" : "到診面談"}</td></tr>
+                ${therapistProfile?.name ? `<tr><td ${tdL}>晤談人員</td><td ${tdR}>${therapistProfile.name} ${(therapistProfile as unknown as { title?: string | null }).title ?? "心理輔導師"}</td></tr>` : ""}
+                <tr><td ${tdL}>晤談方式</td><td ${tdR}>${data.is_online ? "線上晤談（視訊）" : "面談"}</td></tr>
                 ${data.is_online && data.meeting_link ? `<tr><td ${tdL}>視訊連結</td><td ${tdR}><a href="${data.meeting_link}" style="color:#2d4a38;word-break:break-all">${data.meeting_link}</a></td></tr>` : ""}
               </table>
+              ${intakeSection}
               <div style="background:#f0f5f1;border-left:3px solid #5a8a6a;padding:14px 18px;margin:0 0 20px">
                 <p style="margin:0;color:#2d4a38;font-size:13px;line-height:1.7">如需更改時間或取消，請於晤談前 <strong>24 小時</strong> 聯繫行政人員。</p>
               </div>

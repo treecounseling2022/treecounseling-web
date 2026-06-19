@@ -91,7 +91,7 @@ export default function AppointmentsPage() {
   const [rejectModal, setRejectModal] = useState<Appointment | null>(null);
   const [detailModal, setDetailModal] = useState<Appointment | null>(null);
   const [rescheduleModal, setRescheduleModal] = useState<Appointment | null>(null);
-  const [rescheduleForm, setRescheduleForm] = useState({ scheduled_at: "", room_id: "" });
+  const [rescheduleForm, setRescheduleForm] = useState({ scheduled_date: "", scheduled_time: "", room_id: "" });
 
   // New appointment form
   const [newForm, setNewForm] = useState({
@@ -109,7 +109,8 @@ export default function AppointmentsPage() {
     is_online: false,
     meeting_link: "",
     use_custom_link: false,
-    scheduled_at: "",
+    scheduled_date: new Date().toISOString().slice(0, 10),
+    scheduled_time: "",
     session_fee: "",
     arrangement_type: "",
   });
@@ -215,13 +216,15 @@ export default function AppointmentsPage() {
       room_id: assignForm.room_id || null,
       is_online: assignForm.is_online,
       meeting_link: assignForm.is_online ? (assignForm.meeting_link || null) : null,
-      scheduled_at: assignForm.scheduled_at || null,
+      scheduled_at: (assignForm.scheduled_date && assignForm.scheduled_time)
+        ? `${assignForm.scheduled_date}T${assignForm.scheduled_time}`
+        : null,
       session_fee: assignForm.session_fee ? +assignForm.session_fee : null,
       arrangement_type: assignForm.arrangement_type || null,
     });
     if (ok) {
       setAssignModal(null);
-      setAssignForm({ therapist_id: "", room_id: "", is_online: false, meeting_link: "", use_custom_link: false, scheduled_at: "", session_fee: "", arrangement_type: "" });
+      setAssignForm({ therapist_id: "", room_id: "", is_online: false, meeting_link: "", use_custom_link: false, scheduled_date: new Date().toISOString().slice(0, 10), scheduled_time: "", session_fee: "", arrangement_type: "" });
     }
   }
 
@@ -232,13 +235,13 @@ export default function AppointmentsPage() {
   }
 
   async function doReschedule() {
-    if (!rescheduleModal || !rescheduleForm.scheduled_at) { setErr("請選擇新的預約時間"); return; }
+    if (!rescheduleModal || !rescheduleForm.scheduled_date) { setErr("請選擇新的預約時間"); return; }
     const ok = await action(rescheduleModal.id, {
       action: "reschedule",
-      scheduled_at: rescheduleForm.scheduled_at,
+      scheduled_at: `${rescheduleForm.scheduled_date}T${rescheduleForm.scheduled_time || "00:00"}`,
       room_id: rescheduleForm.room_id || null,
     });
-    if (ok) { setRescheduleModal(null); setRescheduleForm({ scheduled_at: "", room_id: "" }); }
+    if (ok) { setRescheduleModal(null); setRescheduleForm({ scheduled_date: "", scheduled_time: "", room_id: "" }); }
   }
 
   const inputCls = "w-full border border-sand/30 px-3 py-2 font-sans text-sm text-deep focus:outline-none focus:border-forest/50";
@@ -293,13 +296,15 @@ export default function AppointmentsPage() {
           {!isTherapist && (appt.booking_status === "pending_admin" || appt.booking_status === "rejected") ? (
             <button
               onClick={() => {
+                const _existingIso = appt.scheduled_at ? new Date(appt.scheduled_at).toISOString().slice(0, 16) : null;
                 setAssignForm({
                   therapist_id: appt.therapist_id ?? "",
                   room_id: appt.room_id ?? "",
                   is_online: false,
                   meeting_link: "",
                   use_custom_link: false,
-                  scheduled_at: appt.scheduled_at ? new Date(appt.scheduled_at).toISOString().slice(0,16) : "",
+                  scheduled_date: _existingIso ? _existingIso.slice(0, 10) : "",
+                  scheduled_time: _existingIso ? _existingIso.slice(11, 16) : "",
                   session_fee: appt.session_fee?.toString() ?? "",
                   arrangement_type: appt.arrangement_type ?? "",
                 });
@@ -341,8 +346,10 @@ export default function AppointmentsPage() {
               </button>
               <button
                 onClick={() => {
+                  const _rIso = appt.scheduled_at ? new Date(appt.scheduled_at).toISOString().slice(0, 16) : null;
                   setRescheduleForm({
-                    scheduled_at: appt.scheduled_at ? new Date(appt.scheduled_at).toISOString().slice(0, 16) : "",
+                    scheduled_date: _rIso ? _rIso.slice(0, 10) : "",
+                    scheduled_time: _rIso ? _rIso.slice(11, 16) : "",
                     room_id: appt.room_id ?? "",
                   });
                   setErr("");
@@ -358,8 +365,10 @@ export default function AppointmentsPage() {
           {!isTherapist && appt.booking_status === "locked" ? (
             <button
               onClick={() => {
+                const _rIso2 = appt.scheduled_at ? new Date(appt.scheduled_at).toISOString().slice(0, 16) : null;
                 setRescheduleForm({
-                  scheduled_at: appt.scheduled_at ? new Date(appt.scheduled_at).toISOString().slice(0, 16) : "",
+                  scheduled_date: _rIso2 ? _rIso2.slice(0, 10) : "",
+                  scheduled_time: _rIso2 ? _rIso2.slice(11, 16) : "",
                   room_id: appt.room_id ?? "",
                 });
                 setErr("");
@@ -643,7 +652,12 @@ export default function AppointmentsPage() {
               </div>
               <div>
                 <label className="font-sans text-[11px] text-muted block mb-1">預定時間（今天之後）</label>
-                <input type="datetime-local" value={assignForm.scheduled_at} min={new Date().toISOString().slice(0, 16)} onChange={(e) => setAssignForm((f) => ({ ...f, scheduled_at: e.target.value }))} className={inputCls} />
+                <div className="flex gap-2 items-center">
+                  <input type="date" value={assignForm.scheduled_date} min={new Date().toISOString().slice(0, 10)} onChange={(e) => setAssignForm((f) => ({ ...f, scheduled_date: e.target.value }))} className="flex-1 border border-sand/30 px-3 py-2 font-sans text-sm text-deep focus:outline-none focus:border-forest/50" />
+                  <select value={assignForm.scheduled_time ? assignForm.scheduled_time.slice(0, 2) : ""} onChange={(e) => { const hh = e.target.value; const mm = assignForm.scheduled_time ? (assignForm.scheduled_time.slice(3, 5) || "00") : "00"; setAssignForm((f) => ({ ...f, scheduled_time: hh ? `${hh}:${mm}` : "" })); }} className="border border-sand/30 px-2 py-2 font-sans text-sm text-deep bg-white focus:outline-none focus:border-forest/50"><option value="">時</option>{Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0")).map((h) => <option key={h} value={h}>{h}</option>)}</select>
+                  <span className="text-muted text-sm">:</span>
+                  <select value={assignForm.scheduled_time ? assignForm.scheduled_time.slice(3, 5) : ""} onChange={(e) => { const mm = e.target.value; const hh = assignForm.scheduled_time ? (assignForm.scheduled_time.slice(0, 2) || "09") : "09"; setAssignForm((f) => ({ ...f, scheduled_time: mm ? `${hh}:${mm}` : "" })); }} className="border border-sand/30 px-2 py-2 font-sans text-sm text-deep bg-white focus:outline-none focus:border-forest/50"><option value="">分</option>{["00", "15", "30", "45"].map((m) => <option key={m} value={m}>{m}</option>)}</select>
+                </div>
               </div>
               <div>
                 <label className="font-sans text-[11px] text-muted block mb-1">收費（MOP）</label>
@@ -709,13 +723,12 @@ export default function AppointmentsPage() {
             <div className="space-y-3">
               <div>
                 <label className="font-sans text-xs text-muted block mb-1">新的預約時間</label>
-                <input
-                  type="datetime-local"
-                  value={rescheduleForm.scheduled_at}
-                  onChange={(e) => setRescheduleForm((f) => ({ ...f, scheduled_at: e.target.value }))}
-                  className={inputCls}
-                  autoFocus
-                />
+                <div className="flex gap-2 items-center">
+                  <input type="date" value={rescheduleForm.scheduled_date} min={new Date().toISOString().slice(0, 10)} onChange={(e) => setRescheduleForm((f) => ({ ...f, scheduled_date: e.target.value }))} className="flex-1 border border-sand/30 px-3 py-2 font-sans text-sm text-deep focus:outline-none focus:border-forest/50" autoFocus />
+                  <select value={rescheduleForm.scheduled_time ? rescheduleForm.scheduled_time.slice(0, 2) : ""} onChange={(e) => { const hh = e.target.value; const mm = rescheduleForm.scheduled_time ? (rescheduleForm.scheduled_time.slice(3, 5) || "00") : "00"; setRescheduleForm((f) => ({ ...f, scheduled_time: hh ? `${hh}:${mm}` : "" })); }} className="border border-sand/30 px-2 py-2 font-sans text-sm text-deep bg-white focus:outline-none focus:border-forest/50"><option value="">時</option>{Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0")).map((h) => <option key={h} value={h}>{h}</option>)}</select>
+                  <span className="text-muted text-sm">:</span>
+                  <select value={rescheduleForm.scheduled_time ? rescheduleForm.scheduled_time.slice(3, 5) : ""} onChange={(e) => { const mm = e.target.value; const hh = rescheduleForm.scheduled_time ? (rescheduleForm.scheduled_time.slice(0, 2) || "09") : "09"; setRescheduleForm((f) => ({ ...f, scheduled_time: mm ? `${hh}:${mm}` : "" })); }} className="border border-sand/30 px-2 py-2 font-sans text-sm text-deep bg-white focus:outline-none focus:border-forest/50"><option value="">分</option>{["00", "15", "30", "45"].map((m) => <option key={m} value={m}>{m}</option>)}</select>
+                </div>
               </div>
               <div>
                 <label className="font-sans text-xs text-muted block mb-1">諮商室（選填）</label>

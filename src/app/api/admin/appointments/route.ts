@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAuthInfo, isAdminLevel } from "@/lib/auth-role";
 import { checkTimeConflict } from "@/lib/appointments";
+import { generateClientPDF } from "@/lib/generate-client-pdf";
 import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -11,7 +12,6 @@ export async function GET() {
   if (!auth) return NextResponse.json({ error: "未授權" }, { status: 403 });
   const db = createAdminClient();
 
-  // Admin sees all; therapist sees only their own
   let query = db
     .from("appointments")
     .select("*, clients(id, full_name, phone), rooms(id, name, color)")
@@ -26,7 +26,6 @@ export async function GET() {
   const { data: appointments, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Fetch therapist names separately (text FK, no auto-join)
   const therapistIds = [
     ...new Set((appointments ?? []).map((a) => a.therapist_id).filter(Boolean)),
   ] as string[];
@@ -42,6 +41,42 @@ export async function GET() {
   return NextResponse.json({ appointments: appointments ?? [], therapistMap });
 }
 
+// ── 共用：新預約後通知行政（PDF + email）────────────────────────────────────────
+async function notifyAdminNewAppointment(clientId: string) {
+  const FROM = process.env.RESEND_FROM_EMAIL ?? "noreply@treecounseling.com";
+  const ADMIN_EMAIL = process.env.ADMIN_NOTIFICATION_EMAIL;
+  if (!ADMIN_EMAIL || !process.env.RESEND_API_KEY) return;
+
+  const { pdfBuffer, fileName, clientName, driveUrl } =
+    await generateClientPDF(clientId, "預約資料");
+
+  const driveNote = driveUrl
+    ? `<p style="margin:12px 0 0;font-size:12px;color:#888">Drive 連結：<a href="${driveUrl}" style="color:#2d4a38">${driveUrl}</a></p>`
+    : "";
+
+  await resend.emails.send({
+    from: FROM,
+    to: ADMIN_EMAIL,
+    subject: `【新預約】${clientName}`,
+    html: `
+      <div style="font-family:sans-serif;max-width:520px;margin:0 auto;color:#111;font-size:14px;line-height:1.75">
+        <div style="background:#2d4a38;padding:20px 28px">
+          <p style="margin:0;color:#a8c5b0;font-size:11px;letter-spacing:1.5px">TREE COUNSELING STUDIO</p>
+          <p style="margin:4px 0 0;color:#fff;font-size:17px;font-weight:600">新預約通知 — ${clientName}</p>
+        </div>
+        <div style="background:#fff;padding:24px 28px">
+          <p style="margin:0 0 12px;color:#444">已收到新預約申請，詳細資料請見附件。</p>
+          ${driveNote}
+        </div>
+        <div style="background:#f7f5ef;padding:12px 28px;text-align:center">
+          <p style="margin:0;color:#999;font-size:11px">樹心理工作室 Tree Counseling Studio</p>
+        </div>
+      </div>
+    `,
+    attachments: [{ filename: fileName, content: pdfBuffer }],
+  });
+}
+
 export async function POST(req: NextRequest) {
   const auth = await getAuthInfo();
   if (!auth) return NextResponse.json({ error: "未授權" }, { status: 403 });
@@ -54,7 +89,6 @@ export async function POST(req: NextRequest) {
     if (!body.client_id) return NextResponse.json({ error: "缺少個案" }, { status: 400 });
     if (!body.scheduled_at) return NextResponse.json({ error: "請選擇晤談時間" }, { status: 400 });
 
-    // Verify therapist has access to this client
     const [{ data: assignedClient }, { data: prevAppt }] = await Promise.all([
       db.from("clients")
         .select("id, full_name, email")
@@ -74,13 +108,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "無法為此個案新增預約" }, { status: 403 });
     }
 
-    // Fetch client info if not already loaded
     const client = assignedClient ?? (
       await db.from("clients").select("id, full_name, email").eq("id", body.client_id).single()
     ).data;
-    void client;
 
-    // Auto-detect intake: first ever appointment for this client
     const { count: existingCount } = await db
       .from("appointments")
       .select("id", { count: "exact", head: true })
@@ -88,11 +119,9 @@ export async function POST(req: NextRequest) {
       .neq("booking_status", "cancelled");
     const sessionType = (existingCount ?? 0) === 0 ? "intake" : "followup";
 
-    // Conflict check
     const conflict = await checkTimeConflict(db, auth.profileId, body.scheduled_at, body.duration_minutes ?? 50);
     if (conflict) return NextResponse.json({ error: conflict }, { status: 409 });
 
-    // Create confirmed appointment directly
     const { data: newAppt, error } = await db
       .from("appointments")
       .insert({
@@ -114,50 +143,84 @@ export async function POST(req: NextRequest) {
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-    // Send confirmation email to client for therapist self-booking (already confirmed)
-    if (process.env.RESEND_API_KEY && client?.email && newAppt) {
-      const FROM = process.env.RESEND_FROM_EMAIL ?? "noreply@treecounseling.com";
-      const WHATSAPP_LINK = "https://wa.me/85362772234";
-      const tdL = `style="color:#333;padding:8px 18px 8px 0;border-bottom:1px solid #e0e0e0;white-space:nowrap;font-size:14px;font-weight:600"`;
-      const tdR = `style="padding:8px 0;border-bottom:1px solid #e0e0e0;font-size:14px;color:#111"`;
-      const { data: therapistProfile } = await db
-        .from("therapist_profiles").select("name").eq("id", auth.profileId).single();
-      const scheduledAt = new Date(body.scheduled_at).toLocaleString("zh-TW", {
-        year: "numeric", month: "long", day: "numeric",
-        weekday: "long", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Macau",
-      });
-      await resend.emails.send({
-        from: FROM,
-        to: client.email,
-        subject: "【樹心理工作室】諮商晤談預約確認",
-        html: `
-          <div style="font-family:sans-serif;max-width:520px;margin:0 auto;color:#111;line-height:1.75;font-size:14px">
-            <div style="background:#2d4a38;padding:24px 32px 20px">
-              <p style="margin:0 0 4px;color:#a8c5b0;font-size:11px;letter-spacing:1.5px">TREE COUNSELING STUDIO</p>
-              <p style="margin:0;color:#fff;font-size:18px;font-weight:600">諮商晤談預約確認</p>
-            </div>
-            <div style="background:#fff;padding:28px 32px">
-              <p style="margin:0 0 12px">您好，<strong>${client.full_name}</strong>，</p>
-              <p style="margin:0 0 20px;color:#444">您的諮商晤談已安排如下：</p>
-              <table style="width:100%;border-collapse:collapse;margin:0 0 24px">
-                <tr><td ${tdL}>晤談時間</td><td ${tdR}><strong>${scheduledAt}</strong></td></tr>
-                ${therapistProfile?.name ? `<tr><td ${tdL}>晤談人員</td><td ${tdR}>${therapistProfile.name} 心理輔導師</td></tr>` : ""}
-                <tr><td ${tdL}>晤談方式</td><td ${tdR}>${body.is_online ? "線上晤談（視訊）" : "到診面談"}</td></tr>
-              </table>
-              <div style="background:#f0f5f1;border-left:3px solid #5a8a6a;padding:14px 18px;margin:0 0 20px">
-                <p style="margin:0;color:#2d4a38;font-size:13px;line-height:1.7">如需更改時間或取消，請於晤談前 <strong>24 小時</strong> 聯繫行政人員。</p>
-              </div>
-              <p style="margin:0 0 8px;color:#555;font-size:13px">有任何問題，歡迎透過 WhatsApp 聯繫我們：</p>
-              <p><a href="${WHATSAPP_LINK}" style="display:inline-block;background:#25d366;color:#fff;padding:10px 22px;text-decoration:none;font-size:13px;font-weight:600">WhatsApp 聯繫我們 →</a></p>
-            </div>
-            <div style="background:#f7f5ef;padding:14px 32px;text-align:center">
-              <p style="margin:0;color:#999;font-size:11px">樹心理工作室　Tree Counseling Studio</p>
-            </div>
-          </div>
-        `,
-      }).catch(console.error);
-    }
+    // PDF + admin notification + client confirmation email（並行，錯誤不影響回應）
+    const FROM = process.env.RESEND_FROM_EMAIL ?? "noreply@treecounseling.com";
+    const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://treecounseling-web.vercel.app";
+    const WHATSAPP_LINK = "https://wa.me/85362772234";
 
+    await Promise.allSettled([
+      // 1. 行政通知（PDF）
+      notifyAdminNewAppointment(body.client_id),
+
+      // 2. 個案確認 email（含初談連結）
+      (async () => {
+        if (!process.env.RESEND_API_KEY) return;
+
+        const { data: clientFull } = await db
+          .from("clients")
+          .select("full_name, email, intake_token, intake_submitted_at")
+          .eq("id", body.client_id)
+          .single();
+        if (!clientFull?.email) return;
+
+        const { data: therapistProfile } = await db
+          .from("therapist_profiles")
+          .select("name, title")
+          .eq("id", auth.profileId)
+          .single();
+
+        const scheduledAt = new Date(body.scheduled_at).toLocaleString("zh-TW", {
+          year: "numeric", month: "long", day: "numeric",
+          weekday: "long", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Macau",
+        });
+
+        const cf = clientFull as typeof clientFull & { intake_token?: string | null; intake_submitted_at?: string | null };
+        const intakeSection = cf.intake_token && !cf.intake_submitted_at
+          ? `<div style="background:#f7f5ef;border:1px solid #d4c9b0;padding:18px 20px;margin:0 0 20px">
+              <p style="margin:0 0 6px;color:#2d4a38;font-size:13px;font-weight:600">📋 預約前準備（選填）</p>
+              <p style="margin:0 0 12px;color:#555;font-size:13px;line-height:1.7">為讓心理師在第一次晤談前更了解您的狀況，歡迎提前完成線上初談問卷。此步驟為選填，不填寫也不影響您的預約。</p>
+              <a href="${SITE}/intake?token=${cf.intake_token}" style="display:inline-block;background:#2d4a38;color:#fff;padding:10px 22px;text-decoration:none;font-size:13px;font-weight:600">開始填寫初談問卷 →</a>
+            </div>`
+          : "";
+
+        const tdL = `style="color:#333;padding:8px 18px 8px 0;border-bottom:1px solid #e0e0e0;white-space:nowrap;font-size:14px;font-weight:600"`;
+        const tdR = `style="padding:8px 0;border-bottom:1px solid #e0e0e0;font-size:14px;color:#111"`;
+
+        await resend.emails.send({
+          from: FROM,
+          to: clientFull.email,
+          subject: "【樹心理工作室】諮商晤談預約確認",
+          html: `
+            <div style="font-family:sans-serif;max-width:520px;margin:0 auto;color:#111;line-height:1.75;font-size:14px">
+              <div style="background:#2d4a38;padding:24px 32px 20px">
+                <p style="margin:0 0 4px;color:#a8c5b0;font-size:11px;letter-spacing:1.5px">TREE COUNSELING STUDIO</p>
+                <p style="margin:0;color:#fff;font-size:18px;font-weight:600">諮商晤談預約確認</p>
+              </div>
+              <div style="background:#fff;padding:28px 32px">
+                <p style="margin:0 0 12px">您好，<strong>${clientFull.full_name}</strong>，</p>
+                <p style="margin:0 0 20px;color:#444">您的諮商晤談已安排如下：</p>
+                <table style="width:100%;border-collapse:collapse;margin:0 0 24px">
+                  <tr><td ${tdL}>晤談時間</td><td ${tdR}><strong>${scheduledAt}</strong></td></tr>
+                  ${therapistProfile?.name ? `<tr><td ${tdL}>晤談人員</td><td ${tdR}>${therapistProfile.name} ${(therapistProfile as unknown as { title?: string | null }).title ?? "心理輔導師"}</td></tr>` : ""}
+                  <tr><td ${tdL}>晤談方式</td><td ${tdR}>${body.is_online ? "線上晤談（視訊）" : "面談"}</td></tr>
+                </table>
+                ${intakeSection}
+                <div style="background:#f0f5f1;border-left:3px solid #5a8a6a;padding:14px 18px;margin:0 0 20px">
+                  <p style="margin:0;color:#2d4a38;font-size:13px;line-height:1.7">如需更改時間或取消，請於晤談前 <strong>24 小時</strong> 聯繫行政人員。</p>
+                </div>
+                <p style="margin:0 0 8px;color:#555;font-size:13px">有任何問題，歡迎透過 WhatsApp 聯繫我們：</p>
+                <p><a href="${WHATSAPP_LINK}" style="display:inline-block;background:#25d366;color:#fff;padding:10px 22px;text-decoration:none;font-size:13px;font-weight:600">WhatsApp 聯繫我們 →</a></p>
+              </div>
+              <div style="background:#f7f5ef;padding:14px 32px;text-align:center">
+                <p style="margin:0;color:#999;font-size:11px">樹心理工作室　Tree Counseling Studio</p>
+              </div>
+            </div>
+          `,
+        });
+      })(),
+    ]).catch(console.error);
+
+    void client;
     return NextResponse.json(newAppt, { status: 201 });
   }
 
@@ -167,7 +230,6 @@ export async function POST(req: NextRequest) {
   }
   if (!body.client_id) return NextResponse.json({ error: "請選擇個案" }, { status: 400 });
 
-  // Auto-detect intake: first ever appointment for this client
   const { count: existingCount } = await db
     .from("appointments")
     .select("id", { count: "exact", head: true })
@@ -175,7 +237,6 @@ export async function POST(req: NextRequest) {
     .neq("booking_status", "cancelled");
   const autoSessionType = (existingCount ?? 0) === 0 ? "intake" : "followup";
 
-  // Conflict check (only if therapist and time are both specified)
   if (body.therapist_id && body.scheduled_at) {
     const conflict = await checkTimeConflict(db, body.therapist_id, body.scheduled_at, body.duration_minutes ?? 50);
     if (conflict) return NextResponse.json({ error: conflict }, { status: 409 });
@@ -191,5 +252,6 @@ export async function POST(req: NextRequest) {
     .select()
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
   return NextResponse.json(data, { status: 201 });
 }

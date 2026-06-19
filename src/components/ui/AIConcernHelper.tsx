@@ -83,14 +83,10 @@ export default function AIConcernHelper({ onComplete, serviceType }: AIConcernHe
 
       // 檢查回覆中是否含有 [SUMMARY_START] 和 [SUMMARY_END] 標籤
       const match = replyText.match(/\[SUMMARY_START\]([\s\S]*?)\[SUMMARY_END\]/);
-      let parsedSummary = null;
-      let displayReply = replyText;
-
-      if (match) {
-        parsedSummary = match[1].trim();
-        // 將標籤區塊從 AI 的顯示回覆中移除，以免版面重複且雜亂
-        displayReply = replyText.replace(/\[SUMMARY_START\][\s\S]*?\[SUMMARY_END\]/, "").trim();
-      }
+      const parsedSummary = match ? match[1].trim() : null;
+      const displayReply = replyText
+        .replace(/\[SUMMARY_START\][\s\S]*?\[SUMMARY_END\]/, "")
+        .trim();
 
       setMessages((prev) => [
         ...prev,
@@ -100,9 +96,7 @@ export default function AIConcernHelper({ onComplete, serviceType }: AIConcernHe
         },
       ]);
 
-      if (parsedSummary) {
-        setSummaryText(parsedSummary);
-      }
+      if (parsedSummary) setSummaryText(parsedSummary);
     } catch (err) {
       console.error(err);
       setMessages((prev) => [
@@ -291,7 +285,7 @@ export default function AIConcernHelper({ onComplete, serviceType }: AIConcernHe
                     </button>
                   </form>
                   <p className="text-xs text-muted/40 text-center leading-relaxed">
-                    AI 助理會問你 2-3 個溫和的問題來收集必要資訊，隨後自動整理成結構化重點供你回填。
+                    AI 助理會問 2-3 個問題，協助你整理困擾描述後自動填入表單。
                   </p>
                 </div>
               )}

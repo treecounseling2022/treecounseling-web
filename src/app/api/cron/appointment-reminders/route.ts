@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
 
   const { data: appointments } = await db
     .from("appointments")
-    .select("id, scheduled_at, is_online, meeting_link, therapist_id, clients(full_name, email), therapist_profiles:therapist_id(name)")
+    .select("id, scheduled_at, is_online, meeting_link, therapist_id, clients(full_name, email), therapist_profiles:therapist_id(name, title)")
     .eq("booking_status", "confirmed")
     .gte("scheduled_at", tomorrowStart.toISOString())
     .lt("scheduled_at", tomorrowEnd.toISOString());
@@ -92,7 +92,9 @@ export async function GET(req: NextRequest) {
 
     if (!client?.email) continue;
 
-    const therapistName = (appt.therapist_profiles as unknown as { name?: string } | null)?.name;
+    const therapistProf = appt.therapist_profiles as unknown as { name?: string; title?: string } | null;
+    const therapistName = therapistProf?.name;
+    const therapistTitle = therapistProf?.title ?? "心理輔導師";
     const scheduledAt = appt.scheduled_at
       ? new Date(appt.scheduled_at).toLocaleString("zh-TW", {
           year: "numeric", month: "long", day: "numeric",
@@ -115,8 +117,8 @@ export async function GET(req: NextRequest) {
             <p style="margin:0 0 20px;color:#444">提醒您，明天您有以下諮商晤談安排：</p>
             <table style="width:100%;border-collapse:collapse;margin:0 0 24px">
               <tr><td ${tdL}>晤談時間</td><td ${tdR}><strong>${scheduledAt}</strong></td></tr>
-              ${therapistName ? `<tr><td ${tdL}>晤談人員</td><td ${tdR}>${therapistName} 心理輔導師</td></tr>` : ""}
-              <tr><td ${tdL}>晤談方式</td><td ${tdR}>${appt.is_online ? "線上晤談（視訊）" : "到診面談"}</td></tr>
+              ${therapistName ? `<tr><td ${tdL}>晤談人員</td><td ${tdR}>${therapistName} ${therapistTitle}</td></tr>` : ""}
+              <tr><td ${tdL}>晤談方式</td><td ${tdR}>${appt.is_online ? "線上晤談（視訊）" : "面談"}</td></tr>
               ${appt.is_online && meetingLink ? `<tr><td ${tdL}>視訊連結</td><td ${tdR}><a href="${meetingLink}" style="color:#2d4a38;word-break:break-all">${meetingLink}</a></td></tr>` : ""}
             </table>
             <div style="background:#f0f5f1;border-left:3px solid #5a8a6a;padding:14px 18px;margin:0 0 20px">

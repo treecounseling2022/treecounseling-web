@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { Resend } from "resend";
 import { generateInquiryPDF } from "@/lib/pdf/inquiry-pdf";
+import { uploadPDFToDrive } from "@/lib/google-drive";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -106,10 +107,21 @@ export async function POST(request: Request) {
           });
 
           const dateStr = new Date().toISOString().slice(0, 10);
+          const pdfFileName = `${dateStr}_${(body.name ?? "未知").replace(/[/\\?%*:|"<>]/g, "_")}_預約查詢.pdf`;
           pdfAttachment = {
-            filename: `booking_inquiry_${dateStr}.pdf`,
+            filename: pdfFileName,
             content: pdfBuffer.toString("base64"),
           };
+
+          // 上傳至 Google Drive（背景執行，不阻擋 email 發送）
+          if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
+            uploadPDFToDrive(
+              pdfBuffer,
+              pdfFileName,
+              process.env.GOOGLE_DRIVE_FOLDER_ID ?? undefined,
+              body.name ?? "未知申請人"
+            ).catch((e) => console.error("Drive upload failed:", e));
+          }
         } catch (pdfErr) {
           console.error("PDF generation failed:", pdfErr);
         }

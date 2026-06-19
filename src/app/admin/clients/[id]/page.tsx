@@ -7,6 +7,7 @@ import ClientEditor from "./ClientEditor";
 import AdminAppointmentPayments from "./AdminAppointmentPayments";
 import ClientContacts from "./ClientContacts";
 import CaseClosurePanel from "./CaseClosurePanel";
+import IntakePanel from "./IntakePanel";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -167,12 +168,15 @@ export default async function ClientDetailPage({ params }: Props) {
     }));
   }
 
-  // Type-safe access for columns added in migrations 012/014/017
+  // Type-safe access for columns added in later migrations
   const clientExt = client as typeof client & {
     case_status?: string | null;
     case_closed_at?: string | null;
     service_type?: string | null;
     couple_partner_id?: string | null;
+    intake_token?: string | null;
+    intake_summary?: string | null;
+    intake_submitted_at?: string | null;
   };
 
   // Compute client statistics from loaded appointment data
@@ -315,6 +319,16 @@ export default async function ClientDetailPage({ params }: Props) {
         therapists={therapists}
         readonly={!isAdmin}
       />
+
+      {/* Admin: AI 初談 */}
+      {isAdmin && (
+        <IntakePanel
+          clientId={id}
+          intakeToken={clientExt.intake_token ?? null}
+          intakeSummary={clientExt.intake_summary ?? null}
+          intakeSubmittedAt={clientExt.intake_submitted_at ?? null}
+        />
+      )}
 
       {/* Admin: appointments + payment records */}
       {isAdmin && (

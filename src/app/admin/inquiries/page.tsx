@@ -90,7 +90,8 @@ export default function InquiriesPage() {
   const [therapists, setTherapists] = useState<Therapist[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [assignTarget, setAssignTarget] = useState<Inquiry | null>(null);
-  const [assignForm, setAssignForm] = useState({ therapist_id: "", room_id: "", scheduled_at: "", session_fee: "", is_online: false });
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const [assignForm, setAssignForm] = useState({ therapist_id: "", room_id: "", scheduled_date: todayStr, scheduled_time: "", session_fee: "", is_online: false });
   const [assigning, setAssigning] = useState(false);
   const [assignErr, setAssignErr] = useState("");
 
@@ -135,7 +136,7 @@ export default function InquiriesPage() {
 
   function openAssign(inq: Inquiry) {
     setAssignTarget(inq);
-    setAssignForm({ therapist_id: "", room_id: "", scheduled_at: "", session_fee: "", is_online: false });
+    setAssignForm({ therapist_id: "", room_id: "", scheduled_date: new Date().toISOString().slice(0, 10), scheduled_time: "", session_fee: "", is_online: false });
     setAssignErr("");
   }
 
@@ -150,7 +151,9 @@ export default function InquiriesPage() {
       body: JSON.stringify({
         therapist_id: assignForm.therapist_id,
         room_id: assignForm.room_id || undefined,
-        scheduled_at: assignForm.scheduled_at || undefined,
+        scheduled_at: (assignForm.scheduled_date && assignForm.scheduled_time)
+          ? `${assignForm.scheduled_date}T${assignForm.scheduled_time}`
+          : undefined,
         session_fee: assignForm.session_fee ? Number(assignForm.session_fee) : undefined,
         is_online: assignForm.is_online,
       }),
@@ -359,12 +362,32 @@ export default function InquiriesPage() {
 
               <div>
                 <label className="font-sans text-xs text-muted block mb-1">預計時間（選填）</label>
-                <input
-                  type="datetime-local"
-                  value={assignForm.scheduled_at}
-                  onChange={(e) => setAssignForm((f) => ({ ...f, scheduled_at: e.target.value }))}
-                  className="w-full border border-sand/30 px-3 py-2 font-sans text-sm text-deep focus:outline-none focus:border-forest/50"
-                />
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="date"
+                    value={assignForm.scheduled_date}
+                    min={new Date().toISOString().slice(0, 10)}
+                    onChange={(e) => setAssignForm((f) => ({ ...f, scheduled_date: e.target.value }))}
+                    className="flex-1 border border-sand/30 px-3 py-2 font-sans text-sm text-deep focus:outline-none focus:border-forest/50"
+                  />
+                  <select
+                    value={assignForm.scheduled_time ? assignForm.scheduled_time.slice(0, 2) : ""}
+                    onChange={(e) => { const hh = e.target.value; const mm = assignForm.scheduled_time ? (assignForm.scheduled_time.slice(3, 5) || "00") : "00"; setAssignForm((f) => ({ ...f, scheduled_time: hh ? `${hh}:${mm}` : "" })); }}
+                    className="border border-sand/30 px-2 py-2 font-sans text-sm text-deep bg-white focus:outline-none focus:border-forest/50"
+                  >
+                    <option value="">時</option>
+                    {Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0")).map((h) => <option key={h} value={h}>{h}</option>)}
+                  </select>
+                  <span className="text-muted text-sm">:</span>
+                  <select
+                    value={assignForm.scheduled_time ? assignForm.scheduled_time.slice(3, 5) : ""}
+                    onChange={(e) => { const mm = e.target.value; const hh = assignForm.scheduled_time ? (assignForm.scheduled_time.slice(0, 2) || "09") : "09"; setAssignForm((f) => ({ ...f, scheduled_time: mm ? `${hh}:${mm}` : "" })); }}
+                    className="border border-sand/30 px-2 py-2 font-sans text-sm text-deep bg-white focus:outline-none focus:border-forest/50"
+                  >
+                    <option value="">分</option>
+                    {["00", "15", "30", "45"].map((m) => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                </div>
               </div>
 
               <div>

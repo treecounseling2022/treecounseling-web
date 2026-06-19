@@ -115,6 +115,11 @@ export async function POST(
       .maybeSingle();
     if (existing) {
       clientId = existing.id;
+      // 以申請表的姓名更新個案，避免顯示舊的不正確名稱
+      const newName = extractClientName(inquiry);
+      if (newName && newName !== "未知") {
+        await db.from("clients").update({ full_name: newName }).eq("id", existing.id);
+      }
     }
   }
 
