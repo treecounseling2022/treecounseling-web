@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import AIIntakeChat from "@/components/ui/AIIntakeChat";
 
 export const metadata: Metadata = {
@@ -19,7 +20,9 @@ export default function IntakePage() {
             所有內容嚴格保密，僅供你的心理師閱覽。
           </p>
         </div>
-        <AIIntakeChat />
+        <Suspense>
+          <AIIntakeChat />
+        </Suspense>
       </div>
     </main>
   );
