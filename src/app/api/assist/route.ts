@@ -41,11 +41,73 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid messages format" }, { status: 400 });
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    const anthropicKey = process.env.ANTHROPIC_API_KEY;
+    const geminiKey = process.env.GEMINI_API_KEY;
 
-    if (!apiKey) {
-      // Fallback 規則引擎（無 API Key 時使用，快速模擬 3 輪對話）
-      console.warn("GEMINI_API_KEY is not configured for assist. Running fallback simulator.");
+    // ── Claude (primary) ────────────────────────────────────────────────────────
+    if (anthropicKey) {
+      try {
+        const response = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": anthropicKey,
+            "anthropic-version": "2023-06-01",
+          },
+          body: JSON.stringify({
+            model: "claude-haiku-4-5-20251001",
+            max_tokens: 800,
+            system: SYSTEM_INSTRUCTION,
+            messages: messages.map((m: { role: string; parts: { text: string }[] }) => ({
+              role: m.role === "assistant" ? "assistant" : "user",
+              content: m.parts[0]?.text ?? "",
+            })),
+          }),
+        });
+
+        if (!response.ok) {
+          console.error("Claude Assist API Error — falling back to Gemini");
+        } else {
+          const data = await response.json();
+          const replyText = data.content?.[0]?.text ?? "";
+          return NextResponse.json({
+            candidates: [{ content: { parts: [{ text: replyText }] } }],
+          });
+        }
+      } catch (err) {
+        console.error("Claude Assist request failed, falling back to Gemini:", err);
+      }
+    }
+
+    // ── Gemini (fallback) ───────────────────────────────────────────────────────
+    if (geminiKey) {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: messages.map((m: { role: string; parts: { text: string }[] }) => ({
+            role: m.role === "assistant" ? "model" : m.role,
+            parts: m.parts.map((p) => ({ text: p.text })),
+          })),
+          systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
+          generationConfig: { temperature: 0.2, maxOutputTokens: 800 },
+        }),
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error("Gemini Assist API Error:", errText);
+        throw new Error(`Gemini API responded with status ${response.status}`);
+      }
+
+      const data = await response.json();
+      return NextResponse.json(data);
+    }
+
+    // ── 規則引擎 fallback（兩個 key 都沒有時）──────────────────────────────────
+    {
+      console.warn("No AI API key configured for assist. Running fallback simulator.");
       
       const userMessageCount = messages.filter((m: any) => m.role === "user").length;
       let reply = "";
@@ -55,62 +117,17 @@ export async function POST(req: NextRequest) {
       } else if (userMessageCount === 2) {
         reply = "謝謝你願意與我分享。這些狀況大概持續了多久？平時有影響到你的睡眠、飲食或日常工作生活嗎？";
       } else {
-        // 第 3 輪，直接產出模擬的 Summary
-        const lastInput = messages[messages.length - 1]?.parts?.[0]?.text || "";
         reply = `感謝你的信任。我已經大概了解你的狀況了，我已經為你梳理好目前的困擾摘要，你可以點選下方的「填入預約單」直接帶入表單中。\n\n[SUMMARY_START]\n【主要困擾分類】情緒困擾、自我探索\n【持續時間與影響】近期有明顯影響，導致睡眠與工作效率下降\n【過往輔導/醫療經驗】無\n【個案狀況自述】個案表示近期面臨生活與工作調適困擾，常感到焦慮與分心。期望透過心理輔導釐清自我方向並改善情緒狀態。\n[SUMMARY_END]`;
       }
 
       return NextResponse.json({
-        candidates: [
-          {
-            content: {
-              role: "model",
-              parts: [{ text: reply }]
-            }
-          }
-        ]
+        candidates: [{ content: { parts: [{ text: reply }] } }],
       });
     }
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
-
-    const body = {
-      contents: messages.map((m: any) => ({
-        role: m.role === "assistant" ? "model" : m.role,
-        parts: m.parts.map((p: any) => ({ text: p.text }))
-      })),
-      systemInstruction: {
-        parts: [
-          {
-            text: SYSTEM_INSTRUCTION
-          }
-        ]
-      },
-      generationConfig: {
-        temperature: 0.2,
-        maxOutputTokens: 800
-      }
-    };
-
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(body)
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error("Gemini API Assist Error:", errText);
-      throw new Error(`Gemini API responded with status ${response.status}`);
-    }
-
-    const data = await response.json();
-    return NextResponse.json(data);
-
-  } catch (error: any) {
-    console.error("API Assist Route Error:", error);
-    return NextResponse.json({ error: error.message || "Internal Server Error" }, { status: 500 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Internal Server Error";
+    console.error("API Assist Route Error:", message);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
