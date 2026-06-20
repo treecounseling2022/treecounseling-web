@@ -373,16 +373,6 @@ export default function CalendarPage() {
         </div>
       )}
 
-      {/* Google Calendar sync notice */}
-      <div className="bg-sand/10 border border-sand/20 px-4 py-3 flex items-start gap-3">
-        <span className="font-sans text-xs text-muted/50 flex-shrink-0 pt-0.5">▸</span>
-        <div>
-          <p className="font-sans text-xs text-deep font-medium">Google Calendar 同步</p>
-          <p className="font-sans text-[11px] text-muted mt-0.5">
-            即將推出。需要在 .env.local 設定 GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET，並在 Google Cloud Console 設定 OAuth 應用程式。
-          </p>
-        </div>
-      </div>
     </div>
   );
 }

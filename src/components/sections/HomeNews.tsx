@@ -1,11 +1,11 @@
 import Link from "next/link";
 import FadeIn from "@/components/ui/FadeIn";
 import ScrollDivider from "@/components/ui/ScrollDivider";
-import { ARTICLES } from "@/lib/data";
+import { getAllArticles } from "@/lib/articles";
 
-export default function HomeNews() {
-  // 取得最新 3 篇文章
-  const latestArticles = ARTICLES.slice(0, 3);
+export default async function HomeNews() {
+  const articles = await getAllArticles();
+  const latestArticles = articles.slice(0, 3);
 
   return (
     <section className="bg-transparent py-24 md:py-32 relative overflow-hidden">
