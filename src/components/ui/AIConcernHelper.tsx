@@ -198,7 +198,7 @@ export default function AIConcernHelper({ onComplete, serviceType }: AIConcernHe
                     >
                       {msg.parts[0].text.split("\n").map((line, lIdx) => (
                         <p key={lIdx} className={cn(line.trim() === "" ? "h-2" : "min-h-[1rem]")}>
-                          {line}
+                          {renderBold(line)}
                         </p>
                       ))}
                     </div>
@@ -291,5 +291,12 @@ export default function AIConcernHelper({ onComplete, serviceType }: AIConcernHe
         )}
       </AnimatePresence>
     </>
+  );
+}
+
+function renderBold(text: string): React.ReactNode {
+  const parts = text.split(/\*\*(.*?)\*\*/g);
+  return parts.map((part, i) =>
+    i % 2 === 1 ? <strong key={i}>{part}</strong> : part
   );
 }

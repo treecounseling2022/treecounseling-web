@@ -1,4 +1,5 @@
 import React from "react";
+import path from "path";
 import {
   Document,
   Page,
@@ -9,15 +10,11 @@ import {
   renderToBuffer,
 } from "@react-pdf/renderer";
 
-const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL ??
-  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
-
 Font.register({
   family: "NotoSansSC",
   fonts: [
-    { src: `${SITE_URL}/fonts/NotoSansSC-Regular.ttf`, fontWeight: "normal" },
-    { src: `${SITE_URL}/fonts/NotoSansSC-Regular.ttf`, fontWeight: "bold" },
+    { src: path.join(process.cwd(), "public/fonts/NotoSansSC-Regular.ttf"), fontWeight: "normal" },
+    { src: path.join(process.cwd(), "public/fonts/NotoSansSC-Regular.ttf"), fontWeight: "bold" },
   ],
 });
 

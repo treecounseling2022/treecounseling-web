@@ -884,31 +884,8 @@ export default function BookingForm() {
 
                     {INDIVIDUAL_ISSUES.map((mainIssue) => {
                       if (!selectedMainIssues.includes(mainIssue.id)) return null;
-
-                      // 其他困擾：顯示文字框 + AI 助手
-                      if (mainIssue.id === "other_issue") {
-                        return (
-                          <div key={mainIssue.id} className="p-4 bg-paper/50 border border-sand/15 space-y-3 transition-all">
-                            <h4 className="font-serif text-xs font-semibold text-forest uppercase tracking-wider">
-                              其他困擾說明
-                            </h4>
-                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                              <p className="text-xs text-muted/70">請描述您的困擾，或使用 AI 助手協助整理。</p>
-                              <AIConcernHelper
-                                serviceType="individual"
-                                onComplete={(summary) => setOtherIssueText(summary)}
-                              />
-                            </div>
-                            <textarea
-                              rows={4}
-                              value={otherIssueText}
-                              onChange={(e) => setOtherIssueText(e.target.value)}
-                              placeholder="請描述您目前遇到的困擾與狀況，或點擊上方 AI 助手協助您整理…"
-                              className={cn(inputClass(false), "resize-none")}
-                            />
-                          </div>
-                        );
-                      }
+                      // 「其他困擾」無細項，跳過，由下方困擾描述欄填寫
+                      if (mainIssue.id === "other_issue") return null;
 
                       return (
                         <div key={mainIssue.id} className="p-4 bg-paper/50 border border-sand/15 space-y-3 transition-all">
