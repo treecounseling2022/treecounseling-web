@@ -41,7 +41,7 @@ export default function BookingPage() {
                     {[
                       { step: "1", text: "填寫預約表單" },
                       { step: "2", text: "系統自動發送「已收到申請」確認信" },
-                      { step: "3", text: "我們與心理師確認時段" },
+                      { step: "3", text: "我們與心理輔導人員確認時段" },
                       { step: "4", text: "行政人員聯繫您確認正式預約" },
                       { step: "5", text: "收到確認信，如期進行" },
                     ].map((item) => (

@@ -210,7 +210,7 @@ function IndividualContent({ data }: { data: InquiryPDFData }) {
         <Row label="晤談方式" value={MEETING_LABEL[data.meetingType ?? ""] ?? data.meetingType} />
         <Row label="母語" value={LANG_LABEL[data.nativeLanguage ?? ""] ?? data.nativeLanguage} />
         {data.preferredTherapist && (
-          <Row label="偏好心理師" value={data.preferredTherapist} />
+          <Row label="偏好心理輔導人員" value={data.preferredTherapist} />
         )}
       </View>
 

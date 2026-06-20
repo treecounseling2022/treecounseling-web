@@ -840,13 +840,13 @@ export default function BookingForm() {
                   </div>
                 </Field>
 
-                <Field label="偏好的心理師 (選填)">
+                <Field label="偏好心理輔導人員（選填）">
                   <select
                     value={preferredTherapist}
                     onChange={(e) => setPreferredTherapist(e.target.value)}
                     className={cn(inputClass(false), "cursor-pointer w-full max-w-sm")}
                   >
-                    <option value="">由工作室為您配對合適心理師</option>
+                    <option value="">由工作室為您配對合適心理輔導人員</option>
                     {TEAM.map((member) => (
                       <option key={member.id} value={member.id}>
                         {member.name} ({member.title})
@@ -1502,6 +1502,9 @@ export default function BookingForm() {
                 <label className="block font-sans text-sm text-deep">
                   請於下方灰色區域手寫簽名以示同意 <span className="text-sand ml-1">*</span>
                 </label>
+                {serviceType === "couple" && (
+                  <p className="font-sans text-xs text-muted/70">申請人簽名即可，不需要雙方簽署。</p>
+                )}
                 <SignatureCanvas onChange={(img) => setSignature(img)} />
                 {formErrors.signature && <p className="text-xs text-red-500 font-sans font-medium">{formErrors.signature}</p>}
               </div>

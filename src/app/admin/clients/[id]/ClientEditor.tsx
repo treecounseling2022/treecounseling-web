@@ -49,10 +49,12 @@ export default function ClientEditor({
   initialData,
   therapists,
   readonly = false,
+  hideContact = false,
 }: {
   initialData: Partial<ClientData> & { id?: string };
   therapists: Therapist[];
   readonly?: boolean;
+  hideContact?: boolean;
 }) {
   const router = useRouter();
   const isNew = !initialData.id;
@@ -175,32 +177,34 @@ export default function ClientEditor({
           </div>
         </div>
 
-        {/* 聯絡方式 */}
-        <div className="pt-6 border-t border-sand/20 space-y-4">
-          <h2 className="font-serif text-deep text-base">聯絡方式</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <p className={roLabelCls}>電話</p>
-              <p className={roValueCls}>{form.phone || "—"}</p>
+        {/* 聯絡方式 — 心理師無權限查看 */}
+        {!hideContact && (
+          <div className="pt-6 border-t border-sand/20 space-y-4">
+            <h2 className="font-serif text-deep text-base">聯絡方式</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <p className={roLabelCls}>電話</p>
+                <p className={roValueCls}>{form.phone || "—"}</p>
+              </div>
+              <div>
+                <p className={roLabelCls}>Email</p>
+                <p className={roValueCls}>{form.email || "—"}</p>
+              </div>
             </div>
             <div>
-              <p className={roLabelCls}>Email</p>
-              <p className={roValueCls}>{form.email || "—"}</p>
+              <p className={roLabelCls}>緊急聯絡人</p>
+              {form.emergency_contact.name ? (
+                <p className={roValueCls}>
+                  {form.emergency_contact.name}
+                  {form.emergency_contact.relationship && `（${form.emergency_contact.relationship}）`}
+                  {form.emergency_contact.phone && ` · ${form.emergency_contact.phone}`}
+                </p>
+              ) : (
+                <p className="font-sans text-sm text-muted/40">—</p>
+              )}
             </div>
           </div>
-          <div>
-            <p className={roLabelCls}>緊急聯絡人</p>
-            {form.emergency_contact.name ? (
-              <p className={roValueCls}>
-                {form.emergency_contact.name}
-                {form.emergency_contact.relationship && `（${form.emergency_contact.relationship}）`}
-                {form.emergency_contact.phone && ` · ${form.emergency_contact.phone}`}
-              </p>
-            ) : (
-              <p className="font-sans text-sm text-muted/40">—</p>
-            )}
-          </div>
-        </div>
+        )}
 
         {/* 初次申請說明 */}
         {form.intake_notes && (

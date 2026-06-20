@@ -4,6 +4,7 @@ import { getAuthInfo, isAdminLevel } from "@/lib/auth-role";
 import { checkTimeConflict } from "@/lib/appointments";
 import { generateInquiryPDF } from "@/lib/pdf/inquiry-pdf";
 import { createCalendarEvent, updateCalendarEvent, deleteCalendarEvent, maskClientName } from "@/lib/google-calendar";
+import { getTherapistDisplayName } from "@/lib/utils";
 import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -184,7 +185,7 @@ export async function PATCH(
         const sessionNumber = sessionCount ?? 1;
 
         const maskedName = maskClientName(clientRow?.full_name ?? "個案");
-        const therapistFirstName = (therapistRow?.name ?? "").split(" ")[0];
+        const therapistFirstName = getTherapistDisplayName(therapistRow?.name ?? "");
         const therapistCalId = therapistRow?.google_calendar_id;
         const therapistSummary = isOnline
           ? `${maskedName}-${sessionNumber}-Online`
@@ -247,7 +248,7 @@ export async function PATCH(
         const sessionNumber = sessionCount ?? 1;
 
         const maskedName = maskClientName(clientRow?.full_name ?? "個案");
-        const therapistFirstName = (therapistRow?.name ?? "").split(" ")[0];
+        const therapistFirstName = getTherapistDisplayName(therapistRow?.name ?? "");
         const therapistSummary = isOnline
           ? `${maskedName}-${sessionNumber}-Online`
           : `${maskedName}-${sessionNumber}`;

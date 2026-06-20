@@ -302,14 +302,18 @@ export default async function ClientDetailPage({ params }: Props) {
                   : "—"}
               </p>
             </div>
-            <div>
-              <p className="font-sans text-xs text-muted mb-1">電話</p>
-              <p className="font-sans text-sm text-deep">{partnerData.phone || "—"}</p>
-            </div>
-            <div>
-              <p className="font-sans text-xs text-muted mb-1">Email</p>
-              <p className="font-sans text-sm text-deep">{partnerData.email || "—"}</p>
-            </div>
+            {isAdmin && (
+              <>
+                <div>
+                  <p className="font-sans text-xs text-muted mb-1">電話</p>
+                  <p className="font-sans text-sm text-deep">{partnerData.phone || "—"}</p>
+                </div>
+                <div>
+                  <p className="font-sans text-xs text-muted mb-1">Email</p>
+                  <p className="font-sans text-sm text-deep">{partnerData.email || "—"}</p>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -318,6 +322,7 @@ export default async function ClientDetailPage({ params }: Props) {
         initialData={client}
         therapists={therapists}
         readonly={!isAdmin}
+        hideContact={!isAdmin}
       />
 
       {/* Admin: AI 初談 */}
@@ -349,15 +354,13 @@ export default async function ClientDetailPage({ params }: Props) {
         />
       )}
 
-      {/* Admin: case closure */}
-      {isAdmin && (
-        <CaseClosurePanel
-          clientId={id}
-          clientName={client.full_name}
-          isClosed={clientExt.case_status === "closed"}
-          closedAt={clientExt.case_closed_at ?? null}
-        />
-      )}
+      {/* Case closure — admin and therapist assigned to this client can both operate */}
+      <CaseClosurePanel
+        clientId={id}
+        clientName={client.full_name}
+        isClosed={clientExt.case_status === "closed"}
+        closedAt={clientExt.case_closed_at ?? null}
+      />
 
       {/* Therapist: appointments + session notes for this client */}
       {!isAdmin && (

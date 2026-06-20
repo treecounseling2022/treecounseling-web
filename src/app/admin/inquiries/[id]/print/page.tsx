@@ -34,7 +34,7 @@ export default async function InquiryPrintPage({
   const FIELD_LABEL: Record<string, string> = {
     gender: "性別", birthday: "出生日期", city: "居住城市",
     contactType: "聯絡方式", contactId: "聯絡帳號", meetingType: "晤談方式",
-    nativeLanguage: "母語", devices: "可使用設備", preferredTherapist: "偏好心理師",
+    nativeLanguage: "母語", devices: "可使用設備", preferredTherapist: "偏好心理輔導人員",
   };
   const VALUE_MAP: Record<string, string> = {
     face: "面談", online: "線上晤談", whatsapp: "WhatsApp",

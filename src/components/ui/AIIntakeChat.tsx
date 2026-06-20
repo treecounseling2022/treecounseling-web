@@ -38,7 +38,7 @@ export default function AIIntakeChat() {
         setClientName(data.clientName);
         const welcome: Message = {
           role: "assistant",
-          parts: [{ text: `你好，${data.clientName}，很高興認識你。這次的對話是為了讓我們的心理師在見面前更了解你的狀況，所有內容都會嚴格保密。\n\n請用你自己最自然的話，告訴我：是什麼讓你決定來尋求心理輔導？` }],
+          parts: [{ text: `你好，${data.clientName}，很高興認識你。這次的對話是為了讓我們的心理輔導人員在見面前更了解你的狀況，所有內容都會嚴格保密。\n\n請用你自己最自然的話，告訴我：是什麼讓你決定來尋求心理輔導？` }],
         };
         setMessages([welcome]);
         setStage("chat");
@@ -153,7 +153,7 @@ export default function AIIntakeChat() {
         </div>
         <h2 className="font-serif text-deep text-xl">初談資料已送出</h2>
         <p className="font-sans text-sm text-muted leading-relaxed">
-          你已完成初談，資料已傳送給心理師。期待與你相見。
+          你已完成初談，資料已傳送給心理輔導人員。期待與你相見。
         </p>
       </div>
     );
@@ -174,7 +174,7 @@ export default function AIIntakeChat() {
         </div>
         <h2 className="font-serif text-deep text-2xl">資料已送出</h2>
         <p className="font-sans text-sm text-muted leading-relaxed max-w-sm mx-auto">
-          初談摘要已傳送給心理師。他們在見面前會先閱讀，讓第一次晤談更快進入狀態。期待與你相見。
+          初談摘要已傳送給心理輔導人員。他們在見面前會先閱讀，讓第一次晤談更快進入狀態。期待與你相見。
         </p>
       </motion.div>
     );

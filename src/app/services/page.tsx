@@ -127,7 +127,7 @@ export default function ServicesPage() {
                   <div className="space-y-6">
                     {[
                       { step: "01", text: "填寫線上預約表單，告知方便的時段與服務類型" },
-                      { step: "02", text: "我們收到申請後，會與心理師確認時段安排" },
+                      { step: "02", text: "我們收到申請後，會與心理輔導人員確認時段安排" },
                       { step: "03", text: "行政人員聯繫你確認正式預約時間與發送匯款資訊" },
                       { step: "04", text: "收到確認信，於約定時間前來或連線開始" },
                     ].map((item) => (

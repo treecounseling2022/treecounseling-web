@@ -14,14 +14,14 @@ export default function HomeTeam() {
                 Team
               </p>
               <h2 className="font-serif text-deep text-3xl md:text-4xl leading-snug">
-                陪伴你扎根的心理師
+                陪伴你扎根的心理輔導人員
               </h2>
             </div>
             <Link
               href="/team"
               className="text-sm font-sans text-muted hover:text-forest transition-colors border-b border-muted/30 hover:border-forest pb-1 self-start md:self-auto cursor-pointer"
             >
-              認識我們的心理師團隊 →
+              認識我們的心理輔導人員 →
             </Link>
           </div>
         </FadeIn>

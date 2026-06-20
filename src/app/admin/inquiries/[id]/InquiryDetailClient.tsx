@@ -62,7 +62,7 @@ const FIELD_LABEL: Record<string, string> = {
   meetingType: "晤談方式",
   nativeLanguage: "母語",
   devices: "可使用設備",
-  preferredTherapist: "偏好心理師",
+  preferredTherapist: "偏好心理輔導人員",
 };
 
 const VALUE_MAP: Record<string, string> = {

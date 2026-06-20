@@ -24,7 +24,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const auth = await getAuthInfo();
-  if (!auth || !isAdminLevel(auth.role)) return NextResponse.json({ error: "未授權" }, { status: 403 });
+  if (!auth) return NextResponse.json({ error: "未授權" }, { status: 403 });
   const { id } = await params;
   const body = await req.json() as Record<string, unknown> & {
     action?: string;
@@ -35,6 +35,22 @@ export async function PATCH(
     admin_note?: string;
   };
   const db = createAdminClient();
+
+  // Therapists may only perform close_case / reopen_case on their assigned clients
+  if (!isAdminLevel(auth.role)) {
+    const caseActions = ["close_case", "reopen_case"];
+    if (!caseActions.includes(body.action ?? "")) {
+      return NextResponse.json({ error: "未授權" }, { status: 403 });
+    }
+    const { data: clientRow } = await db
+      .from("clients")
+      .select("assigned_therapist_id")
+      .eq("id", id)
+      .single();
+    if (!clientRow || clientRow.assigned_therapist_id !== auth.profileId) {
+      return NextResponse.json({ error: "未授權：只能對自己負責的個案進行結案操作" }, { status: 403 });
+    }
+  }
 
   // Handle case closure action
   if (body.action === "close_case") {
