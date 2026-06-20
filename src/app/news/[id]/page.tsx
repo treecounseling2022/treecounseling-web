@@ -31,6 +31,8 @@ export default async function ArticlePage({ params }: Props) {
   const article = await getArticleById(id);
   if (!article) notFound();
 
+  const isHtml = article.content.trimStart().startsWith("<");
+
   return (
     <div className="relative w-full overflow-hidden bg-background isolate">
       <WeepingWillow
@@ -84,108 +86,76 @@ export default async function ArticlePage({ params }: Props) {
             )}
 
             <FadeIn delay={120}>
-              <div className="font-sans text-muted text-base leading-relaxed prose-article">
-                <ReactMarkdown
-                  components={{
-                    h2: ({ children }) => (
-                      <h2 className="font-serif text-deep text-2xl mt-10 mb-4">{children}</h2>
-                    ),
-                    h3: ({ children }) => (
-                      <h3 className="font-serif text-deep text-xl mt-8 mb-3">{children}</h3>
-                    ),
-                    p: ({ children }) => {
-                      const childArr = Array.isArray(children) ? children : [children];
-                      if (childArr.length === 1 && typeof childArr[0] === "string") {
-                        const text = childArr[0];
-
-                        // Instagram embed
-                        const igMatch = text.match(/^%%ig:(https?:\/\/www\.instagram\.com\/[^%]+)%%$/);
-                        if (igMatch) {
-                          const scMatch = igMatch[1].match(/\/(?:p|reel|tv)\/([A-Za-z0-9_-]+)/);
-                          if (scMatch) {
-                            return (
-                              <div className="my-6 flex justify-center">
-                                <iframe
-                                  src={`https://www.instagram.com/p/${scMatch[1]}/embed/`}
-                                  width="400"
-                                  height="550"
-                                  className="border-0 max-w-full"
-                                  title="Instagram 貼文"
-                                  loading="lazy"
-                                />
-                              </div>
-                            );
+              <div className="font-sans text-muted text-base leading-relaxed">
+                {isHtml ? (
+                  /* TipTap HTML content */
+                  <div
+                    className="article-html"
+                    dangerouslySetInnerHTML={{ __html: article.content }}
+                  />
+                ) : (
+                  /* Legacy Markdown content */
+                  <ReactMarkdown
+                    components={{
+                      h2: ({ children }) => (
+                        <h2 className="font-serif text-deep text-2xl mt-10 mb-4">{children}</h2>
+                      ),
+                      h3: ({ children }) => (
+                        <h3 className="font-serif text-deep text-xl mt-8 mb-3">{children}</h3>
+                      ),
+                      p: ({ children }) => {
+                        const childArr = Array.isArray(children) ? children : [children];
+                        if (childArr.length === 1 && typeof childArr[0] === "string") {
+                          const text = childArr[0];
+                          const igMatch = text.match(/^%%ig:(https?:\/\/www\.instagram\.com\/[^%]+)%%$/);
+                          if (igMatch) {
+                            const scMatch = igMatch[1].match(/\/(?:p|reel|tv)\/([A-Za-z0-9_-]+)/);
+                            if (scMatch) {
+                              return (
+                                <div className="my-6 flex justify-center">
+                                  <iframe src={`https://www.instagram.com/p/${scMatch[1]}/embed/`} width="400" height="550" className="border-0 max-w-full" title="Instagram 貼文" loading="lazy" />
+                                </div>
+                              );
+                            }
+                          }
+                          const ytMatch = text.match(/^%%yt:(https?:\/\/[^%]+)%%$/);
+                          if (ytMatch) {
+                            let videoId: string | null = null;
+                            try {
+                              const u = new URL(ytMatch[1]);
+                              if (u.hostname.includes("youtube.com")) videoId = u.searchParams.get("v");
+                              else if (u.hostname === "youtu.be") videoId = u.pathname.slice(1).split("?")[0] || null;
+                            } catch { /* invalid url */ }
+                            if (videoId) {
+                              return (
+                                <div className="my-6 w-full aspect-video">
+                                  <iframe src={`https://www.youtube.com/embed/${videoId}`} className="w-full h-full border-0" title="YouTube 影片" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen loading="lazy" />
+                                </div>
+                              );
+                            }
                           }
                         }
-
-                        // YouTube embed
-                        const ytMatch = text.match(/^%%yt:(https?:\/\/[^%]+)%%$/);
-                        if (ytMatch) {
-                          let videoId: string | null = null;
-                          try {
-                            const u = new URL(ytMatch[1]);
-                            if (u.hostname.includes("youtube.com")) videoId = u.searchParams.get("v");
-                            else if (u.hostname === "youtu.be") videoId = u.pathname.slice(1).split("?")[0] || null;
-                          } catch { /* invalid url */ }
-                          if (videoId) {
-                            return (
-                              <div className="my-6 w-full aspect-video">
-                                <iframe
-                                  src={`https://www.youtube.com/embed/${videoId}`}
-                                  className="w-full h-full border-0"
-                                  title="YouTube 影片"
-                                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                  allowFullScreen
-                                  loading="lazy"
-                                />
-                              </div>
-                            );
-                          }
-                        }
-                      }
-                      return <p className="mb-5 leading-relaxed">{children}</p>;
-                    },
-                    img: ({ src, alt }) => (
-                      <span className="block my-6">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={src}
-                          alt={alt ?? ""}
-                          className="max-w-full border border-sand/15"
-                          loading="lazy"
-                        />
-                        {alt && (
-                          <span className="block font-sans text-xs text-muted/50 mt-2 italic">{alt}</span>
-                        )}
-                      </span>
-                    ),
-                    strong: ({ children }) => (
-                      <strong className="text-deep font-medium">{children}</strong>
-                    ),
-                    ol: ({ children }) => (
-                      <ol className="list-decimal pl-6 space-y-2 mb-5">{children}</ol>
-                    ),
-                    ul: ({ children }) => (
-                      <ul className="list-disc pl-6 space-y-2 mb-5">{children}</ul>
-                    ),
-                    li: ({ children }) => (
-                      <li className="leading-relaxed">{children}</li>
-                    ),
-                    blockquote: ({ children }) => (
-                      <blockquote className="border-l-2 border-sand pl-5 italic text-muted/70 my-6">
-                        {children}
-                      </blockquote>
-                    ),
-                    hr: () => <hr className="border-sand/20 my-8" />,
-                    a: ({ href, children }) => (
-                      <a href={href} className="text-forest underline underline-offset-2 hover:text-deep transition-colors" target="_blank" rel="noopener noreferrer">
-                        {children}
-                      </a>
-                    ),
-                  }}
-                >
-                  {article.content}
-                </ReactMarkdown>
+                        return <p className="mb-5 leading-relaxed">{children}</p>;
+                      },
+                      img: ({ src, alt }) => (
+                        <span className="block my-6">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={src} alt={alt ?? ""} className="max-w-full border border-sand/15" loading="lazy" />
+                          {alt && <span className="block font-sans text-xs text-muted/50 mt-2 italic">{alt}</span>}
+                        </span>
+                      ),
+                      strong: ({ children }) => <strong className="text-deep font-medium">{children}</strong>,
+                      ol: ({ children }) => <ol className="list-decimal pl-6 space-y-2 mb-5">{children}</ol>,
+                      ul: ({ children }) => <ul className="list-disc pl-6 space-y-2 mb-5">{children}</ul>,
+                      li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+                      blockquote: ({ children }) => <blockquote className="border-l-2 border-sand pl-5 italic text-muted/70 my-6">{children}</blockquote>,
+                      hr: () => <hr className="border-sand/20 my-8" />,
+                      a: ({ href, children }) => <a href={href} className="text-forest underline underline-offset-2 hover:text-deep transition-colors" target="_blank" rel="noopener noreferrer">{children}</a>,
+                    }}
+                  >
+                    {article.content}
+                  </ReactMarkdown>
+                )}
               </div>
             </FadeIn>
           </article>

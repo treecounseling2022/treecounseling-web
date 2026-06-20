@@ -442,6 +442,57 @@ h1, h2, h3, h4, h5, h6 {
   transform-origin: bottom left;
 }
 
+/* ── TipTap WYSIWYG 編輯器 ─────────────────────────────────────────────────── */
+.tiptap-editor .ProseMirror {
+  min-height: 650px;
+  padding: 1.5rem 2rem;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  color: #1a1f2b;
+  line-height: 1.8;
+  outline: none;
+  caret-color: #3a4a3a;
+}
+.tiptap-editor .ProseMirror > * + * { margin-top: 0.6em; }
+.tiptap-editor .ProseMirror h1 { font-family: var(--font-serif); font-size: 1.75rem; font-weight: 700; color: #1a1f2b; line-height: 1.25; border-bottom: 1px solid #e8e0d5; padding-bottom: 0.4rem; }
+.tiptap-editor .ProseMirror h2 { font-family: var(--font-serif); font-size: 1.375rem; font-weight: 700; color: #1a1f2b; line-height: 1.3; }
+.tiptap-editor .ProseMirror h3 { font-family: var(--font-serif); font-size: 1.125rem; font-weight: 600; color: #1a1f2b; }
+.tiptap-editor .ProseMirror p { margin: 0; }
+.tiptap-editor .ProseMirror strong { font-weight: 700; color: #1a1f2b; }
+.tiptap-editor .ProseMirror em { font-style: italic; }
+.tiptap-editor .ProseMirror s { text-decoration: line-through; }
+.tiptap-editor .ProseMirror u { text-decoration: underline; }
+.tiptap-editor .ProseMirror ul { list-style-type: disc; padding-left: 1.5rem; }
+.tiptap-editor .ProseMirror ol { list-style-type: decimal; padding-left: 1.5rem; }
+.tiptap-editor .ProseMirror li { margin-bottom: 0.2rem; }
+.tiptap-editor .ProseMirror blockquote { border-left: 3px solid #c9b88a; padding-left: 1rem; color: #4d634d; font-style: italic; }
+.tiptap-editor .ProseMirror hr { border: none; border-top: 1px solid #e8e0d5; margin: 0.5rem 0; }
+.tiptap-editor .ProseMirror a { color: #3a4a3a; text-decoration: underline; }
+.tiptap-editor .ProseMirror img { max-width: 100%; border: 1px solid #e8e0d5; display: block; }
+.tiptap-editor .ProseMirror iframe { display: block; margin: 0.5rem auto; max-width: 100%; border: 0; }
+.tiptap-editor .ProseMirror p.is-editor-empty:first-child::before { content: attr(data-placeholder); color: #9ca3af; pointer-events: none; float: left; height: 0; }
+.tiptap-editor .ProseMirror .is-empty::before { content: attr(data-placeholder); color: #9ca3af; pointer-events: none; float: left; height: 0; }
+
+/* ── 前台文章 HTML 渲染（TipTap 輸出）──────────────────────────────────────── */
+.article-html h1 { font-family: var(--font-serif); font-size: 1.875rem; font-weight: 700; color: #1f2a24; margin-top: 2.5rem; margin-bottom: 1rem; line-height: 1.25; border-bottom: 1px solid #e8e0d5; padding-bottom: 0.5rem; }
+.article-html h2 { font-family: var(--font-serif); font-size: 1.5rem; font-weight: 700; color: #1f2a24; margin-top: 2rem; margin-bottom: 0.75rem; border-bottom: 1px solid #e8e0d5; padding-bottom: 0.4rem; }
+.article-html h3 { font-family: var(--font-serif); font-size: 1.25rem; font-weight: 600; color: #1f2a24; margin-top: 1.5rem; margin-bottom: 0.5rem; }
+.article-html p { margin-bottom: 1.25rem; line-height: 1.8; }
+.article-html strong { font-weight: 600; color: #1f2a24; }
+.article-html em { font-style: italic; }
+.article-html u { text-decoration: underline; }
+.article-html s { text-decoration: line-through; }
+.article-html ul { list-style-type: disc; padding-left: 1.5rem; margin-bottom: 1.25rem; }
+.article-html ol { list-style-type: decimal; padding-left: 1.5rem; margin-bottom: 1.25rem; }
+.article-html li { margin-bottom: 0.5rem; line-height: 1.7; }
+.article-html blockquote { border-left: 2px solid #c9b88a; padding-left: 1.25rem; color: rgba(77,99,77,0.7); margin: 1.5rem 0; font-style: italic; }
+.article-html hr { border: none; border-top: 1px solid #e8e0d5; margin: 2rem 0; }
+.article-html a { color: #3a4a3a; text-decoration: underline; text-underline-offset: 2px; }
+.article-html img { max-width: 100%; border: 1px solid #e8e0d5; margin: 1.5rem 0; }
+.article-html iframe { display: block; margin: 1.5rem auto; max-width: 100%; }
+.article-html [style*="text-align: center"], .article-html .text-center { text-align: center; }
+.article-html [style*="text-align: right"], .article-html .text-right { text-align: right; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
