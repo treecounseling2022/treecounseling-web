@@ -544,6 +544,7 @@ export default function BookingForm() {
   };
 
   if (submitState === "success") {
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
     return (
       <div className="bg-forest/10 border border-sand/30 p-10 text-center font-sans max-w-2xl mx-auto my-12">
         <div className="w-14 h-14 border border-sand flex items-center justify-center mx-auto mb-6">

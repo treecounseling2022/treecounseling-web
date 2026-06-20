@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 
 // ─── Types ───────────────────────────────────────────────────
 type BookingStatus =
@@ -74,6 +75,7 @@ function fmtDay(iso: string) {
 
 // ─── Main Component ───────────────────────────────────────────
 export default function AppointmentsPage() {
+  const router = useRouter();
   const [data, setData] = useState<{
     appointments: Appointment[];
     therapistMap: Record<string, string>;
@@ -179,6 +181,7 @@ export default function AppointmentsPage() {
       const json = await res.json();
       if (!res.ok) { setErr(json.error ?? "發生錯誤"); return false; }
       await load();
+      router.refresh();
       return true;
     } finally {
       setWorking(false);

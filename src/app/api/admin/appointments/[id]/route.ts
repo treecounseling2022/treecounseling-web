@@ -334,7 +334,7 @@ export async function PATCH(
               <p style="margin:0;color:#fff;font-size:18px;font-weight:600">新派案通知</p>
             </div>
             <div style="background:#fff;padding:28px 32px">
-              <p style="margin:0 0 12px">您好，<strong>${therapistProfile.name ?? ""}</strong>，</p>
+              <p style="margin:0 0 12px">您好，<strong>${therapistProfile.name ?? ""}心理師</strong>，</p>
               <p style="margin:0 0 20px;color:#444">行政已為您安排一個新個案，請登入後台確認是否接案。</p>
               <table style="width:100%;border-collapse:collapse;margin:0 0 24px">
                 <tr><td ${tdL}>個案</td><td ${tdR}><strong>${clientData?.full_name ?? "—"}</strong></td></tr>
@@ -470,7 +470,7 @@ export async function PATCH(
                   <p style="margin:4px 0 0;color:#fff;font-size:17px;font-weight:600">排案確認 — ${client?.full_name ?? ""}</p>
                 </div>
                 <div style="background:#fff;padding:24px 28px">
-                  <p style="margin:0 0 12px">您好，<strong>${tProfile.name ?? ""}</strong>，</p>
+                  <p style="margin:0 0 12px">您好，<strong>${tProfile.name ?? ""}心理師</strong>，</p>
                   <p style="margin:0 0 16px;color:#444">您已確認接案，個案基本資料請見附件 PDF。</p>
                   <p style="margin:0 0 4px;color:#333;font-weight:600">晤談時間</p>
                   <p style="margin:0 0 0;color:#111">${scheduledAt}</p>

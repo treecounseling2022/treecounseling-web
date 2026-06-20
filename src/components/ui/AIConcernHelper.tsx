@@ -22,6 +22,7 @@ export default function AIConcernHelper({ onComplete, serviceType }: AIConcernHe
   const [summaryText, setSummaryText] = useState<string | null>(null);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatViewportRef = useRef<HTMLDivElement>(null);
 
   // 當開啟 Modal 時重設對話
   useEffect(() => {
@@ -51,9 +52,10 @@ export default function AIConcernHelper({ onComplete, serviceType }: AIConcernHe
     }
   }, [isOpen, serviceType]);
 
-  // 滾動到對話最下端
+  // 只滾動聊天容器，不影響頁面位置
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const vp = chatViewportRef.current;
+    if (vp) vp.scrollTop = vp.scrollHeight;
   }, [messages, isLoading]);
 
   const handleSend = async (text: string) => {
@@ -177,7 +179,7 @@ export default function AIConcernHelper({ onComplete, serviceType }: AIConcernHe
               </div>
 
               {/* Chat Viewport */}
-              <div className="flex-1 overflow-y-auto p-6 space-y-5 bg-transparent">
+              <div ref={chatViewportRef} className="flex-1 overflow-y-auto p-6 space-y-5 bg-transparent">
                 {messages.map((msg, idx) => (
                   <div
                     key={idx}
@@ -249,23 +251,17 @@ export default function AIConcernHelper({ onComplete, serviceType }: AIConcernHe
                   </motion.div>
                 )}
 
-                <div ref={messagesEndRef} />
               </div>
 
               {/* Input Footer */}
               {!summaryText && (
                 <div className="p-4 border-t border-sand/15 bg-paper/90 space-y-2">
-                  <form
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      handleSend(inputVal);
-                    }}
-                    className="flex gap-2"
-                  >
+                  <div className="flex gap-2">
                     <input
                       type="text"
                       value={inputVal}
                       onChange={(e) => setInputVal(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(inputVal); } }}
                       placeholder={
                         isLoading
                           ? "整理中..."
@@ -277,13 +273,14 @@ export default function AIConcernHelper({ onComplete, serviceType }: AIConcernHe
                       className="flex-1 px-3 py-2.5 text-sm bg-soft border border-sand/35 placeholder:text-muted/40 outline-none focus:border-forest text-deep transition-all rounded-none"
                     />
                     <button
-                      type="submit"
+                      type="button"
+                      onClick={() => handleSend(inputVal)}
                       disabled={!inputVal.trim() || isLoading}
                       className="px-5 py-2.5 bg-forest hover:bg-deep text-paper text-sm transition-colors cursor-pointer disabled:bg-muted/30 disabled:text-muted disabled:cursor-not-allowed font-medium"
                     >
                       送出
                     </button>
-                  </form>
+                  </div>
                   <p className="text-xs text-muted/40 text-center leading-relaxed">
                     AI 助理會問 2-3 個問題，協助你整理困擾描述後自動填入表單。
                   </p>

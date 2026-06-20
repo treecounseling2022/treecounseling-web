@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 
 type Inquiry = {
   id: string;
@@ -80,6 +81,7 @@ function guessTherapistFee(therapist: Therapist, serviceType: string): string {
 }
 
 export default function InquiriesPage() {
+  const router = useRouter();
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [filter, setFilter] = useState<string>("new");
   const [detail, setDetail] = useState<Inquiry | null>(null);
@@ -119,6 +121,7 @@ export default function InquiriesPage() {
       body: JSON.stringify({ id, status, admin_notes }),
     });
     await load();
+    router.refresh();
     setSaving(false);
     if (detail?.id === id) setDetail(null);
   }

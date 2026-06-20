@@ -1,3 +1,4 @@
+import path from "path";
 import {
   Document,
   Page,
@@ -9,8 +10,10 @@ import {
 
 Font.register({
   family: "NotoSansTC",
-  // jsDelivr mirrors @fontsource — full Traditional Chinese character set
-  src: "https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-tc@5/files/noto-sans-tc-chinese-traditional-400-normal.woff2",
+  fonts: [
+    { src: path.join(process.cwd(), "public/fonts/NotoSansSC-Regular.ttf"), fontWeight: "normal" },
+    { src: path.join(process.cwd(), "public/fonts/NotoSansSC-Regular.ttf"), fontWeight: "bold" },
+  ],
 });
 
 const styles = StyleSheet.create({
