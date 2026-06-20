@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getAuthInfo, isAdminLevel } from "@/lib/auth-role";
 import { checkTimeConflict } from "@/lib/appointments";
 import { generateInquiryPDF } from "@/lib/pdf/inquiry-pdf";
+import { createCalendarEvent, updateCalendarEvent, deleteCalendarEvent, maskClientName } from "@/lib/google-calendar";
 import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -347,11 +348,17 @@ export async function PATCH(
           })
         : "（待另行通知）";
 
-      // Include intake link if this is the first appointment and intake not yet submitted
+      // Include intake link if this is the first appointment, intake not yet submitted, and not couple counseling
       const clientAny = client as typeof client & { intake_token?: string | null; intake_submitted_at?: string | null };
       const intakeToken = clientAny.intake_token;
       const intakeSubmitted = !!clientAny.intake_submitted_at;
-      const intakeSection = (intakeToken && !intakeSubmitted)
+      const { data: inquiryForIntake } = await db
+        .from("booking_inquiries")
+        .select("service_type")
+        .eq("appointment_id", id)
+        .maybeSingle();
+      const isCouple = inquiryForIntake?.service_type === "couple";
+      const intakeSection = (intakeToken && !intakeSubmitted && !isCouple)
         ? `
           <div style="background:#f7f5ef;border:1px solid #d4c9b0;padding:18px 20px;margin:0 0 20px">
             <p style="margin:0 0 6px;color:#2d4a38;font-size:13px;font-weight:600">📋 預約前準備（選填）</p>
