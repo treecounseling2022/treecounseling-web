@@ -286,15 +286,17 @@ export default function InquiryDetailClient({
     if (!assignForm.therapist_id) { setAssignErr("請選擇心理師"); return; }
     setAssigning(true);
     setAssignErr("");
+    const scheduledAt = (assignForm.scheduled_date && assignForm.scheduled_time)
+      ? `${assignForm.scheduled_date}T${assignForm.scheduled_time}:00+08:00`
+      : undefined;
+    console.log("[doAssign] scheduledAt =", scheduledAt, "| date =", assignForm.scheduled_date, "| time =", assignForm.scheduled_time);
     const res = await fetch(`/api/admin/inquiries/${inquiry.id}/assign`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         therapist_id: assignForm.therapist_id,
         room_id: assignForm.room_id || undefined,
-        scheduled_at: (assignForm.scheduled_date && assignForm.scheduled_time)
-          ? `${assignForm.scheduled_date}T${assignForm.scheduled_time}`
-          : undefined,
+        scheduled_at: scheduledAt,
         session_fee: assignForm.session_fee ? Number(assignForm.session_fee) : undefined,
         is_online: assignForm.is_online,
       }),

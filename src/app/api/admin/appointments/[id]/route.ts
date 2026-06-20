@@ -159,148 +159,138 @@ export async function PATCH(
     }
   }
 
-  // ── Google Calendar 同步 ──────────────────────────────────────────────────────
+  // ── Google Calendar 同步（await 確保 Vercel Lambda 不會提前終止）────────────
   if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
     const SPACE_CAL_ID = process.env.GOOGLE_SPACE_CALENDAR_ID;
 
+    console.log("[Calendar] confirm check — scheduled_at:", data?.scheduled_at, "| therapist_id:", data?.therapist_id, "| client_id:", data?.client_id, "| SPACE_CAL_ID set:", !!SPACE_CAL_ID);
     if (action === "confirm" && data?.scheduled_at && data.therapist_id && data.client_id) {
-      (async () => {
-        try {
-          const [{ data: clientRow }, { data: therapistRow }] = await Promise.all([
-            db.from("clients").select("full_name").eq("id", data.client_id!).single(),
-            db.from("therapist_profiles").select("name, google_calendar_id").eq("id", data.therapist_id!).single(),
-          ]);
+      try {
+        const [{ data: clientRow }, { data: therapistRow }] = await Promise.all([
+          db.from("clients").select("full_name").eq("id", data.client_id).single(),
+          db.from("therapist_profiles").select("name, google_calendar_id").eq("id", data.therapist_id).single(),
+        ]);
+        console.log("[Calendar] therapistRow?.google_calendar_id:", therapistRow?.google_calendar_id, "| is_online:", !!(data as Record<string, unknown>).is_online);
 
-          const duration = (data as Record<string, unknown>).duration_minutes as number ?? 50;
-          const isOnline = !!(data as Record<string, unknown>).is_online;
+        const duration = (data as Record<string, unknown>).duration_minutes as number ?? 50;
+        const isOnline = !!(data as Record<string, unknown>).is_online;
 
-          // Session number: count of confirmed/completed appts for this client up to this time
-          const { count: sessionCount } = await db
-            .from("appointments")
-            .select("id", { count: "exact", head: true })
-            .eq("client_id", data.client_id!)
-            .in("booking_status", ["confirmed", "locked", "completed"])
-            .lte("scheduled_at", data.scheduled_at);
-          const sessionNumber = sessionCount ?? 1;
+        const { count: sessionCount } = await db
+          .from("appointments")
+          .select("id", { count: "exact", head: true })
+          .eq("client_id", data.client_id)
+          .in("booking_status", ["confirmed", "locked", "completed"])
+          .lte("scheduled_at", data.scheduled_at);
+        const sessionNumber = sessionCount ?? 1;
 
-          const maskedName = maskClientName(clientRow?.full_name ?? "個案");
-          const therapistFirstName = (therapistRow?.name ?? "").split(" ")[0];
+        const maskedName = maskClientName(clientRow?.full_name ?? "個案");
+        const therapistFirstName = (therapistRow?.name ?? "").split(" ")[0];
+        const therapistCalId = therapistRow?.google_calendar_id;
+        const therapistSummary = isOnline
+          ? `${maskedName}-${sessionNumber}-Online`
+          : `${maskedName}-${sessionNumber}`;
 
-          // Therapist calendar event
-          const therapistCalId = therapistRow?.google_calendar_id;
-          const therapistSummary = isOnline
-            ? `${maskedName}-${sessionNumber}-Online`
-            : `${maskedName}-${sessionNumber}`;
-
-          let therapistEventId: string | null = null;
-          if (therapistCalId) {
-            therapistEventId = await createCalendarEvent(therapistCalId, {
-              summary: therapistSummary,
-              startIso: data.scheduled_at,
-              durationMinutes: duration,
-            });
-          }
-
-          // Space calendar event (face-to-face only)
-          let spaceEventId: string | null = null;
-          if (!isOnline && SPACE_CAL_ID) {
-            spaceEventId = await createCalendarEvent(SPACE_CAL_ID, {
-              summary: therapistFirstName,
-              startIso: data.scheduled_at,
-              durationMinutes: duration,
-            });
-          }
-
-          // Store event IDs back to appointment
-          if (therapistEventId || spaceEventId) {
-            await db.from("appointments").update({
-              ...(therapistEventId ? { therapist_calendar_event_id: therapistEventId } : {}),
-              ...(spaceEventId ? { space_calendar_event_id: spaceEventId } : {}),
-            }).eq("id", id);
-          }
-        } catch (err) {
-          console.error("Calendar sync (confirm) failed:", err);
+        let therapistEventId: string | null = null;
+        if (therapistCalId) {
+          therapistEventId = await createCalendarEvent(therapistCalId, {
+            summary: therapistSummary,
+            startIso: data.scheduled_at,
+            durationMinutes: duration,
+          });
         }
-      })();
+
+        let spaceEventId: string | null = null;
+        if (!isOnline && SPACE_CAL_ID) {
+          spaceEventId = await createCalendarEvent(SPACE_CAL_ID, {
+            summary: therapistFirstName,
+            startIso: data.scheduled_at,
+            durationMinutes: duration,
+          });
+        }
+
+        if (therapistEventId || spaceEventId) {
+          await db.from("appointments").update({
+            ...(therapistEventId ? { therapist_calendar_event_id: therapistEventId } : {}),
+            ...(spaceEventId ? { space_calendar_event_id: spaceEventId } : {}),
+          }).eq("id", id);
+        }
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        const details = (err as Record<string, unknown>)?.response as Record<string, unknown> | undefined;
+        console.error("[Calendar] sync (confirm) FAILED:", msg, details ? JSON.stringify(details.data ?? details.status) : "");
+      }
     }
 
     if (action === "reschedule" && data?.scheduled_at) {
-      (async () => {
-        try {
-          const duration = (appt as Record<string, unknown>).duration_minutes as number ?? 50;
-          const isOnline = !!(appt as Record<string, unknown>).is_online;
-          const apptAny = appt as Record<string, unknown>;
+      try {
+        const duration = (appt as Record<string, unknown>).duration_minutes as number ?? 50;
+        const isOnline = !!(appt as Record<string, unknown>).is_online;
+        const apptAny = appt as Record<string, unknown>;
+        const therapistCalEventId = apptAny.therapist_calendar_event_id as string | null;
+        const spaceCalEventId = apptAny.space_calendar_event_id as string | null;
 
-          const therapistCalEventId = apptAny.therapist_calendar_event_id as string | null;
-          const spaceCalEventId = apptAny.space_calendar_event_id as string | null;
+        const [{ data: clientRow }, { data: therapistRow }] = await Promise.all([
+          appt.client_id
+            ? db.from("clients").select("full_name").eq("id", appt.client_id).single()
+            : Promise.resolve({ data: null }),
+          appt.therapist_id
+            ? db.from("therapist_profiles").select("name, google_calendar_id").eq("id", appt.therapist_id).single()
+            : Promise.resolve({ data: null }),
+        ]);
 
-          // Re-fetch therapist calendar id and client name for summary
-          const [{ data: clientRow }, { data: therapistRow }] = await Promise.all([
-            appt.client_id
-              ? db.from("clients").select("full_name").eq("id", appt.client_id).single()
-              : Promise.resolve({ data: null }),
-            appt.therapist_id
-              ? db.from("therapist_profiles").select("name, google_calendar_id").eq("id", appt.therapist_id).single()
-              : Promise.resolve({ data: null }),
-          ]);
+        const { count: sessionCount } = await db
+          .from("appointments")
+          .select("id", { count: "exact", head: true })
+          .eq("client_id", appt.client_id!)
+          .in("booking_status", ["confirmed", "locked", "completed"])
+          .lte("scheduled_at", data.scheduled_at);
+        const sessionNumber = sessionCount ?? 1;
 
-          const { count: sessionCount } = await db
-            .from("appointments")
-            .select("id", { count: "exact", head: true })
-            .eq("client_id", appt.client_id!)
-            .in("booking_status", ["confirmed", "locked", "completed"])
-            .lte("scheduled_at", data.scheduled_at);
-          const sessionNumber = sessionCount ?? 1;
+        const maskedName = maskClientName(clientRow?.full_name ?? "個案");
+        const therapistFirstName = (therapistRow?.name ?? "").split(" ")[0];
+        const therapistSummary = isOnline
+          ? `${maskedName}-${sessionNumber}-Online`
+          : `${maskedName}-${sessionNumber}`;
 
-          const maskedName = maskClientName(clientRow?.full_name ?? "個案");
-          const therapistFirstName = (therapistRow?.name ?? "").split(" ")[0];
-          const therapistSummary = isOnline
-            ? `${maskedName}-${sessionNumber}-Online`
-            : `${maskedName}-${sessionNumber}`;
-
-          const therapistCalId = therapistRow?.google_calendar_id;
-          if (therapistCalEventId && therapistCalId) {
-            await updateCalendarEvent(therapistCalId, therapistCalEventId, {
-              summary: therapistSummary,
-              startIso: data.scheduled_at,
-              durationMinutes: duration,
-            });
-          }
-
-          if (spaceCalEventId && !isOnline && SPACE_CAL_ID) {
-            await updateCalendarEvent(SPACE_CAL_ID, spaceCalEventId, {
-              summary: therapistFirstName,
-              startIso: data.scheduled_at,
-              durationMinutes: duration,
-            });
-          }
-        } catch (err) {
-          console.error("Calendar sync (reschedule) failed:", err);
+        const therapistCalId = therapistRow?.google_calendar_id;
+        if (therapistCalEventId && therapistCalId) {
+          await updateCalendarEvent(therapistCalId, therapistCalEventId, {
+            summary: therapistSummary,
+            startIso: data.scheduled_at,
+            durationMinutes: duration,
+          });
         }
-      })();
+        if (spaceCalEventId && !isOnline && SPACE_CAL_ID) {
+          await updateCalendarEvent(SPACE_CAL_ID, spaceCalEventId, {
+            summary: therapistFirstName,
+            startIso: data.scheduled_at,
+            durationMinutes: duration,
+          });
+        }
+      } catch (err) {
+        console.error("Calendar sync (reschedule) failed:", err);
+      }
     }
 
     if (action === "cancel") {
-      (async () => {
-        try {
-          const apptAny = appt as Record<string, unknown>;
-          const therapistCalEventId = apptAny.therapist_calendar_event_id as string | null;
-          const spaceCalEventId = apptAny.space_calendar_event_id as string | null;
+      try {
+        const apptAny = appt as Record<string, unknown>;
+        const therapistCalEventId = apptAny.therapist_calendar_event_id as string | null;
+        const spaceCalEventId = apptAny.space_calendar_event_id as string | null;
 
-          const therapistCalId = appt.therapist_id
-            ? (await db.from("therapist_profiles").select("google_calendar_id").eq("id", appt.therapist_id).single()).data?.google_calendar_id
-            : null;
+        const therapistCalId = appt.therapist_id
+          ? (await db.from("therapist_profiles").select("google_calendar_id").eq("id", appt.therapist_id).single()).data?.google_calendar_id
+          : null;
 
-          if (therapistCalEventId && therapistCalId) {
-            await deleteCalendarEvent(therapistCalId, therapistCalEventId).catch(console.error);
-          }
-          if (spaceCalEventId && SPACE_CAL_ID) {
-            await deleteCalendarEvent(SPACE_CAL_ID, spaceCalEventId).catch(console.error);
-          }
-        } catch (err) {
-          console.error("Calendar sync (cancel) failed:", err);
+        if (therapistCalEventId && therapistCalId) {
+          await deleteCalendarEvent(therapistCalId, therapistCalEventId).catch(console.error);
         }
-      })();
+        if (spaceCalEventId && SPACE_CAL_ID) {
+          await deleteCalendarEvent(SPACE_CAL_ID, spaceCalEventId).catch(console.error);
+        }
+      } catch (err) {
+        console.error("Calendar sync (cancel) failed:", err);
+      }
     }
   }
   // ─────────────────────────────────────────────────────────────────────────────
@@ -313,7 +303,7 @@ export async function PATCH(
   const tdL = `style="color:#333;padding:8px 18px 8px 0;border-bottom:1px solid #e0e0e0;white-space:nowrap;font-size:14px;font-weight:600"`;
   const tdR = `style="padding:8px 0;border-bottom:1px solid #e0e0e0;font-size:14px;color:#111"`;
 
-  // After admin assigns, send email to therapist
+  // After admin assigns, send email to therapist (with inquiry PDF)
   if (action === "assign" && data?.therapist_id && process.env.RESEND_API_KEY) {
     const [{ data: therapistProfile }, { data: clientData }] = await Promise.all([
       db.from("therapist_profiles").select("name, email").eq("id", data.therapist_id).single(),
@@ -323,6 +313,55 @@ export async function PATCH(
     ]);
     if (therapistProfile?.email) {
       const adminUrl = `${SITE}/admin/appointments`;
+
+      // Generate inquiry PDF to attach
+      let assignPdfAttachment: { filename: string; content: Buffer } | undefined;
+      const { data: assignInquiry } = await db
+        .from("booking_inquiries")
+        .select("*")
+        .eq("appointment_id", id)
+        .maybeSingle();
+      if (assignInquiry) {
+        try {
+          const fd = (assignInquiry.form_data ?? {}) as Record<string, unknown>;
+          const isCouple = assignInquiry.service_type === "couple";
+          const cd = isCouple
+            ? (fd.coupleDetails as {
+                partnerA?: { name?: string; gender?: string; birthday?: string; language?: string };
+                partnerB?: { name?: string; gender?: string; birthday?: string; language?: string };
+                meetingType?: string;
+              } | undefined)
+            : undefined;
+          const pdfBuf = await generateInquiryPDF({
+            serviceType: assignInquiry.service_type,
+            preferredTimes: assignInquiry.preferred_times ?? undefined,
+            name: (fd.name as string) ?? assignInquiry.name ?? undefined,
+            gender: fd.gender as string | undefined,
+            birthday: fd.birthday as string | undefined,
+            city: fd.city as string | undefined,
+            meetingType: fd.meetingType as string | undefined,
+            nativeLanguage: fd.nativeLanguage as string | undefined,
+            preferredTherapist: fd.preferredTherapist as string | undefined,
+            concern: assignInquiry.concern ?? undefined,
+            individualDetails: fd.individualDetails as Parameters<typeof generateInquiryPDF>[0]["individualDetails"],
+            coupleDetails: cd ? {
+              partnerA: { name: cd.partnerA?.name, gender: cd.partnerA?.gender, birthday: cd.partnerA?.birthday, language: cd.partnerA?.language },
+              partnerB: { name: cd.partnerB?.name, gender: cd.partnerB?.gender, birthday: cd.partnerB?.birthday, language: cd.partnerB?.language },
+              issues: (fd.coupleDetails as Record<string, unknown>)?.issues as string[] | undefined,
+              duration: (fd.coupleDetails as Record<string, unknown>)?.duration as string | undefined,
+              children: (fd.coupleDetails as Record<string, unknown>)?.children as string | undefined,
+              meetingType: cd.meetingType ?? undefined,
+            } : undefined,
+            otherDetails: fd.otherDetails as Parameters<typeof generateInquiryPDF>[0]["otherDetails"],
+            submittedAt: assignInquiry.created_at ?? new Date().toISOString(),
+          });
+          const dateStr = new Date().toISOString().slice(0, 10);
+          assignPdfAttachment = { filename: `booking_inquiry_${dateStr}.pdf`, content: pdfBuf };
+        } catch (pdfErr) {
+          console.error("Assign therapist PDF generation failed:", pdfErr);
+        }
+      }
+
       await resend.emails.send({
         from: FROM,
         to: therapistProfile.email,
@@ -335,7 +374,7 @@ export async function PATCH(
             </div>
             <div style="background:#fff;padding:28px 32px">
               <p style="margin:0 0 12px">您好，<strong>${therapistProfile.name ?? ""}心理師</strong>，</p>
-              <p style="margin:0 0 20px;color:#444">行政已為您安排一個新個案，請登入後台確認是否接案。</p>
+              <p style="margin:0 0 20px;color:#444">行政已為您安排一個新個案，個案預約資料請見附件 PDF。請登入後台確認是否接案。</p>
               <table style="width:100%;border-collapse:collapse;margin:0 0 24px">
                 <tr><td ${tdL}>個案</td><td ${tdR}><strong>${clientData?.full_name ?? "—"}</strong></td></tr>
                 ${data.scheduled_at ? `<tr><td ${tdL}>預計時間</td><td ${tdR}>${new Date(data.scheduled_at).toLocaleString("zh-TW", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Macau" })}</td></tr>` : ""}
@@ -347,6 +386,7 @@ export async function PATCH(
             </div>
           </div>
         `,
+        attachments: assignPdfAttachment ? [assignPdfAttachment] : [],
       }).catch(console.error);
     }
   }
@@ -504,6 +544,7 @@ export async function PATCH(
         .eq("appointment_id", id)
         .maybeSingle();
       const isCouple = inquiryForIntake?.service_type === "couple";
+      console.log("[Confirm Email] intakeToken:", intakeToken ? "SET" : "NULL", "| intakeSubmitted:", intakeSubmitted, "| isCouple:", isCouple, "→ showLink:", !!(intakeToken && !intakeSubmitted && !isCouple));
       const intakeSection = (intakeToken && !intakeSubmitted && !isCouple)
         ? `
           <div style="background:#f7f5ef;border:1px solid #d4c9b0;padding:18px 20px;margin:0 0 20px">

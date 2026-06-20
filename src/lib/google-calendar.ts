@@ -28,23 +28,31 @@ interface CalendarEventInput {
   timeZone?: string;
 }
 
+// UTC ISO → "YYYY-MM-DDTHH:mm:ss" in local timezone (without Z suffix)
+// Google Calendar interprets this datetime as being in the specified timeZone
+function toLocalDateStr(utcIso: string, durationMinutes: number, tz: string): { startStr: string; endStr: string } {
+  const start = new Date(utcIso);
+  const end = new Date(start.getTime() + durationMinutes * 60 * 1000);
+  const startStr = start.toLocaleString("sv", { timeZone: tz }).replace(" ", "T").slice(0, 19);
+  const endStr   = end.toLocaleString("sv", { timeZone: tz }).replace(" ", "T").slice(0, 19);
+  return { startStr, endStr };
+}
+
 export async function createCalendarEvent(
   calendarId: string,
   event: CalendarEventInput
 ): Promise<string> {
   const cal = getCalendarClient();
   const tz = event.timeZone ?? "Asia/Macau";
-
-  const start = new Date(event.startIso);
-  const end = new Date(start.getTime() + event.durationMinutes * 60 * 1000);
+  const { startStr, endStr } = toLocalDateStr(event.startIso, event.durationMinutes, tz);
 
   const { data } = await cal.events.insert({
     calendarId,
     requestBody: {
       summary: event.summary,
       description: event.description,
-      start: { dateTime: start.toISOString(), timeZone: tz },
-      end:   { dateTime: end.toISOString(),   timeZone: tz },
+      start: { dateTime: startStr, timeZone: tz },
+      end:   { dateTime: endStr,   timeZone: tz },
     },
   });
 
@@ -59,9 +67,7 @@ export async function updateCalendarEvent(
 ): Promise<void> {
   const cal = getCalendarClient();
   const tz = event.timeZone ?? "Asia/Macau";
-
-  const start = new Date(event.startIso);
-  const end = new Date(start.getTime() + event.durationMinutes * 60 * 1000);
+  const { startStr, endStr } = toLocalDateStr(event.startIso, event.durationMinutes, tz);
 
   await cal.events.patch({
     calendarId,
@@ -69,8 +75,8 @@ export async function updateCalendarEvent(
     requestBody: {
       summary: event.summary,
       description: event.description,
-      start: { dateTime: start.toISOString(), timeZone: tz },
-      end:   { dateTime: end.toISOString(),   timeZone: tz },
+      start: { dateTime: startStr, timeZone: tz },
+      end:   { dateTime: endStr,   timeZone: tz },
     },
   });
 }

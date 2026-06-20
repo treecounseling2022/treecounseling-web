@@ -210,7 +210,7 @@ export default function CalendarPage() {
                               style={{ backgroundColor: STATUS_COLOR[a.booking_status] ?? "#9ca3af" }}
                               title={`${a.clients?.full_name} · ${a.rooms?.name ?? ""}`}
                             >
-                              {new Date(a.scheduled_at!).toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit" })}
+                              {new Date(a.scheduled_at!).toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Macau" })}
                               {" "}{a.clients?.full_name}
                             </div>
                           );
@@ -223,7 +223,7 @@ export default function CalendarPage() {
                             style={{ backgroundColor: "#7c3aed" }}
                             title={`講座：${w.title}`}
                           >
-                            {new Date(w.scheduled_at).toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit" })}
+                            {new Date(w.scheduled_at).toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Macau" })}
                             {" "}♦ {w.title}
                           </div>
                         );
@@ -266,7 +266,7 @@ export default function CalendarPage() {
                       style={{ backgroundColor: a.rooms?.color ?? STATUS_COLOR[a.booking_status] }}
                     />
                     <span className="text-deep font-medium">
-                      {new Date(a.scheduled_at!).toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit" })}
+                      {new Date(a.scheduled_at!).toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Macau" })}
                     </span>
                     <span className="text-muted">{a.clients?.full_name}</span>
                     {a.rooms && <span className="text-muted/60 text-xs">{a.rooms.name}</span>}
@@ -287,7 +287,7 @@ export default function CalendarPage() {
                 <div key={`w-${w.id}`} className="flex items-center gap-3 font-sans text-sm px-3 py-2.5">
                   <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: "#7c3aed" }} />
                   <span className="text-deep font-medium">
-                    {new Date(w.scheduled_at).toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit" })}
+                    {new Date(w.scheduled_at).toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Macau" })}
                   </span>
                   <span className="text-muted">♦ {w.title}</span>
                   <span className="font-sans text-[10px] bg-violet-50 text-violet-600 px-1.5 py-0.5 ml-auto">講座</span>

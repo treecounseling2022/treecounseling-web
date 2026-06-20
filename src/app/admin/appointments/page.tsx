@@ -59,6 +59,8 @@ const STATUS_COLOR: Record<BookingStatus, string> = {
 };
 
 // ─── Helpers ─────────────────────────────────────────────────
+const TZ = "Asia/Macau";
+
 function fmtDate(iso: string | null) {
   if (!iso) return "—";
   return new Date(iso).toLocaleString("zh-TW", {
@@ -66,11 +68,17 @@ function fmtDate(iso: string | null) {
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: TZ,
   });
 }
 
 function fmtDay(iso: string) {
-  return new Date(iso).toLocaleDateString("zh-TW");
+  return new Date(iso).toLocaleDateString("zh-TW", { timeZone: TZ });
+}
+
+// UTC ISO → "YYYY-MM-DDTHH:mm" in Macau local time (for datetime-local inputs)
+function toMacauInput(iso: string): string {
+  return new Date(iso).toLocaleString("sv", { timeZone: TZ }).replace(" ", "T").slice(0, 16);
 }
 
 // ─── Main Component ───────────────────────────────────────────
@@ -220,7 +228,7 @@ export default function AppointmentsPage() {
       is_online: assignForm.is_online,
       meeting_link: assignForm.is_online ? (assignForm.meeting_link || null) : null,
       scheduled_at: (assignForm.scheduled_date && assignForm.scheduled_time)
-        ? `${assignForm.scheduled_date}T${assignForm.scheduled_time}`
+        ? `${assignForm.scheduled_date}T${assignForm.scheduled_time}:00+08:00`
         : null,
       session_fee: assignForm.session_fee ? +assignForm.session_fee : null,
       arrangement_type: assignForm.arrangement_type || null,
@@ -241,7 +249,7 @@ export default function AppointmentsPage() {
     if (!rescheduleModal || !rescheduleForm.scheduled_date) { setErr("請選擇新的預約時間"); return; }
     const ok = await action(rescheduleModal.id, {
       action: "reschedule",
-      scheduled_at: `${rescheduleForm.scheduled_date}T${rescheduleForm.scheduled_time || "00:00"}`,
+      scheduled_at: `${rescheduleForm.scheduled_date}T${rescheduleForm.scheduled_time || "00:00"}:00+08:00`,
       room_id: rescheduleForm.room_id || null,
     });
     if (ok) { setRescheduleModal(null); setRescheduleForm({ scheduled_date: "", scheduled_time: "", room_id: "" }); }
@@ -299,7 +307,7 @@ export default function AppointmentsPage() {
           {!isTherapist && (appt.booking_status === "pending_admin" || appt.booking_status === "rejected") ? (
             <button
               onClick={() => {
-                const _existingIso = appt.scheduled_at ? new Date(appt.scheduled_at).toISOString().slice(0, 16) : null;
+                const _existingIso = appt.scheduled_at ? toMacauInput(appt.scheduled_at) : null;
                 setAssignForm({
                   therapist_id: appt.therapist_id ?? "",
                   room_id: appt.room_id ?? "",
@@ -308,8 +316,8 @@ export default function AppointmentsPage() {
                   use_custom_link: false,
                   scheduled_date: _existingIso ? _existingIso.slice(0, 10) : "",
                   scheduled_time: _existingIso ? _existingIso.slice(11, 16) : "",
-                  session_fee: appt.session_fee?.toString() ?? "",
-                  arrangement_type: appt.arrangement_type ?? "",
+                  session_fee: "",
+                  arrangement_type: "",
                 });
                 setErr("");
                 setAssignModal(appt);
@@ -349,7 +357,7 @@ export default function AppointmentsPage() {
               </button>
               <button
                 onClick={() => {
-                  const _rIso = appt.scheduled_at ? new Date(appt.scheduled_at).toISOString().slice(0, 16) : null;
+                  const _rIso = appt.scheduled_at ? toMacauInput(appt.scheduled_at) : null;
                   setRescheduleForm({
                     scheduled_date: _rIso ? _rIso.slice(0, 10) : "",
                     scheduled_time: _rIso ? _rIso.slice(11, 16) : "",
@@ -368,7 +376,7 @@ export default function AppointmentsPage() {
           {!isTherapist && appt.booking_status === "locked" ? (
             <button
               onClick={() => {
-                const _rIso2 = appt.scheduled_at ? new Date(appt.scheduled_at).toISOString().slice(0, 16) : null;
+                const _rIso2 = appt.scheduled_at ? toMacauInput(appt.scheduled_at) : null;
                 setRescheduleForm({
                   scheduled_date: _rIso2 ? _rIso2.slice(0, 10) : "",
                   scheduled_time: _rIso2 ? _rIso2.slice(11, 16) : "",

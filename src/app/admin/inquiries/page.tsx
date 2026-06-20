@@ -155,7 +155,7 @@ export default function InquiriesPage() {
         therapist_id: assignForm.therapist_id,
         room_id: assignForm.room_id || undefined,
         scheduled_at: (assignForm.scheduled_date && assignForm.scheduled_time)
-          ? `${assignForm.scheduled_date}T${assignForm.scheduled_time}`
+          ? `${assignForm.scheduled_date}T${assignForm.scheduled_time}:00+08:00`
           : undefined,
         session_fee: assignForm.session_fee ? Number(assignForm.session_fee) : undefined,
         is_online: assignForm.is_online,

@@ -50,6 +50,7 @@ export default function RootLayout({
     <html
       lang="zh-Hant"
       className={`${notoSerifTC.variable} ${notoSansTC.variable} ${ebGaramond.variable}`}
+      suppressHydrationWarning
     >
       <body className="min-h-screen flex flex-col">
         <a

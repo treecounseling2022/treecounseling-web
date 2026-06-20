@@ -26,7 +26,7 @@ export default async function AdminLayout({
     if (isAdminLevel(auth.role)) {
       const [inqRes, apptRes] = await Promise.all([
         db.from("booking_inquiries").select("id", { count: "exact", head: true }).eq("status", "new"),
-        db.from("appointments").select("id", { count: "exact", head: true }).eq("booking_status", "pending_admin"),
+        db.from("appointments").select("id", { count: "exact", head: true }).in("booking_status", ["pending_admin", "pending_therapist"]),
       ]);
       pendingInquiries = inqRes.count ?? 0;
       pendingAppointments = apptRes.count ?? 0;

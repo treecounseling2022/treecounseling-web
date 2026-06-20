@@ -188,7 +188,7 @@ export async function POST(request: Request) {
             </div>
             <p style="margin:0 0 6px;color:#777;font-size:13px">如有緊急需求，歡迎直接聯繫我們：</p>
             <ul style="margin:0 0 0;padding-left:18px;color:#555;font-size:13px;line-height:2">
-              <li>WhatsApp：請至官網查看最新聯絡資訊</li>
+              <li>WhatsApp：<a href="https://wa.me/85362772234" style="color:#2d4a38;text-decoration:none;font-weight:500">+853 6277 2234</a></li>
               <li>Email：<a href="mailto:${FROM}" style="color:#2d4a38;text-decoration:none;font-weight:500">${FROM}</a></li>
             </ul>
           </div>

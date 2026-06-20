@@ -10,7 +10,7 @@ interface Message {
   parts: { text: string }[];
 }
 
-type Stage = "loading" | "invalid" | "already_done" | "chat" | "summary" | "submitted";
+type Stage = "loading" | "invalid" | "already_done" | "chat" | "submitted";
 
 export default function AIIntakeChat() {
   const searchParams = useSearchParams();
@@ -21,10 +21,10 @@ export default function AIIntakeChat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputVal, setInputVal] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [summaryText, setSummaryText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasCrisisFlag, setHasCrisisFlag] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatViewportRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // 驗證 token
   useEffect(() => {
@@ -46,8 +46,10 @@ export default function AIIntakeChat() {
       .catch(() => setStage("invalid"));
   }, [token]);
 
+  // 只滾動聊天容器，不影響頁面位置
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const vp = chatViewportRef.current;
+    if (vp) vp.scrollTop = vp.scrollHeight;
   }, [messages, isLoading]);
 
   const handleSend = async (text: string) => {
@@ -85,8 +87,7 @@ export default function AIIntakeChat() {
 
       if (crisis) setHasCrisisFlag(true);
       if (match) {
-        setSummaryText(match[1].trim());
-        setStage("summary");
+        autoSubmit(match[1].trim());
       }
     } catch {
       setMessages((prev) => [
@@ -95,16 +96,17 @@ export default function AIIntakeChat() {
       ]);
     } finally {
       setIsLoading(false);
+      inputRef.current?.focus();
     }
   };
 
-  const handleSubmit = async () => {
+  const autoSubmit = async (summary: string) => {
     setIsSubmitting(true);
     try {
       await fetch("/api/intake", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "submit", token, messages: summaryText }),
+        body: JSON.stringify({ action: "submit", token, messages: summary }),
       });
     } catch { /* 靜默失敗，仍顯示完成 */ }
     setStage("submitted");
@@ -178,40 +180,6 @@ export default function AIIntakeChat() {
     );
   }
 
-  // ── 摘要確認 ──────────────────────────────────────────────────────────────
-  if (stage === "summary") {
-    return (
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="max-w-lg mx-auto space-y-4"
-      >
-        <div className="bg-paper border border-forest/20 p-6 space-y-4">
-          <h3 className="font-serif text-deep text-lg">初談摘要</h3>
-          <p className="font-sans text-xs text-muted">請確認以下內容正確，再送出給心理師。</p>
-          <pre className="font-sans text-xs text-deep/90 leading-relaxed whitespace-pre-wrap bg-soft/60 border border-sand/15 p-4">
-            {summaryText}
-          </pre>
-          <div className="flex gap-3 pt-2">
-            <button
-              onClick={handleSubmit}
-              disabled={isSubmitting}
-              className="flex-1 py-2.5 bg-forest hover:bg-deep text-paper font-sans text-sm transition-colors disabled:opacity-40"
-            >
-              {isSubmitting ? "送出中…" : "確認送出給心理師"}
-            </button>
-            <button
-              onClick={() => setStage("chat")}
-              className="px-4 py-2.5 border border-sand/30 hover:bg-soft text-muted font-sans text-sm transition-colors"
-            >
-              繼續補充
-            </button>
-          </div>
-        </div>
-      </motion.div>
-    );
-  }
-
   // ── 對話介面 ──────────────────────────────────────────────────────────────
   return (
     <div className="max-w-lg mx-auto flex flex-col h-[600px] bg-paper border border-sand/20">
@@ -238,7 +206,7 @@ export default function AIIntakeChat() {
       )}
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-5 space-y-4">
+      <div ref={chatViewportRef} className="flex-1 overflow-y-auto p-5 space-y-4">
         {messages.map((msg, idx) => (
           <div
             key={idx}
@@ -271,7 +239,6 @@ export default function AIIntakeChat() {
             </div>
           </div>
         )}
-        <div ref={messagesEndRef} />
       </div>
 
       {/* Input */}
@@ -280,6 +247,7 @@ export default function AIIntakeChat() {
         className="p-3 border-t border-sand/20 flex gap-2 flex-shrink-0"
       >
         <input
+          ref={inputRef}
           type="text"
           value={inputVal}
           onChange={(e) => setInputVal(e.target.value)}

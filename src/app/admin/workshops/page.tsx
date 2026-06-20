@@ -97,7 +97,7 @@ export default function WorkshopsPage() {
     setForm({
       therapist_id: w.therapist_id,
       title: w.title,
-      scheduled_at: w.scheduled_at.slice(0, 16),
+      scheduled_at: new Date(w.scheduled_at).toLocaleString("sv", { timeZone: "Asia/Macau" }).replace(" ", "T").slice(0, 16),
       duration_hours: String(w.duration_hours),
       hourly_rate: String(w.hourly_rate),
       total_fee: String(w.total_fee),
@@ -130,7 +130,7 @@ export default function WorkshopsPage() {
       const payload = {
         therapist_id: form.therapist_id,
         title: form.title.trim(),
-        scheduled_at: form.scheduled_at,
+        scheduled_at: `${form.scheduled_at}:00+08:00`,
         duration_hours: parseFloat(form.duration_hours) || 1,
         hourly_rate: parseFloat(form.hourly_rate) || 0,
         total_fee: totalFee,
