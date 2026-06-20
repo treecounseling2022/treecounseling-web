@@ -159,6 +159,152 @@ export async function PATCH(
     }
   }
 
+  // ── Google Calendar 同步 ──────────────────────────────────────────────────────
+  if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
+    const SPACE_CAL_ID = process.env.GOOGLE_SPACE_CALENDAR_ID;
+
+    if (action === "confirm" && data?.scheduled_at && data.therapist_id && data.client_id) {
+      (async () => {
+        try {
+          const [{ data: clientRow }, { data: therapistRow }] = await Promise.all([
+            db.from("clients").select("full_name").eq("id", data.client_id!).single(),
+            db.from("therapist_profiles").select("name, google_calendar_id").eq("id", data.therapist_id!).single(),
+          ]);
+
+          const duration = (data as Record<string, unknown>).duration_minutes as number ?? 50;
+          const isOnline = !!(data as Record<string, unknown>).is_online;
+
+          // Session number: count of confirmed/completed appts for this client up to this time
+          const { count: sessionCount } = await db
+            .from("appointments")
+            .select("id", { count: "exact", head: true })
+            .eq("client_id", data.client_id!)
+            .in("booking_status", ["confirmed", "locked", "completed"])
+            .lte("scheduled_at", data.scheduled_at);
+          const sessionNumber = sessionCount ?? 1;
+
+          const maskedName = maskClientName(clientRow?.full_name ?? "個案");
+          const therapistFirstName = (therapistRow?.name ?? "").split(" ")[0];
+
+          // Therapist calendar event
+          const therapistCalId = therapistRow?.google_calendar_id;
+          const therapistSummary = isOnline
+            ? `${maskedName}-${sessionNumber}-Online`
+            : `${maskedName}-${sessionNumber}`;
+
+          let therapistEventId: string | null = null;
+          if (therapistCalId) {
+            therapistEventId = await createCalendarEvent(therapistCalId, {
+              summary: therapistSummary,
+              startIso: data.scheduled_at,
+              durationMinutes: duration,
+            });
+          }
+
+          // Space calendar event (face-to-face only)
+          let spaceEventId: string | null = null;
+          if (!isOnline && SPACE_CAL_ID) {
+            spaceEventId = await createCalendarEvent(SPACE_CAL_ID, {
+              summary: therapistFirstName,
+              startIso: data.scheduled_at,
+              durationMinutes: duration,
+            });
+          }
+
+          // Store event IDs back to appointment
+          if (therapistEventId || spaceEventId) {
+            await db.from("appointments").update({
+              ...(therapistEventId ? { therapist_calendar_event_id: therapistEventId } : {}),
+              ...(spaceEventId ? { space_calendar_event_id: spaceEventId } : {}),
+            }).eq("id", id);
+          }
+        } catch (err) {
+          console.error("Calendar sync (confirm) failed:", err);
+        }
+      })();
+    }
+
+    if (action === "reschedule" && data?.scheduled_at) {
+      (async () => {
+        try {
+          const duration = (appt as Record<string, unknown>).duration_minutes as number ?? 50;
+          const isOnline = !!(appt as Record<string, unknown>).is_online;
+          const apptAny = appt as Record<string, unknown>;
+
+          const therapistCalEventId = apptAny.therapist_calendar_event_id as string | null;
+          const spaceCalEventId = apptAny.space_calendar_event_id as string | null;
+
+          // Re-fetch therapist calendar id and client name for summary
+          const [{ data: clientRow }, { data: therapistRow }] = await Promise.all([
+            appt.client_id
+              ? db.from("clients").select("full_name").eq("id", appt.client_id).single()
+              : Promise.resolve({ data: null }),
+            appt.therapist_id
+              ? db.from("therapist_profiles").select("name, google_calendar_id").eq("id", appt.therapist_id).single()
+              : Promise.resolve({ data: null }),
+          ]);
+
+          const { count: sessionCount } = await db
+            .from("appointments")
+            .select("id", { count: "exact", head: true })
+            .eq("client_id", appt.client_id!)
+            .in("booking_status", ["confirmed", "locked", "completed"])
+            .lte("scheduled_at", data.scheduled_at);
+          const sessionNumber = sessionCount ?? 1;
+
+          const maskedName = maskClientName(clientRow?.full_name ?? "個案");
+          const therapistFirstName = (therapistRow?.name ?? "").split(" ")[0];
+          const therapistSummary = isOnline
+            ? `${maskedName}-${sessionNumber}-Online`
+            : `${maskedName}-${sessionNumber}`;
+
+          const therapistCalId = therapistRow?.google_calendar_id;
+          if (therapistCalEventId && therapistCalId) {
+            await updateCalendarEvent(therapistCalId, therapistCalEventId, {
+              summary: therapistSummary,
+              startIso: data.scheduled_at,
+              durationMinutes: duration,
+            });
+          }
+
+          if (spaceCalEventId && !isOnline && SPACE_CAL_ID) {
+            await updateCalendarEvent(SPACE_CAL_ID, spaceCalEventId, {
+              summary: therapistFirstName,
+              startIso: data.scheduled_at,
+              durationMinutes: duration,
+            });
+          }
+        } catch (err) {
+          console.error("Calendar sync (reschedule) failed:", err);
+        }
+      })();
+    }
+
+    if (action === "cancel") {
+      (async () => {
+        try {
+          const apptAny = appt as Record<string, unknown>;
+          const therapistCalEventId = apptAny.therapist_calendar_event_id as string | null;
+          const spaceCalEventId = apptAny.space_calendar_event_id as string | null;
+
+          const therapistCalId = appt.therapist_id
+            ? (await db.from("therapist_profiles").select("google_calendar_id").eq("id", appt.therapist_id).single()).data?.google_calendar_id
+            : null;
+
+          if (therapistCalEventId && therapistCalId) {
+            await deleteCalendarEvent(therapistCalId, therapistCalEventId).catch(console.error);
+          }
+          if (spaceCalEventId && SPACE_CAL_ID) {
+            await deleteCalendarEvent(SPACE_CAL_ID, spaceCalEventId).catch(console.error);
+          }
+        } catch (err) {
+          console.error("Calendar sync (cancel) failed:", err);
+        }
+      })();
+    }
+  }
+  // ─────────────────────────────────────────────────────────────────────────────
+
   const FROM = process.env.RESEND_FROM_EMAIL ?? "noreply@treecounseling.com";
   const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://treecounseling-web.vercel.app";
   const ADMIN_EMAIL = process.env.ADMIN_NOTIFICATION_EMAIL;

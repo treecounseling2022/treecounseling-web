@@ -20,6 +20,7 @@ type ProfileData = {
   name_en?: string;
   email?: string;
   google_meet_link?: string;
+  google_calendar_id?: string;
   bio?: string;
   photo_url?: string;
   title?: string;
@@ -437,7 +438,7 @@ export default function TherapistProfileEditor({ therapistId, initialData, userR
               className={inputCls}
             />
           </div>
-          <div className="sm:col-span-2">
+          <div>
             <label className="block font-sans text-xs text-muted mb-1">Google Meet 永久連結（線上晤談用）</label>
             <input
               type="url"
@@ -447,6 +448,17 @@ export default function TherapistProfileEditor({ therapistId, initialData, userR
               className={inputCls}
             />
             <p className="font-sans text-[10px] text-muted/50 mt-1">在 Google Meet 首頁點「使用個人會議室」即可取得永久連結。</p>
+          </div>
+          <div>
+            <label className="block font-sans text-xs text-muted mb-1">個人 Google Calendar ID</label>
+            <input
+              type="text"
+              value={data.google_calendar_id ?? ""}
+              onChange={(e) => setData((p) => ({ ...p, google_calendar_id: e.target.value }))}
+              placeholder="example@group.calendar.google.com"
+              className={inputCls}
+            />
+            <p className="font-sans text-[10px] text-muted/50 mt-1">在 Google Calendar 設定 → 與其他人共享日曆 → 日曆 ID。</p>
           </div>
         </div>
 
