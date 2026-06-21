@@ -198,7 +198,7 @@ export async function POST(
     if (therapistProfile?.email) {
       const clientName = extractClientName(inquiry);
       const serviceLabel = SERVICE_LABEL[inquiry.service_type] ?? inquiry.service_type;
-      const adminUrl = `${process.env.NEXT_PUBLIC_SITE_URL ?? "https://treecounseling-web.vercel.app"}/admin/appointments`;
+      const adminUrl = `${process.env.NEXT_PUBLIC_SITE_URL ?? "https://treecounseling.com"}/admin/appointments`;
 
       // Extract extra fields from form_data
       const fd = (inquiry.form_data ?? {}) as Record<string, unknown>;

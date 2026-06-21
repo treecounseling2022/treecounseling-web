@@ -48,7 +48,7 @@ export async function POST(request: Request) {
       const serviceLabel = SERVICE_LABEL[body.serviceType] ?? body.serviceType;
       const name = body.name ?? "（未填）";
       const clientEmail = body.email ?? null;
-      const adminUrl = `${process.env.NEXT_PUBLIC_SITE_URL ?? "https://treecounseling-web.vercel.app"}/admin/inquiries`;
+      const adminUrl = `${process.env.NEXT_PUBLIC_SITE_URL ?? "https://treecounseling.com"}/admin/inquiries`;
 
       // 1. Notify admin — no contact info in body; full details in PDF attachment
       if (ADMIN_EMAIL) {

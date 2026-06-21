@@ -297,7 +297,7 @@ export async function PATCH(
   // ─────────────────────────────────────────────────────────────────────────────
 
   const FROM = process.env.RESEND_FROM_EMAIL ?? "noreply@treecounseling.com";
-  const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://treecounseling-web.vercel.app";
+  const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://treecounseling.com";
   const ADMIN_EMAIL = process.env.ADMIN_NOTIFICATION_EMAIL;
   const WHATSAPP_LINK = "https://wa.me/85362772234";
 

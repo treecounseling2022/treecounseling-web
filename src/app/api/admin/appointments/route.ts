@@ -145,7 +145,7 @@ export async function POST(req: NextRequest) {
 
     // PDF + admin notification + client confirmation email（並行，錯誤不影響回應）
     const FROM = process.env.RESEND_FROM_EMAIL ?? "noreply@treecounseling.com";
-    const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://treecounseling-web.vercel.app";
+    const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://treecounseling.com";
     const WHATSAPP_LINK = "https://wa.me/85362772234";
 
     await Promise.allSettled([
