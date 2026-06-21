@@ -9,6 +9,7 @@ import { AdminThemeProvider } from "./_components/AdminThemeProvider";
 export const metadata: Metadata = {
   title: "後台管理 - 樹心理工作室",
   robots: { index: false, follow: false },
+  manifest: "/admin-manifest.json",
 };
 
 export default async function AdminLayout({
