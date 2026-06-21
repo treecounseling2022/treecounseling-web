@@ -1,5 +1,6 @@
 import { ImageResponse } from "next/og";
 
+export const runtime = "edge";
 export const dynamic = "force-dynamic";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
@@ -11,7 +12,7 @@ async function loadFont(text: string) {
       { headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" } }
     ).then((r) => r.text());
     const urls = [...css.matchAll(/url\(([^)]+\.woff2)\)/g)].map((m) => m[1]);
-    return Promise.all(urls.map((url) => fetch(url).then((r) => r.arrayBuffer())));
+    return await Promise.all(urls.map((url) => fetch(url).then((r) => r.arrayBuffer())));
   } catch {
     return [];
   }
