@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 type Client = { id: string; full_name: string };
 type Room   = { id: string; name: string; color: string; is_online?: boolean };
 type Plan   = { id: string; name: string; price_per_session: number; currency: string };
+type CoupleInfo = { service_type: string; couple_partner_id: string | null; partner_name: string | null };
 
 type Props = {
   clients: Client[];
@@ -21,19 +22,48 @@ export default function TherapistNewApptForm({ clients, defaultClientId, rooms, 
   const defaultPlan = plans[0] ?? null;
   const today = new Date().toISOString().slice(0, 10);
 
-  const [clientId,       setClientId]       = useState(defaultClientId ?? "");
-  const [date,           setDate]           = useState("");
-  const [time,           setTime]           = useState("10:00");
-  const [planId,         setPlanId]         = useState(defaultPlan?.id ?? "");
-  const [fee,            setFee]            = useState(defaultPlan?.price_per_session?.toString() ?? "");
-  const [currency,       setCurrency]       = useState(defaultPlan?.currency ?? "MOP");
-  const [roomId,         setRoomId]         = useState("");
-  const [isOnline,       setIsOnline]       = useState(false);
-  const [meetingLink,    setMeetingLink]    = useState("");
-  const [useCustomLink,  setUseCustomLink]  = useState(false);
-  const [notes,          setNotes]          = useState("");
-  const [submitting,     setSubmitting]     = useState(false);
-  const [err,            setErr]            = useState("");
+  const [clientId,        setClientId]        = useState(defaultClientId ?? "");
+  const [date,            setDate]            = useState("");
+  const [time,            setTime]            = useState("10:00");
+  const [planId,          setPlanId]          = useState(defaultPlan?.id ?? "");
+  const [fee,             setFee]             = useState(defaultPlan?.price_per_session?.toString() ?? "");
+  const [currency,        setCurrency]        = useState(defaultPlan?.currency ?? "MOP");
+  const [roomId,          setRoomId]          = useState("");
+  const [isOnline,        setIsOnline]        = useState(false);
+  const [meetingLink,     setMeetingLink]     = useState("");
+  const [useCustomLink,   setUseCustomLink]   = useState(false);
+  const [notes,           setNotes]           = useState("");
+  const [submitting,      setSubmitting]      = useState(false);
+  const [err,             setErr]             = useState("");
+
+  // 伴侶場次類型
+  const [coupleInfo,      setCoupleInfo]      = useState<CoupleInfo | null>(null);
+  const [coupleSessionType, setCoupleSessionType] = useState<"joint" | "individual_a" | "individual_b" | "">("");
+
+  // 選擇個案後，若為伴侶諮商，取得伴侶資訊
+  useEffect(() => {
+    setCoupleInfo(null);
+    setCoupleSessionType("");
+    if (!clientId) return;
+    fetch(`/api/admin/clients/${clientId}`)
+      .then((r) => r.json())
+      .then(async (data) => {
+        if (data?.service_type !== "couple") return;
+        let partnerName: string | null = null;
+        if (data.couple_partner_id) {
+          const pr = await fetch(`/api/admin/clients/${data.couple_partner_id}`);
+          const pd = await pr.json();
+          partnerName = pd?.full_name ?? null;
+        }
+        setCoupleInfo({
+          service_type: data.service_type,
+          couple_partner_id: data.couple_partner_id ?? null,
+          partner_name: partnerName,
+        });
+        setCoupleSessionType("joint");
+      })
+      .catch(() => {});
+  }, [clientId]);
 
   function handlePlanChange(id: string) {
     setPlanId(id);
@@ -66,25 +96,35 @@ export default function TherapistNewApptForm({ clients, defaultClientId, rooms, 
     try {
       const scheduled_at = new Date(`${date}T${time}:00+08:00`).toISOString();
 
+      // 伴侶 joint 場次：若選 individual_b，以 partner 為主個案
+      const actualClientId =
+        coupleInfo && coupleSessionType === "individual_b" && coupleInfo.couple_partner_id
+          ? coupleInfo.couple_partner_id
+          : clientId;
+
       const res = await fetch("/api/admin/appointments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          client_id:    clientId,
+          client_id:                  actualClientId,
           scheduled_at,
-          room_id:      roomId  || null,
-          plan_id:      planId  || null,
-          session_fee:  fee     ? parseFloat(fee) : null,
-          is_online:    isOnline,
-          meeting_link: isOnline ? (meetingLink || null) : null,
-          admin_notes:  notes   || null,
+          room_id:                    roomId  || null,
+          plan_id:                    planId  || null,
+          session_fee:                fee     ? parseFloat(fee) : null,
+          is_online:                  isOnline,
+          meeting_link:               isOnline ? (meetingLink || null) : null,
+          admin_notes:                notes   || null,
+          couple_session_type:        coupleSessionType || null,
+          couple_partner_client_id:   coupleSessionType === "joint" && coupleInfo?.couple_partner_id
+                                        ? coupleInfo.couple_partner_id
+                                        : null,
         }),
       });
 
       const json = await res.json();
       if (!res.ok) { setErr(json.error ?? "發生錯誤"); return; }
 
-      router.push(`/admin/clients/${clientId}`);
+      router.push(`/admin/clients/${actualClientId}`);
       router.refresh();
     } finally {
       setSubmitting(false);
@@ -119,6 +159,33 @@ export default function TherapistNewApptForm({ clients, defaultClientId, rooms, 
           </select>
         )}
       </div>
+
+      {/* 伴侶場次類型（僅伴侶個案顯示） */}
+      {coupleInfo && (
+        <div className="space-y-2 p-3 bg-forest/5 border border-forest/15">
+          <p className="font-sans text-[11px] text-forest font-medium">伴侶諮商場次類型</p>
+          <div className="flex flex-wrap gap-4">
+            {[
+              { value: "joint",        label: "雙方同來（伴侶）" },
+              { value: "individual_a", label: `個人（${clients.find(c => c.id === clientId)?.full_name ?? "A 方"}）` },
+              { value: "individual_b", label: `個人（${coupleInfo.partner_name ?? "B 方"}）` },
+            ].map((opt) => (
+              <label key={opt.value} className="flex items-center gap-2 cursor-pointer font-sans text-sm text-deep">
+                <input
+                  type="radio"
+                  checked={coupleSessionType === opt.value}
+                  onChange={() => setCoupleSessionType(opt.value as typeof coupleSessionType)}
+                  className="w-4 h-4 border border-sand accent-forest"
+                />
+                {opt.label}
+              </label>
+            ))}
+          </div>
+          {coupleSessionType === "joint" && !coupleInfo.couple_partner_id && (
+            <p className="font-sans text-[10px] text-amber-600">⚠ 尚未連結另一方個案，無法自動帶入雙方。請先在個案記錄中連結伴侶。</p>
+          )}
+        </div>
+      )}
 
       {/* Date + Time */}
       <div className="grid grid-cols-2 gap-4">

@@ -20,6 +20,7 @@ type Appointment = {
   status: string;
   scheduled_at: string | null;
   booking_status: string;
+  couple_session_type: "joint" | "individual_a" | "individual_b" | null;
 };
 type Workshop = {
   id: string;
@@ -109,9 +110,15 @@ function calcSessionCommission(
     }
 
     totalCommission += c;
+    const sessionLabel =
+      appt.couple_session_type === "joint"         ? "伴侶諮商（雙方）" :
+      appt.couple_session_type === "individual_a"  ? "伴侶個人諮商（A 方）" :
+      appt.couple_session_type === "individual_b"  ? "伴侶個人諮商（B 方）" :
+      "個人諮商";
+
     breakdown.push({
       date: appt.scheduled_at ? new Date(appt.scheduled_at).toLocaleDateString("zh-TW") : "—",
-      label: "個人/伴侶諮商",
+      label: sessionLabel,
       fee,
       commission: Math.round(c),
       type: "session",
