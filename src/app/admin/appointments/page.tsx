@@ -786,10 +786,12 @@ export default function AppointmentsPage() {
               {detailModal.is_online && (
                 <p className="text-forest font-medium">
                   線上晤談
-                  {detailModal.meeting_link
-                    ? <> — <a href={detailModal.meeting_link} target="_blank" rel="noopener noreferrer" className="underline break-all">{detailModal.meeting_link}</a></>
-                    : <span className="text-amber-600 font-normal"> — ⚠ 尚未設定視訊連結</span>
-                  }
+                  {(() => {
+                    const link = detailModal.meeting_link || therapists.find((t) => t.id === detailModal.therapist_id)?.google_meet_link;
+                    return link
+                      ? <> — <a href={link} target="_blank" rel="noopener noreferrer" className="underline break-all">{link}</a></>
+                      : <span className="text-amber-600 font-normal"> — ⚠ 尚未設定視訊連結</span>;
+                  })()}
                 </p>
               )}
             </div>
