@@ -645,7 +645,14 @@ export default function ClientEditor({
       {/* 臨床背景 */}
       {!readonly && (
         <div className={sectionCls}>
-          <h2 className="font-serif text-deep text-base">臨床背景</h2>
+          <div className="flex items-center gap-3">
+            <h2 className="font-serif text-deep text-base">臨床背景</h2>
+            {form.service_type === "couple" && (
+              <span className="font-sans text-[10px] text-sand border border-sand/30 px-2 py-0.5">
+                「困擾 / 關係 / 子女」欄位與伴侶共享，儲存後自動同步
+              </span>
+            )}
+          </div>
 
           {/* 主訴困擾 — 根據服務類型顯示不同清單 */}
           {form.service_type === "couple" ? (
@@ -789,6 +796,11 @@ export default function ClientEditor({
               </select>
             </div>
           </div>
+
+          {/* 個人臨床資料 */}
+          {form.service_type === "couple" && (
+            <p className="font-sans text-[11px] text-muted/60 pt-1 border-t border-sand/15">以下為個人資料，不與伴侶共享</p>
+          )}
 
           {/* 精神科就診史 */}
           <div>

@@ -39,5 +39,18 @@ export async function POST(req: NextRequest) {
   const db = createAdminClient();
   const { data, error } = await db.from("clients").insert(body).select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // 新建伴侶個案時：同步共同欄位到對方，並互相建立反向連結
+  const partnerId = body.couple_partner_id as string | null;
+  if (body.service_type === "couple" && partnerId && data) {
+    const sharedFields: Record<string, unknown> = {
+      couple_partner_id: data.id,
+    };
+    if (body.presenting_concerns !== undefined) sharedFields.presenting_concerns = body.presenting_concerns;
+    if (body.relationship_duration !== undefined) sharedFields.relationship_duration = body.relationship_duration;
+    if (body.children_info !== undefined) sharedFields.children_info = body.children_info;
+    await db.from("clients").update(sharedFields).eq("id", partnerId);
+  }
+
   return NextResponse.json(data, { status: 201 });
 }

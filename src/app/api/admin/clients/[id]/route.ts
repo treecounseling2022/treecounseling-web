@@ -92,6 +92,19 @@ export async function PATCH(
   const { action: _a, ...rest } = body;
   const { data, error } = await db.from("clients").update(rest).eq("id", id).select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // 伴侶共同欄位同步：若有 couple_partner_id，將共同資料寫入對方記錄
+  const partnerId = (rest.couple_partner_id as string | null) ?? (data?.couple_partner_id as string | null);
+  if (data?.service_type === "couple" && partnerId) {
+    const sharedFields: Record<string, unknown> = {};
+    if ("presenting_concerns" in rest) sharedFields.presenting_concerns = rest.presenting_concerns;
+    if ("relationship_duration" in rest) sharedFields.relationship_duration = rest.relationship_duration;
+    if ("children_info" in rest) sharedFields.children_info = rest.children_info;
+    if (Object.keys(sharedFields).length > 0) {
+      await db.from("clients").update(sharedFields).eq("id", partnerId);
+    }
+  }
+
   return NextResponse.json(data);
 }
 
