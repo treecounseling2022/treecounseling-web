@@ -201,9 +201,10 @@ export async function PATCH(
         }
 
         let spaceEventId: string | null = null;
-        if (!isOnline && SPACE_CAL_ID) {
+        if (SPACE_CAL_ID) {
+          const spaceSummary = isOnline ? `${therapistFirstName}-Online` : therapistFirstName;
           spaceEventId = await createCalendarEvent(SPACE_CAL_ID, {
-            summary: therapistFirstName,
+            summary: spaceSummary,
             startIso: data.scheduled_at,
             durationMinutes: duration,
           });
@@ -261,9 +262,10 @@ export async function PATCH(
             durationMinutes: duration,
           });
         }
-        if (spaceCalEventId && !isOnline && SPACE_CAL_ID) {
+        if (spaceCalEventId && SPACE_CAL_ID) {
+          const spaceSummary = isOnline ? `${therapistFirstName}-Online` : therapistFirstName;
           await updateCalendarEvent(SPACE_CAL_ID, spaceCalEventId, {
-            summary: therapistFirstName,
+            summary: spaceSummary,
             startIso: data.scheduled_at,
             durationMinutes: duration,
           });
