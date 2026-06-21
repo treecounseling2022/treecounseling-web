@@ -35,7 +35,7 @@ type Appointment = {
   rooms: { id: string; name: string; color: string } | null;
 };
 
-type Client = { id: string; full_name: string; phone: string | null; assigned_therapist_id: string | null };
+type Client = { id: string; full_name: string; phone: string | null; assigned_therapist_id: string | null; service_type: string | null; couple_partner_id: string | null };
 type Room = { id: string; name: string; color: string; is_active: boolean };
 type Therapist = { id: string; name: string; google_meet_link: string | null };
 type ServicePlan = { id: string; name: string; price_per_session: number; currency: string };
@@ -151,6 +151,11 @@ export default function AppointmentsPage() {
   const [err, setErr] = useState("");
   const [myRole, setMyRole] = useState<string | null>(null);
 
+  // 伴侶場次（新增預約 modal 用）
+  type NewCoupleInfo = { couple_partner_id: string | null; partner_name: string | null };
+  const [newCoupleInfo, setNewCoupleInfo] = useState<NewCoupleInfo | null>(null);
+  const [newCoupleSessionType, setNewCoupleSessionType] = useState<"joint" | "individual_a" | "individual_b" | "">("");
+
   // ─── Load ─────────────────────────────────────────────────
   const load = useCallback(async () => {
     const [apptRes, clientRes, roomRes, therapistRes, planRes, meRes] = await Promise.all([
@@ -170,6 +175,24 @@ export default function AppointmentsPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // 選個案後偵測是否為伴侶諮商，若是則取得對方姓名
+  useEffect(() => {
+    setNewCoupleInfo(null);
+    setNewCoupleSessionType("");
+    if (!newForm.client_id) return;
+    const found = clients.find((c) => c.id === newForm.client_id);
+    if (found?.service_type !== "couple") return;
+    setNewCoupleSessionType("joint");
+    if (!found.couple_partner_id) {
+      setNewCoupleInfo({ couple_partner_id: null, partner_name: null });
+      return;
+    }
+    fetch(`/api/admin/clients/${found.couple_partner_id}`)
+      .then((r) => r.json())
+      .then((pd) => setNewCoupleInfo({ couple_partner_id: found.couple_partner_id!, partner_name: pd?.full_name ?? null }))
+      .catch(() => setNewCoupleInfo({ couple_partner_id: found.couple_partner_id!, partner_name: null }));
+  }, [newForm.client_id, clients]);
 
   // ─── Derived lists ────────────────────────────────────────
   const isTherapist = myRole === "therapist";
@@ -225,11 +248,18 @@ export default function AppointmentsPage() {
       const scheduled_at = newForm.scheduled_date && newForm.scheduled_time
         ? new Date(`${newForm.scheduled_date}T${newForm.scheduled_time}:00+08:00`).toISOString()
         : null;
+
+      // 伴侶 individual_b：以另一方個案為主個案
+      const actualClientId =
+        newCoupleInfo && newCoupleSessionType === "individual_b" && newCoupleInfo.couple_partner_id
+          ? newCoupleInfo.couple_partner_id
+          : newForm.client_id;
+
       const res = await fetch("/api/admin/appointments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          client_id: newForm.client_id,
+          client_id: actualClientId,
           therapist_id: newForm.therapist_id || null,
           room_id: newForm.room_id || null,
           scheduled_at,
@@ -240,6 +270,11 @@ export default function AppointmentsPage() {
           meeting_link: newForm.is_online ? (newForm.meeting_link || null) : null,
           client_intake_notes: newForm.client_intake_notes || null,
           admin_notes: newForm.admin_notes || null,
+          couple_session_type: newCoupleSessionType || null,
+          couple_partner_client_id:
+            newCoupleSessionType === "joint" && newCoupleInfo?.couple_partner_id
+              ? newCoupleInfo.couple_partner_id
+              : null,
           ...(newForm.direct_entry ? { booking_status: "locked" } : {}),
         }),
       });
@@ -576,6 +611,33 @@ export default function AppointmentsPage() {
                     {clients.map((c) => <option key={c.id} value={c.id}>{c.full_name}{c.phone ? ` · ${c.phone}` : ""}</option>)}
                   </select>
                 </div>
+
+                {/* 伴侶場次類型（選到伴侶個案才顯示） */}
+                {newCoupleInfo && (
+                  <div className="space-y-2 p-3 bg-forest/5 border border-forest/15">
+                    <p className="font-sans text-[11px] text-forest font-medium">伴侶諮商場次類型</p>
+                    <div className="flex flex-wrap gap-4">
+                      {[
+                        { value: "joint",        label: "雙方同來（伴侶）" },
+                        { value: "individual_a", label: `個人（${clients.find((c) => c.id === newForm.client_id)?.full_name ?? "A 方"}）` },
+                        { value: "individual_b", label: `個人（${newCoupleInfo.partner_name ?? "B 方"}）` },
+                      ].map((opt) => (
+                        <label key={opt.value} className="flex items-center gap-2 cursor-pointer font-sans text-sm text-deep">
+                          <input
+                            type="radio"
+                            checked={newCoupleSessionType === opt.value}
+                            onChange={() => setNewCoupleSessionType(opt.value as typeof newCoupleSessionType)}
+                            className="w-4 h-4 border border-sand accent-forest"
+                          />
+                          {opt.label}
+                        </label>
+                      ))}
+                    </div>
+                    {newCoupleSessionType === "joint" && !newCoupleInfo.couple_partner_id && (
+                      <p className="font-sans text-[10px] text-amber-600">⚠ 尚未連結另一方個案，無法自動帶入雙方。請先在個案記錄中連結伴侶。</p>
+                    )}
+                  </div>
+                )}
 
                 <div>
                   <label className="font-sans text-[11px] text-muted block mb-1">心理師</label>
