@@ -24,7 +24,22 @@ type ClientData = {
   prior_sessions: number;
   service_type: string;
   couple_partner_id: string;
+  // 擴充欄位
+  native_language: string;
+  preferred_meeting_type: string;
+  has_psychiatry_history: boolean | null;
+  psychiatry_notes: string;
+  has_prior_counseling: boolean | null;
+  prior_counseling_notes: string;
+  presenting_concerns: string[];
+  city: string;
+  consent_signed_at: string;
 };
+
+const INDIVIDUAL_CONCERNS = [
+  "成癮問題", "自我探索", "家庭關係", "伴侶關係", "親子關係",
+  "工作壓力", "學業/生涯", "人際關係", "情緒困擾", "其他困擾",
+];
 
 const GENDER_OPTIONS = [
   { value: "", label: "（未填寫）" },
@@ -75,6 +90,15 @@ export default function ClientEditor({
     prior_sessions: (initialData as { prior_sessions?: number }).prior_sessions ?? 0,
     service_type: (initialData as { service_type?: string }).service_type ?? "individual",
     couple_partner_id: (initialData as { couple_partner_id?: string }).couple_partner_id ?? "",
+    native_language: (initialData as { native_language?: string }).native_language ?? "",
+    preferred_meeting_type: (initialData as { preferred_meeting_type?: string }).preferred_meeting_type ?? "",
+    has_psychiatry_history: (initialData as { has_psychiatry_history?: boolean | null }).has_psychiatry_history ?? null,
+    psychiatry_notes: (initialData as { psychiatry_notes?: string }).psychiatry_notes ?? "",
+    has_prior_counseling: (initialData as { has_prior_counseling?: boolean | null }).has_prior_counseling ?? null,
+    prior_counseling_notes: (initialData as { prior_counseling_notes?: string }).prior_counseling_notes ?? "",
+    presenting_concerns: (initialData as { presenting_concerns?: string[] }).presenting_concerns ?? [],
+    city: (initialData as { city?: string }).city ?? "",
+    consent_signed_at: (initialData as { consent_signed_at?: string }).consent_signed_at ?? "",
   });
 
   const [saving, setSaving] = useState(false);
@@ -120,6 +144,12 @@ export default function ClientEditor({
         assigned_therapist_id: form.assigned_therapist_id || null,
         dob: form.dob || null,
         gender: form.gender || null,
+        native_language: form.native_language || null,
+        preferred_meeting_type: form.preferred_meeting_type || null,
+        city: form.city.trim() || null,
+        consent_signed_at: form.consent_signed_at || null,
+        psychiatry_notes: form.has_psychiatry_history === true ? form.psychiatry_notes : null,
+        prior_counseling_notes: form.has_prior_counseling === true ? form.prior_counseling_notes : null,
       };
       const url = isNew ? "/api/admin/clients" : `/api/admin/clients/${initialData.id}`;
       const res = await fetch(url, {
@@ -352,6 +382,156 @@ export default function ClientEditor({
           </div>
         )}
       </div>
+
+      {/* 臨床背景 */}
+      {!readonly && (
+        <div className={sectionCls}>
+          <h2 className="font-serif text-deep text-base">臨床背景</h2>
+
+          {/* 主訴困擾 */}
+          <div>
+            <label className={labelCls}>主訴困擾類型（可多選）</label>
+            <div className="flex flex-wrap gap-2 mt-1">
+              {INDIVIDUAL_CONCERNS.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => {
+                    const next = form.presenting_concerns.includes(c)
+                      ? form.presenting_concerns.filter((x) => x !== c)
+                      : [...form.presenting_concerns, c];
+                    setField("presenting_concerns", next);
+                  }}
+                  className={`font-sans text-xs px-3 py-1 border transition-colors ${
+                    form.presenting_concerns.includes(c)
+                      ? "bg-forest/10 border-forest text-forest"
+                      : "border-sand/30 text-muted hover:border-sand/60"
+                  }`}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* 輔導語言 */}
+            <div>
+              <label className={labelCls}>輔導語言</label>
+              <select value={form.native_language} onChange={(e) => setField("native_language", e.target.value)} className={inputCls}>
+                <option value="">（未填寫）</option>
+                <option value="cantonese">粵語</option>
+                <option value="mandarin">普通話 / 國語</option>
+                <option value="english">英語</option>
+                <option value="other">其他</option>
+              </select>
+            </div>
+
+            {/* 偏好晤談方式 */}
+            <div>
+              <label className={labelCls}>偏好晤談方式</label>
+              <select value={form.preferred_meeting_type} onChange={(e) => setField("preferred_meeting_type", e.target.value)} className={inputCls}>
+                <option value="">（未填寫）</option>
+                <option value="face">面談</option>
+                <option value="online">線上</option>
+                <option value="both">面談或線上均可</option>
+              </select>
+            </div>
+          </div>
+
+          {/* 精神科就診史 */}
+          <div>
+            <label className={labelCls}>曾有精神科就診經驗</label>
+            <div className="flex gap-6 mt-1">
+              {[{ val: true, label: "有" }, { val: false, label: "沒有" }].map((opt) => (
+                <label key={String(opt.val)} className="flex items-center gap-2 cursor-pointer font-sans text-sm text-muted">
+                  <input
+                    type="radio"
+                    checked={form.has_psychiatry_history === opt.val}
+                    onChange={() => setField("has_psychiatry_history", opt.val)}
+                    className="w-4 h-4 border border-sand accent-forest"
+                  />
+                  {opt.label}
+                </label>
+              ))}
+              <label className="flex items-center gap-2 cursor-pointer font-sans text-sm text-muted">
+                <input
+                  type="radio"
+                  checked={form.has_psychiatry_history === null}
+                  onChange={() => setField("has_psychiatry_history", null)}
+                  className="w-4 h-4 border border-sand accent-forest"
+                />
+                未知
+              </label>
+            </div>
+          </div>
+          {form.has_psychiatry_history === true && (
+            <div>
+              <label className={labelCls}>精神科就診詳情</label>
+              <textarea
+                value={form.psychiatry_notes}
+                onChange={(e) => setField("psychiatry_notes", e.target.value)}
+                rows={3}
+                className={inputCls + " resize-none"}
+                placeholder="就診時間、診斷、用藥情況…"
+              />
+            </div>
+          )}
+
+          {/* 過往輔導/諮商經歷 */}
+          <div>
+            <label className={labelCls}>曾有接受心理輔導或諮商經驗</label>
+            <div className="flex gap-6 mt-1">
+              {[{ val: true, label: "有" }, { val: false, label: "沒有" }].map((opt) => (
+                <label key={String(opt.val)} className="flex items-center gap-2 cursor-pointer font-sans text-sm text-muted">
+                  <input
+                    type="radio"
+                    checked={form.has_prior_counseling === opt.val}
+                    onChange={() => setField("has_prior_counseling", opt.val)}
+                    className="w-4 h-4 border border-sand accent-forest"
+                  />
+                  {opt.label}
+                </label>
+              ))}
+              <label className="flex items-center gap-2 cursor-pointer font-sans text-sm text-muted">
+                <input
+                  type="radio"
+                  checked={form.has_prior_counseling === null}
+                  onChange={() => setField("has_prior_counseling", null)}
+                  className="w-4 h-4 border border-sand accent-forest"
+                />
+                未知
+              </label>
+            </div>
+          </div>
+          {form.has_prior_counseling === true && (
+            <div>
+              <label className={labelCls}>過往輔導詳情</label>
+              <textarea
+                value={form.prior_counseling_notes}
+                onChange={(e) => setField("prior_counseling_notes", e.target.value)}
+                rows={3}
+                className={inputCls + " resize-none"}
+                placeholder="接受時間、持續多久、結束原因…"
+              />
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* 居住城市 */}
+            <div>
+              <label className={labelCls}>居住城市</label>
+              <input value={form.city} onChange={(e) => setField("city", e.target.value)} className={inputCls} placeholder="如：澳門" />
+            </div>
+
+            {/* 同意書簽署日期 */}
+            <div>
+              <label className={labelCls}>知情同意書簽署日期</label>
+              <input type="date" value={form.consent_signed_at} onChange={(e) => setField("consent_signed_at", e.target.value)} className={inputCls} />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 行政備註：僅管理員可見 */}
       {!readonly && (
