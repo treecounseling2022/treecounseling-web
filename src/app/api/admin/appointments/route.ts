@@ -242,11 +242,12 @@ export async function POST(req: NextRequest) {
     if (conflict) return NextResponse.json({ error: conflict }, { status: 409 });
   }
 
+  const autoStatus = body.therapist_id && body.scheduled_at ? "pending_therapist" : "pending_admin";
   const { data, error } = await db
     .from("appointments")
     .insert({
       ...body,
-      booking_status: "pending_admin",
+      booking_status: body.booking_status ?? autoStatus,
       session_type: body.session_type ?? autoSessionType,
     })
     .select()

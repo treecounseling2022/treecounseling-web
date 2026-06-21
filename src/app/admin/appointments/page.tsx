@@ -106,10 +106,25 @@ export default function AppointmentsPage() {
   // New appointment form
   const [newForm, setNewForm] = useState({
     client_id: "",
+    therapist_id: "",
+    room_id: "",
+    scheduled_date: new Date().toISOString().slice(0, 10),
+    scheduled_time: "",
     plan_id: "",
-    client_intake_notes: "",
+    session_fee: "",
     is_first_session: false,
+    is_online: false,
+    meeting_link: "",
+    use_custom_link: false,
+    client_intake_notes: "",
     admin_notes: "",
+  });
+  const resetNewForm = () => setNewForm({
+    client_id: "", therapist_id: "", room_id: "",
+    scheduled_date: new Date().toISOString().slice(0, 10), scheduled_time: "",
+    plan_id: "", session_fee: "", is_first_session: false,
+    is_online: false, meeting_link: "", use_custom_link: false,
+    client_intake_notes: "", admin_notes: "",
   });
 
   // Assign form
@@ -198,22 +213,35 @@ export default function AppointmentsPage() {
 
   async function createAppointment() {
     if (!newForm.client_id) { setErr("請選擇個案"); return; }
+    if (newForm.therapist_id && !newForm.scheduled_time) { setErr("已指派心理師，請選擇預約時間"); return; }
     setWorking(true);
     setErr("");
     try {
+      const scheduled_at = newForm.scheduled_date && newForm.scheduled_time
+        ? new Date(`${newForm.scheduled_date}T${newForm.scheduled_time}:00+08:00`).toISOString()
+        : null;
       const res = await fetch("/api/admin/appointments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...newForm,
+          client_id: newForm.client_id,
+          therapist_id: newForm.therapist_id || null,
+          room_id: newForm.room_id || null,
+          scheduled_at,
           plan_id: newForm.plan_id || null,
+          session_fee: newForm.session_fee ? parseFloat(newForm.session_fee) : null,
+          is_first_session: newForm.is_first_session,
+          is_online: newForm.is_online,
+          meeting_link: newForm.is_online ? (newForm.meeting_link || null) : null,
+          client_intake_notes: newForm.client_intake_notes || null,
+          admin_notes: newForm.admin_notes || null,
         }),
       });
       const json = await res.json();
       if (!res.ok) { setErr(json.error ?? "發生錯誤"); return; }
       await load();
       setNewModal(false);
-      setNewForm({ client_id: "", plan_id: "", client_intake_notes: "", is_first_session: false, admin_notes: "" });
+      resetNewForm();
     } finally {
       setWorking(false);
     }
@@ -486,76 +514,143 @@ export default function AppointmentsPage() {
 
       {/* ── New Appointment Modal ── */}
       {newModal && (
-        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50 p-4" onClick={() => setNewModal(false)}>
-          <div className="bg-white p-6 w-full max-w-md space-y-4 shadow-sm" onClick={(e) => e.stopPropagation()}>
-            <h2 className="font-serif text-deep text-lg">新增預約申請</h2>
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50 p-4" onClick={() => { setNewModal(false); setErr(""); resetNewForm(); }}>
+          <div className="bg-white w-full max-w-md shadow-sm overflow-y-auto max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6 space-y-4">
+              <h2 className="font-serif text-deep text-lg">新增預約</h2>
 
-            <div className="space-y-3">
-              <div>
-                <label className="font-sans text-[11px] text-muted block mb-1">個案 *</label>
-                <select
-                  value={newForm.client_id}
-                  onChange={(e) => setNewForm((f) => ({ ...f, client_id: e.target.value }))}
-                  className={inputCls}
-                >
-                  <option value="">請選擇個案…</option>
-                  {clients.map((c) => <option key={c.id} value={c.id}>{c.full_name}{c.phone ? ` · ${c.phone}` : ""}</option>)}
-                </select>
+              <div className="space-y-3">
+                <div>
+                  <label className="font-sans text-[11px] text-muted block mb-1">個案 *</label>
+                  <select value={newForm.client_id} onChange={(e) => setNewForm((f) => ({ ...f, client_id: e.target.value }))} className={inputCls}>
+                    <option value="">請選擇個案…</option>
+                    {clients.map((c) => <option key={c.id} value={c.id}>{c.full_name}{c.phone ? ` · ${c.phone}` : ""}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="font-sans text-[11px] text-muted block mb-1">心理師</label>
+                  <select
+                    value={newForm.therapist_id}
+                    onChange={(e) => setNewForm((f) => ({
+                      ...f,
+                      therapist_id: e.target.value,
+                      ...(f.is_online && !f.use_custom_link ? { meeting_link: getTherapistMeetLink(e.target.value) } : {}),
+                    }))}
+                    className={inputCls}
+                  >
+                    <option value="">（尚未指派）</option>
+                    {therapists.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="font-sans text-[11px] text-muted block mb-1">日期</label>
+                    <input type="date" value={newForm.scheduled_date} onChange={(e) => setNewForm((f) => ({ ...f, scheduled_date: e.target.value }))} className={inputCls} />
+                  </div>
+                  <div>
+                    <label className="font-sans text-[11px] text-muted block mb-1">時間</label>
+                    <input type="time" value={newForm.scheduled_time} onChange={(e) => setNewForm((f) => ({ ...f, scheduled_time: e.target.value }))} className={inputCls} />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="font-sans text-[11px] text-muted block mb-1">諮商室</label>
+                  <select value={newForm.room_id} onChange={(e) => setNewForm((f) => ({ ...f, room_id: e.target.value }))} className={inputCls}>
+                    <option value="">（未指定）</option>
+                    {rooms.filter((r) => r.is_active).map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="font-sans text-[11px] text-muted block mb-1">服務方案</label>
+                  <select value={newForm.plan_id} onChange={(e) => setNewForm((f) => ({ ...f, plan_id: e.target.value }))} className={inputCls}>
+                    <option value="">（未指定）</option>
+                    {plans.map((p) => <option key={p.id} value={p.id}>{p.name} — {p.price_per_session} {p.currency}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="font-sans text-[11px] text-muted block mb-1">費用</label>
+                  <input type="number" value={newForm.session_fee} onChange={(e) => setNewForm((f) => ({ ...f, session_fee: e.target.value }))} placeholder="0" min="0" step="0.5" className={inputCls} />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={newForm.is_online}
+                      onChange={(e) => setNewForm((f) => ({
+                        ...f,
+                        is_online: e.target.checked,
+                        room_id: e.target.checked ? "" : f.room_id,
+                        meeting_link: e.target.checked ? getTherapistMeetLink(f.therapist_id) : "",
+                        use_custom_link: false,
+                      }))}
+                      className="accent-forest w-4 h-4"
+                    />
+                    <span className="font-sans text-sm text-deep">線上諮商</span>
+                  </label>
+
+                  {newForm.is_online && (
+                    <div className="pl-6 border-l-2 border-forest/20 space-y-2">
+                      {!newForm.use_custom_link ? (
+                        <div>
+                          <p className="font-sans text-[11px] text-muted mb-1">視訊連結（Google Meet）</p>
+                          {newForm.meeting_link ? (
+                            <p className="font-sans text-[11px] text-forest/80 bg-sand/10 px-3 py-2 break-all">{newForm.meeting_link}</p>
+                          ) : (
+                            <p className="font-sans text-[11px] text-amber-600 bg-amber-50 px-3 py-2">⚠ 請先指派心理師，或勾選下方改用其他連結。</p>
+                          )}
+                        </div>
+                      ) : (
+                        <div>
+                          <label className="font-sans text-[11px] text-muted block mb-1">視訊連結（請貼上）</label>
+                          <input value={newForm.meeting_link} onChange={(e) => setNewForm((f) => ({ ...f, meeting_link: e.target.value }))} placeholder="https://..." className={inputCls} />
+                        </div>
+                      )}
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={newForm.use_custom_link}
+                          onChange={(e) => setNewForm((f) => ({
+                            ...f,
+                            use_custom_link: e.target.checked,
+                            meeting_link: e.target.checked ? "" : getTherapistMeetLink(f.therapist_id),
+                          }))}
+                          className="w-3 h-3 accent-amber-600"
+                        />
+                        <span className="font-sans text-[11px] text-muted/70">不使用 Google Meet，改用其他連結</span>
+                      </label>
+                    </div>
+                  )}
+                </div>
+
+                <div className="border-t border-sand/10 pt-3 space-y-3">
+                  <label className="flex items-center gap-2 font-sans text-sm text-muted cursor-pointer">
+                    <input type="checkbox" checked={newForm.is_first_session} onChange={(e) => setNewForm((f) => ({ ...f, is_first_session: e.target.checked }))} className="accent-forest" />
+                    首次晤談
+                  </label>
+                  <div>
+                    <label className="font-sans text-[11px] text-muted block mb-1">個案說明 / 求助原因</label>
+                    <textarea value={newForm.client_intake_notes} onChange={(e) => setNewForm((f) => ({ ...f, client_intake_notes: e.target.value }))} rows={2} className={inputCls + " resize-none"} placeholder="個案背景說明…" />
+                  </div>
+                  <div>
+                    <label className="font-sans text-[11px] text-muted block mb-1">行政備註</label>
+                    <input value={newForm.admin_notes} onChange={(e) => setNewForm((f) => ({ ...f, admin_notes: e.target.value }))} className={inputCls} placeholder="內部備註…" />
+                  </div>
+                </div>
               </div>
 
-              <div>
-                <label className="font-sans text-[11px] text-muted block mb-1">服務方案</label>
-                <select
-                  value={newForm.plan_id}
-                  onChange={(e) => setNewForm((f) => ({ ...f, plan_id: e.target.value }))}
-                  className={inputCls}
-                >
-                  <option value="">（未指定）</option>
-                  {plans.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name} — {p.price_per_session} {p.currency}</option>
-                  ))}
-                </select>
+              {err && <p className="font-sans text-xs text-red-500">{err}</p>}
+
+              <div className="flex gap-2 pt-2">
+                <button onClick={() => { setNewModal(false); setErr(""); resetNewForm(); }} className="flex-1 font-sans text-xs py-2 border border-sand/30 text-muted hover:bg-sand/10 transition-colors">取消</button>
+                <button onClick={createAppointment} disabled={working} className="flex-1 font-sans text-xs py-2 bg-deep text-paper hover:bg-forest disabled:opacity-40 transition-colors">
+                  {working ? "建立中…" : "建立預約"}
+                </button>
               </div>
-
-              <div>
-                <label className="font-sans text-[11px] text-muted block mb-1">個案說明 / 求助原因</label>
-                <textarea
-                  value={newForm.client_intake_notes}
-                  onChange={(e) => setNewForm((f) => ({ ...f, client_intake_notes: e.target.value }))}
-                  rows={3}
-                  className={inputCls + " resize-none"}
-                  placeholder="個案填寫的背景說明…"
-                />
-              </div>
-
-              <label className="flex items-center gap-2 font-sans text-sm text-muted cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={newForm.is_first_session}
-                  onChange={(e) => setNewForm((f) => ({ ...f, is_first_session: e.target.checked }))}
-                  className="accent-forest"
-                />
-                首次晤談
-              </label>
-
-              <div>
-                <label className="font-sans text-[11px] text-muted block mb-1">行政備註</label>
-                <input
-                  value={newForm.admin_notes}
-                  onChange={(e) => setNewForm((f) => ({ ...f, admin_notes: e.target.value }))}
-                  className={inputCls}
-                  placeholder="內部備註…"
-                />
-              </div>
-            </div>
-
-            {err && <p className="font-sans text-xs text-red-500">{err}</p>}
-
-            <div className="flex gap-2 pt-2">
-              <button onClick={() => setNewModal(false)} className="flex-1 font-sans text-xs py-2 border border-sand/30 text-muted hover:bg-sand/10 transition-colors">取消</button>
-              <button onClick={createAppointment} disabled={working} className="flex-1 font-sans text-xs py-2 bg-deep text-paper hover:bg-forest disabled:opacity-40 transition-colors">
-                {working ? "建立中…" : "建立預約"}
-              </button>
             </div>
           </div>
         </div>
