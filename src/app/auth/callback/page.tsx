@@ -11,8 +11,10 @@ export default function AuthCallbackPage() {
     const supabase = createClient();
 
     async function handleCallback() {
-      // Invite links use implicit flow: token is in URL hash (#access_token=...)
-      // Hash is never sent to the server, so this must run client-side
+      const searchParams = new URLSearchParams(window.location.search);
+      const nextParam = searchParams.get("next");
+
+      // Invite / recovery links (implicit flow): token is in URL hash
       const hash = window.location.hash;
       if (hash) {
         const params = new URLSearchParams(hash.slice(1));
@@ -28,20 +30,26 @@ export default function AuthCallbackPage() {
             router.replace("/admin/login?error=auth_failed");
             return;
           }
-          // Invite links require the user to set a password before entering
-          if (params.get("type") === "invite") {
+          // Invite and recovery types both need the user to set a password
+          const type = params.get("type");
+          if (type === "invite" || type === "recovery") {
             router.replace("/auth/set-password");
             return;
           }
         }
       }
 
-      // Magic links / social login use PKCE: code is in ?code= query param
-      const code = new URLSearchParams(window.location.search).get("code");
+      // PKCE flow: code is in ?code= query param
+      const code = searchParams.get("code");
       if (code) {
         const { error } = await supabase.auth.exchangeCodeForSession(code);
         if (error) {
           router.replace("/admin/login?error=auth_failed");
+          return;
+        }
+        // If caller passed ?next= (e.g. invite or password reset), honour it
+        if (nextParam) {
+          router.replace(nextParam);
           return;
         }
       }

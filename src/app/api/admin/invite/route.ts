@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
     email.trim(),
     {
       data: { role: inviteRole },
-      redirectTo: `${siteUrl}/auth/callback`,
+      redirectTo: `${siteUrl}/auth/callback?next=/auth/set-password`,
     }
   );
 
