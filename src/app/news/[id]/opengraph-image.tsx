@@ -8,9 +8,9 @@ export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
 function loadFonts() {
-  const base = path.join(process.cwd(), "node_modules/@fontsource/noto-sans-sc/files");
-  const chinese = fs.readFileSync(path.join(base, "noto-sans-sc-chinese-simplified-600-normal.woff2"));
-  const latin = fs.readFileSync(path.join(base, "noto-sans-sc-latin-600-normal.woff2"));
+  const base = path.join(process.cwd(), "public/fonts");
+  const chinese = fs.readFileSync(path.join(base, "noto-sc-chinese-600.woff2"));
+  const latin = fs.readFileSync(path.join(base, "noto-sc-latin-600.woff2"));
   return [
     { name: "Noto", data: Buffer.from(chinese), weight: 600 as const, style: "normal" as const },
     { name: "Noto", data: Buffer.from(latin), weight: 600 as const, style: "normal" as const },
