@@ -1,9 +1,16 @@
+import type { Metadata } from "next";
 import HomeHero from "@/components/sections/HomeHero";
 import HomeIntro from "@/components/sections/HomeIntro";
 import HomeServices from "@/components/sections/HomeServices";
 import HomeNews from "@/components/sections/HomeNews";
 import HomeCTA from "@/components/sections/HomeCTA";
 import { VibrantTreeCrown } from "@/components/ui/VibrantPlants";
+
+export const metadata: Metadata = {
+  title: "樹心理工作室｜專業心理輔導｜澳門",
+  description:
+    "澳門專業心理輔導私營機構，提供個人輔導、伴侶輔導、線上輔導及工作坊服務。立即預約，開始您的心理健康之旅。",
+};
 
 export default function HomePage() {
   return (
