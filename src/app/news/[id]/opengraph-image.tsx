@@ -5,16 +5,21 @@ export const dynamic = "force-dynamic";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
+const CDN = "https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-sc@5.2.9/files";
+
 async function loadFonts() {
-  const BASE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.treecounseling.com";
-  const [chinese, latin] = await Promise.all([
-    fetch(`${BASE}/fonts/noto-sc-chinese-600.woff2`).then((r) => r.arrayBuffer()),
-    fetch(`${BASE}/fonts/noto-sc-latin-600.woff2`).then((r) => r.arrayBuffer()),
-  ]);
-  return [
-    { name: "Noto", data: chinese, weight: 600 as const, style: "normal" as const },
-    { name: "Noto", data: latin, weight: 600 as const, style: "normal" as const },
-  ];
+  try {
+    const [chinese, latin] = await Promise.all([
+      fetch(`${CDN}/noto-sans-sc-chinese-simplified-600-normal.woff2`).then((r) => r.arrayBuffer()),
+      fetch(`${CDN}/noto-sans-sc-latin-600-normal.woff2`).then((r) => r.arrayBuffer()),
+    ]);
+    return [
+      { name: "Noto", data: chinese, weight: 600 as const, style: "normal" as const },
+      { name: "Noto", data: latin, weight: 600 as const, style: "normal" as const },
+    ];
+  } catch {
+    return null;
+  }
 }
 
 export default async function Image({ params }: { params: Promise<{ id: string }> }) {
@@ -36,7 +41,10 @@ export default async function Image({ params }: { params: Promise<{ id: string }
   const truncatedExcerpt = excerpt.length > 55 ? excerpt.slice(0, 55) + "…" : excerpt;
   const titleFontSize = title.length > 18 ? 44 : title.length > 12 ? 54 : 64;
 
-  const fonts = await loadFonts();
+  const fontList = await loadFonts();
+  const opts = fontList
+    ? { width: 1200, height: 630, fonts: fontList }
+    : { width: 1200, height: 630 };
 
   return new ImageResponse(
     (
@@ -107,6 +115,6 @@ export default async function Image({ params }: { params: Promise<{ id: string }
         </div>
       </div>
     ),
-    { ...size, fonts }
+    opts
   );
 }
