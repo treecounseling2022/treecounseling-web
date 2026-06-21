@@ -35,7 +35,7 @@ type Appointment = {
   rooms: { id: string; name: string; color: string } | null;
 };
 
-type Client = { id: string; full_name: string; phone: string | null };
+type Client = { id: string; full_name: string; phone: string | null; assigned_therapist_id: string | null };
 type Room = { id: string; name: string; color: string; is_active: boolean };
 type Therapist = { id: string; name: string; google_meet_link: string | null };
 type ServicePlan = { id: string; name: string; price_per_session: number; currency: string };
@@ -120,13 +120,14 @@ export default function AppointmentsPage() {
     use_custom_link: false,
     client_intake_notes: "",
     admin_notes: "",
+    direct_entry: false,
   });
   const resetNewForm = () => setNewForm({
     client_id: "", therapist_id: "", room_id: "",
     scheduled_date: new Date().toISOString().slice(0, 10), scheduled_time: "",
     plan_id: "", session_fee: "", is_first_session: false,
     is_online: false, meeting_link: "", use_custom_link: false,
-    client_intake_notes: "", admin_notes: "",
+    client_intake_notes: "", admin_notes: "", direct_entry: false,
   });
 
   // Assign form
@@ -215,7 +216,9 @@ export default function AppointmentsPage() {
 
   async function createAppointment() {
     if (!newForm.client_id) { setErr("請選擇個案"); return; }
-    if (newForm.therapist_id && !newForm.scheduled_time) { setErr("已指派心理師，請選擇預約時間"); return; }
+    if (newForm.direct_entry && !newForm.therapist_id) { setErr("補錄模式需指定心理師"); return; }
+    if (newForm.direct_entry && (!newForm.scheduled_date || !newForm.scheduled_time)) { setErr("補錄模式需填寫晤談日期與時間"); return; }
+    if (!newForm.direct_entry && newForm.therapist_id && !newForm.scheduled_time) { setErr("已指派心理師，請選擇預約時間"); return; }
     setWorking(true);
     setErr("");
     try {
@@ -237,6 +240,7 @@ export default function AppointmentsPage() {
           meeting_link: newForm.is_online ? (newForm.meeting_link || null) : null,
           client_intake_notes: newForm.client_intake_notes || null,
           admin_notes: newForm.admin_notes || null,
+          ...(newForm.direct_entry ? { booking_status: "locked" } : {}),
         }),
       });
       const json = await res.json();
@@ -551,7 +555,23 @@ export default function AppointmentsPage() {
               <div className="space-y-3">
                 <div>
                   <label className="font-sans text-[11px] text-muted block mb-1">個案 *</label>
-                  <select value={newForm.client_id} onChange={(e) => setNewForm((f) => ({ ...f, client_id: e.target.value }))} className={inputCls}>
+                  <select
+                    value={newForm.client_id}
+                    onChange={(e) => {
+                      const cid = e.target.value;
+                      const found = clients.find((c) => c.id === cid);
+                      const assignedTherapist = found?.assigned_therapist_id ?? "";
+                      setNewForm((f) => ({
+                        ...f,
+                        client_id: cid,
+                        therapist_id: assignedTherapist,
+                        ...(f.is_online && !f.use_custom_link && assignedTherapist
+                          ? { meeting_link: getTherapistMeetLink(assignedTherapist) }
+                          : {}),
+                      }));
+                    }}
+                    className={inputCls}
+                  >
                     <option value="">請選擇個案…</option>
                     {clients.map((c) => <option key={c.id} value={c.id}>{c.full_name}{c.phone ? ` · ${c.phone}` : ""}</option>)}
                   </select>
@@ -672,12 +692,30 @@ export default function AppointmentsPage() {
                 </div>
               </div>
 
+              {/* 補錄模式 */}
+              <div className={`p-3 border ${newForm.direct_entry ? "border-amber-300 bg-amber-50" : "border-sand/20 bg-sand/5"}`}>
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={newForm.direct_entry}
+                    onChange={(e) => setNewForm((f) => ({ ...f, direct_entry: e.target.checked }))}
+                    className="accent-amber-600 w-4 h-4"
+                  />
+                  <span className="font-sans text-sm text-deep font-medium">補錄模式（直接建立已鎖定晤談）</span>
+                </label>
+                {newForm.direct_entry && (
+                  <p className="font-sans text-[11px] text-amber-700 mt-1.5 leading-relaxed">
+                    適用於遷入紙本個案過往記錄。晤談將直接設為「已鎖定」狀態，心理師和時間為必填。
+                  </p>
+                )}
+              </div>
+
               {err && <p className="font-sans text-xs text-red-500">{err}</p>}
 
               <div className="flex gap-2 pt-2">
                 <button onClick={() => { setNewModal(false); setErr(""); resetNewForm(); }} className="flex-1 font-sans text-xs py-2 border border-sand/30 text-muted hover:bg-sand/10 transition-colors">取消</button>
-                <button onClick={createAppointment} disabled={working} className="flex-1 font-sans text-xs py-2 bg-deep text-paper hover:bg-forest disabled:opacity-40 transition-colors">
-                  {working ? "建立中…" : "建立預約"}
+                <button onClick={createAppointment} disabled={working} className={`flex-1 font-sans text-xs py-2 disabled:opacity-40 transition-colors ${newForm.direct_entry ? "bg-amber-600 text-white hover:bg-amber-700" : "bg-deep text-paper hover:bg-forest"}`}>
+                  {working ? "建立中…" : newForm.direct_entry ? "補錄晤談" : "建立預約"}
                 </button>
               </div>
             </div>
