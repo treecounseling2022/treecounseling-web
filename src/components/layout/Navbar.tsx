@@ -202,7 +202,7 @@ export default function Navbar() {
         {/* Mobile Hamburger */}
         <button
           onClick={() => setMenuOpen(!menuOpen)}
-          className={cn("md:hidden p-2 cursor-pointer", textColor)}
+          className={cn("md:hidden min-h-[44px] min-w-[44px] flex items-center justify-center cursor-pointer", textColor)}
           aria-label={menuOpen ? "關閉選單" : "開啟選單"}
           aria-expanded={menuOpen}
           aria-controls="mobile-nav-menu"
@@ -231,7 +231,7 @@ export default function Navbar() {
                     aria-expanded={teamOpen}
                     aria-controls="mobile-team-submenu"
                     className={cn(
-                      "flex items-center justify-between w-full text-sm font-sans transition-colors",
+                      "flex items-center justify-between w-full text-sm font-sans transition-colors py-2",
                       isTeamActive ? "text-sand" : "text-deep hover:text-sand"
                     )}
                   >
@@ -260,7 +260,7 @@ export default function Navbar() {
                       <li>
                         <Link
                           href="/team"
-                          className="block text-xs font-sans text-muted hover:text-forest transition-colors py-1"
+                          className="block text-xs font-sans text-muted hover:text-forest transition-colors py-2.5"
                         >
                           所有成員
                         </Link>
@@ -270,7 +270,7 @@ export default function Navbar() {
                           <Link
                             href={child.href}
                             className={cn(
-                              "block text-xs font-sans transition-colors py-1",
+                              "block text-xs font-sans transition-colors py-2.5",
                               pathname === child.href
                                 ? "text-forest"
                                 : "text-muted hover:text-forest"
@@ -292,7 +292,7 @@ export default function Navbar() {
                 <Link
                   href={link.href}
                   className={cn(
-                    "block text-sm font-sans text-deep transition-colors",
+                    "block text-sm font-sans text-deep transition-colors py-2",
                     pathname === link.href ? "text-sand" : "hover:text-sand"
                   )}
                 >
@@ -304,7 +304,7 @@ export default function Navbar() {
           <li className="pt-3 border-t border-sand/15">
             <Link
               href="/booking"
-              className="block text-center py-2 bg-forest hover:bg-deep text-paper text-xs font-sans tracking-widest transition-colors cursor-pointer"
+              className="block text-center py-3 bg-forest hover:bg-deep text-paper text-xs font-sans tracking-widest transition-colors cursor-pointer"
             >
               預約諮商輔導
             </Link>

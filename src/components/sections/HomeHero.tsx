@@ -94,7 +94,7 @@ export default function HomeHero() {
                 </svg>
                 <button
                   onClick={() => setHasScrolled(true)}
-                  className="mt-4 text-[11px] font-sans text-forest/50 hover:text-forest/80 border border-forest/20 hover:border-forest/40 px-3 py-1 transition-colors cursor-pointer"
+                  className="mt-4 min-h-[44px] px-5 inline-flex items-center text-[11px] font-sans text-forest/50 hover:text-forest/80 border border-forest/20 hover:border-forest/40 transition-colors cursor-pointer"
                 >
                   跳過動畫
                 </button>

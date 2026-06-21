@@ -1,0 +1,47 @@
+{
+  "name": "樹心理工作室",
+  "short_name": "樹心理",
+  "description": "澳門專業心理輔導機構，提供個人輔導、伴侶輔導及工作坊服務。",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f5f1ea",
+  "theme_color": "#3a4a3a",
+  "orientation": "portrait-primary",
+  "lang": "zh-Hant",
+  "scope": "/",
+  "categories": ["health", "lifestyle"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "預約諮商",
+      "short_name": "預約",
+      "url": "/booking",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "最新消息",
+      "short_name": "消息",
+      "url": "/news",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

@@ -27,6 +27,14 @@ const nextConfig: NextConfig = {
         source: "/(.*)",
         headers: securityHeaders,
       },
+      // Allow browser to cache SW with short TTL
+      {
+        source: "/sw.js",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=0, must-revalidate" },
+          { key: "Service-Worker-Allowed", value: "/" },
+        ],
+      },
     ];
   },
   async redirects() {
@@ -56,4 +64,3 @@ const nextConfig: NextConfig = {
 };
 
 export default nextConfig;
-

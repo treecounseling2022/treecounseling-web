@@ -46,7 +46,7 @@ export default function HomeIntro() {
                       <span className="font-garamond text-sand text-lg font-light">{v.num}</span>
                       <h3 className="font-serif text-deep text-lg">{v.title}</h3>
                     </div>
-                    <p className="font-sans text-muted text-xs leading-relaxed">{v.desc}</p>
+                    <p className="font-sans text-muted text-sm leading-relaxed">{v.desc}</p>
                   </div>
                 </div>
               </FadeIn>

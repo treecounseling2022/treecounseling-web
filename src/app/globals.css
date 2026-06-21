@@ -250,6 +250,11 @@
 .adm-urgent-stat       { color: #B45309; }
 [data-admin-theme="dark"] .adm-urgent-stat { color: #34D399; }
 
+/* Eliminate 300ms tap delay on mobile */
+button, a, [role="button"] {
+  touch-action: manipulation;
+}
+
 html {
   scroll-behavior: smooth;
 }

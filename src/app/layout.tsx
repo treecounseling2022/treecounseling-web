@@ -3,6 +3,7 @@ import { Noto_Serif_TC, Noto_Sans_TC, EB_Garamond } from "next/font/google";
 import "./globals.css";
 import PublicShell from "@/components/layout/PublicShell";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import PwaRegister from "@/components/PwaRegister";
 
 
 const notoSerifTC = Noto_Serif_TC({
@@ -35,6 +36,15 @@ export const metadata: Metadata = {
   description:
     "樹心理工作室成立於2022年，是澳門少有的專業心理輔導私營機構，提供個人輔導、伴侶輔導、線上輔導及工作坊服務。",
   keywords: ["心理輔導", "諮商", "澳門", "樹心理工作室", "心理健康"],
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "樹心理工作室",
+  },
+  other: {
+    "mobile-web-app-capable": "yes",
+  },
   openGraph: {
     siteName: "樹心理工作室",
     locale: "zh_TW",
@@ -53,6 +63,10 @@ export default function RootLayout({
       className={`${notoSerifTC.variable} ${notoSansTC.variable} ${ebGaramond.variable}`}
       suppressHydrationWarning
     >
+      <head>
+        <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+        <meta name="theme-color" content="#3a4a3a" />
+      </head>
       <body className="min-h-screen flex flex-col">
         <a
           href="#main-content"
@@ -60,6 +74,7 @@ export default function RootLayout({
         >
           跳至主要內容
         </a>
+        <PwaRegister />
         <ThemeProvider>
           <PublicShell>{children}</PublicShell>
         </ThemeProvider>
