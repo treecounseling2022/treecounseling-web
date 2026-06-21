@@ -255,20 +255,44 @@ export async function PATCH(
           : `${maskedName}-${sessionNumber}`;
 
         const therapistCalId = therapistRow?.google_calendar_id;
-        if (therapistCalEventId && therapistCalId) {
-          await updateCalendarEvent(therapistCalId, therapistCalEventId, {
-            summary: therapistSummary,
-            startIso: data.scheduled_at,
-            durationMinutes: duration,
-          });
+        let newTherapistEventId: string | null = null;
+        if (therapistCalId) {
+          if (therapistCalEventId) {
+            await updateCalendarEvent(therapistCalId, therapistCalEventId, {
+              summary: therapistSummary,
+              startIso: data.scheduled_at,
+              durationMinutes: duration,
+            });
+          } else {
+            newTherapistEventId = await createCalendarEvent(therapistCalId, {
+              summary: therapistSummary,
+              startIso: data.scheduled_at,
+              durationMinutes: duration,
+            });
+          }
         }
-        if (spaceCalEventId && SPACE_CAL_ID) {
+        let newSpaceEventId: string | null = null;
+        if (SPACE_CAL_ID) {
           const spaceSummary = isOnline ? `${therapistFirstName}-Online` : therapistFirstName;
-          await updateCalendarEvent(SPACE_CAL_ID, spaceCalEventId, {
-            summary: spaceSummary,
-            startIso: data.scheduled_at,
-            durationMinutes: duration,
-          });
+          if (spaceCalEventId) {
+            await updateCalendarEvent(SPACE_CAL_ID, spaceCalEventId, {
+              summary: spaceSummary,
+              startIso: data.scheduled_at,
+              durationMinutes: duration,
+            });
+          } else {
+            newSpaceEventId = await createCalendarEvent(SPACE_CAL_ID, {
+              summary: spaceSummary,
+              startIso: data.scheduled_at,
+              durationMinutes: duration,
+            });
+          }
+        }
+        if (newTherapistEventId || newSpaceEventId) {
+          await db.from("appointments").update({
+            ...(newTherapistEventId ? { therapist_calendar_event_id: newTherapistEventId } : {}),
+            ...(newSpaceEventId ? { space_calendar_event_id: newSpaceEventId } : {}),
+          }).eq("id", id);
         }
       } catch (err) {
         console.error("Calendar sync (reschedule) failed:", err);
