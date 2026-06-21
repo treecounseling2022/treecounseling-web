@@ -36,7 +36,14 @@ type ClientData = {
   presenting_concerns: PresentingConcern[];
   city: string;
   consent_signed_at: string;
+  relationship_duration: string;
+  children_info: string;
 };
+
+const COUPLE_CONCERNS = [
+  "外遇", "管教子女", "經濟議題", "溝通不良",
+  "婆媳關係", "婚前輔導", "親密議題", "生育議題", "其他",
+];
 
 const INDIVIDUAL_CONCERNS = [
   {
@@ -226,6 +233,8 @@ export default function ClientEditor({
     presenting_concerns: (initialData as { presenting_concerns?: PresentingConcern[] }).presenting_concerns ?? [],
     city: (initialData as { city?: string }).city ?? "",
     consent_signed_at: (initialData as { consent_signed_at?: string }).consent_signed_at ?? "",
+    relationship_duration: (initialData as { relationship_duration?: string }).relationship_duration ?? "",
+    children_info: (initialData as { children_info?: string }).children_info ?? "",
   });
 
   const [saving, setSaving] = useState(false);
@@ -269,6 +278,7 @@ export default function ClientEditor({
         ...form,
         client_code: form.client_code.trim() || null,
         assigned_therapist_id: form.assigned_therapist_id || null,
+        couple_partner_id: form.couple_partner_id || null,
         dob: form.dob || null,
         gender: form.gender || null,
         native_language: form.native_language || null,
@@ -515,71 +525,123 @@ export default function ClientEditor({
         <div className={sectionCls}>
           <h2 className="font-serif text-deep text-base">臨床背景</h2>
 
-          {/* 主訴困擾 */}
-          <div className="space-y-3">
-            <label className={labelCls}>主訴困擾類型（可多選）</label>
-            {/* 主類別 */}
-            <div className="flex flex-wrap gap-2">
-              {INDIVIDUAL_CONCERNS.map((c) => {
-                const selected = form.presenting_concerns.some((pc) => pc.category === c.label);
+          {/* 主訴困擾 — 根據服務類型顯示不同清單 */}
+          {form.service_type === "couple" ? (
+            <div className="space-y-2">
+              <label className={labelCls}>伴侶輔導困擾（可多選）</label>
+              <div className="flex flex-wrap gap-2">
+                {COUPLE_CONCERNS.map((c) => {
+                  const selected = form.presenting_concerns.some((pc) => pc.category === c);
+                  return (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => {
+                        if (selected) {
+                          setField("presenting_concerns", form.presenting_concerns.filter((pc) => pc.category !== c));
+                        } else {
+                          setField("presenting_concerns", [...form.presenting_concerns, { category: c, items: [] }]);
+                        }
+                      }}
+                      className={`font-sans text-xs px-3 py-1 border transition-colors ${
+                        selected
+                          ? "bg-forest/10 border-forest text-forest"
+                          : "border-sand/30 text-muted hover:border-sand/60"
+                      }`}
+                    >
+                      {c}
+                    </button>
+                  );
+                })}
+              </div>
+              {/* 伴侶專屬欄位 */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                <div>
+                  <label className={labelCls}>關係時長</label>
+                  <input
+                    value={form.relationship_duration}
+                    onChange={(e) => setField("relationship_duration", e.target.value)}
+                    className={inputCls}
+                    placeholder="如：交往兩年、結婚五年"
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>子女資訊</label>
+                  <input
+                    value={form.children_info}
+                    onChange={(e) => setField("children_info", e.target.value)}
+                    className={inputCls}
+                    placeholder="如：一子一女（8歲、5歲）"
+                  />
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <label className={labelCls}>主訴困擾類型（可多選）</label>
+              {/* 主類別 */}
+              <div className="flex flex-wrap gap-2">
+                {INDIVIDUAL_CONCERNS.map((c) => {
+                  const selected = form.presenting_concerns.some((pc) => pc.category === c.label);
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => {
+                        if (selected) {
+                          setField("presenting_concerns", form.presenting_concerns.filter((pc) => pc.category !== c.label));
+                        } else {
+                          setField("presenting_concerns", [...form.presenting_concerns, { category: c.label, items: [] }]);
+                        }
+                      }}
+                      className={`font-sans text-xs px-3 py-1 border transition-colors ${
+                        selected
+                          ? "bg-forest/10 border-forest text-forest"
+                          : "border-sand/30 text-muted hover:border-sand/60"
+                      }`}
+                    >
+                      {c.label}
+                    </button>
+                  );
+                })}
+              </div>
+              {/* 已選主類別的細項 */}
+              {INDIVIDUAL_CONCERNS.filter((c) => form.presenting_concerns.some((pc) => pc.category === c.label) && c.items.length > 0).map((c) => {
+                const entry = form.presenting_concerns.find((pc) => pc.category === c.label)!;
                 return (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => {
-                      if (selected) {
-                        setField("presenting_concerns", form.presenting_concerns.filter((pc) => pc.category !== c.label));
-                      } else {
-                        setField("presenting_concerns", [...form.presenting_concerns, { category: c.label, items: [] }]);
-                      }
-                    }}
-                    className={`font-sans text-xs px-3 py-1 border transition-colors ${
-                      selected
-                        ? "bg-forest/10 border-forest text-forest"
-                        : "border-sand/30 text-muted hover:border-sand/60"
-                    }`}
-                  >
-                    {c.label}
-                  </button>
+                  <div key={c.id} className="pl-3 border-l-2 border-forest/30 space-y-1.5">
+                    <p className="font-sans text-[11px] text-forest font-medium">{c.label} — 細項</p>
+                    <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+                      {c.items.map((item) => {
+                        const checked = entry.items.includes(item);
+                        return (
+                          <label key={item} className="flex items-center gap-1.5 cursor-pointer font-sans text-xs text-muted">
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => {
+                                const newItems = checked
+                                  ? entry.items.filter((i) => i !== item)
+                                  : [...entry.items, item];
+                                setField(
+                                  "presenting_concerns",
+                                  form.presenting_concerns.map((pc) =>
+                                    pc.category === c.label ? { ...pc, items: newItems } : pc
+                                  )
+                                );
+                              }}
+                              className="w-3.5 h-3.5 border border-sand accent-forest"
+                            />
+                            {item}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
                 );
               })}
             </div>
-            {/* 已選主類別的細項 */}
-            {INDIVIDUAL_CONCERNS.filter((c) => form.presenting_concerns.some((pc) => pc.category === c.label) && c.items.length > 0).map((c) => {
-              const entry = form.presenting_concerns.find((pc) => pc.category === c.label)!;
-              return (
-                <div key={c.id} className="pl-3 border-l-2 border-forest/30 space-y-1.5">
-                  <p className="font-sans text-[11px] text-forest font-medium">{c.label} — 細項</p>
-                  <div className="flex flex-wrap gap-2">
-                    {c.items.map((item) => {
-                      const checked = entry.items.includes(item);
-                      return (
-                        <label key={item} className="flex items-center gap-1.5 cursor-pointer font-sans text-xs text-muted">
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() => {
-                              const newItems = checked
-                                ? entry.items.filter((i) => i !== item)
-                                : [...entry.items, item];
-                              setField(
-                                "presenting_concerns",
-                                form.presenting_concerns.map((pc) =>
-                                  pc.category === c.label ? { ...pc, items: newItems } : pc
-                                )
-                              );
-                            }}
-                            className="w-3.5 h-3.5 border border-sand accent-forest"
-                          />
-                          {item}
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* 輔導語言 */}
