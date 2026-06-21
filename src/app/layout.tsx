@@ -28,7 +28,7 @@ const ebGaramond = EB_Garamond({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://treecounseling.com"),
+  metadataBase: new URL("https://www.treecounseling.com"),
   title: {
     default: "樹心理工作室｜專業心理輔導｜澳門",
     template: "%s｜樹心理工作室",
