@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 
 type Therapist = { id: string; name: string };
@@ -242,6 +242,55 @@ export default function ClientEditor({
   const [err, setErr] = useState("");
   const [saved, setSaved] = useState(false);
 
+  // 伴侶搜尋
+  const [partnerSearch, setPartnerSearch] = useState("");
+  const [partnerResults, setPartnerResults] = useState<{ id: string; full_name: string; client_code: string | null }[]>([]);
+  const [partnerSearching, setPartnerSearching] = useState(false);
+  const [partnerName, setPartnerName] = useState("");
+  const partnerSearchRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 初始化時若已有 couple_partner_id，查詢對方姓名
+  useEffect(() => {
+    if (!form.couple_partner_id) return;
+    fetch(`/api/admin/clients/${form.couple_partner_id}`)
+      .then((r) => r.json())
+      .then((d) => { if (d?.full_name) setPartnerName(d.full_name); })
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function handlePartnerSearchChange(q: string) {
+    setPartnerSearch(q);
+    if (partnerSearchRef.current) clearTimeout(partnerSearchRef.current);
+    if (!q.trim()) { setPartnerResults([]); return; }
+    partnerSearchRef.current = setTimeout(async () => {
+      setPartnerSearching(true);
+      try {
+        const res = await fetch(`/api/admin/clients?q=${encodeURIComponent(q)}`);
+        const data = await res.json();
+        setPartnerResults(
+          (data as { id: string; full_name: string; client_code: string | null }[])
+            .filter((c) => c.id !== initialData.id)
+            .slice(0, 6)
+        );
+      } finally {
+        setPartnerSearching(false);
+      }
+    }, 300);
+  }
+
+  function selectPartner(client: { id: string; full_name: string; client_code: string | null }) {
+    setField("couple_partner_id", client.id);
+    setPartnerName(client.full_name);
+    setPartnerSearch("");
+    setPartnerResults([]);
+  }
+
+  function clearPartner() {
+    setField("couple_partner_id", "");
+    setPartnerName("");
+  }
+
   async function generateCode() {
     setGenerating(true);
     try {
@@ -392,6 +441,90 @@ export default function ClientEditor({
 
   return (
     <div className="space-y-6">
+      {/* ── 服務類型（最優先選擇）── */}
+      <div className="space-y-3 p-4 bg-soft/40 border border-sand/20">
+        <h2 className="font-serif text-deep text-base">服務類型</h2>
+        <div className="flex flex-wrap gap-3">
+          {[
+            { value: "individual", label: "個人諮商" },
+            { value: "couple", label: "伴侶諮商" },
+            { value: "hoarding", label: "囤積症諮商" },
+            { value: "other", label: "其他" },
+          ].map((opt) => (
+            <label key={opt.value} className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="service_type"
+                value={opt.value}
+                checked={form.service_type === opt.value}
+                onChange={() => {
+                  setField("service_type", opt.value);
+                  setField("presenting_concerns", []);
+                }}
+                className="w-4 h-4 border border-sand accent-forest"
+              />
+              <span className="font-sans text-sm text-deep">{opt.label}</span>
+            </label>
+          ))}
+        </div>
+
+        {/* 伴侶連結（僅伴侶諮商顯示）*/}
+        {form.service_type === "couple" && (
+          <div className="pt-3 border-t border-sand/15 space-y-2">
+            <p className={labelCls}>連結另一方伴侶個案</p>
+            {form.couple_partner_id ? (
+              <div className="flex items-center gap-3">
+                <span className="font-sans text-sm text-deep bg-forest/10 border border-forest/20 px-3 py-1.5">
+                  {partnerName || form.couple_partner_id}
+                </span>
+                <button
+                  type="button"
+                  onClick={clearPartner}
+                  className="font-sans text-xs text-red-400 hover:text-red-600 transition-colors"
+                >
+                  取消連結
+                </button>
+              </div>
+            ) : (
+              <div className="relative max-w-sm">
+                <input
+                  value={partnerSearch}
+                  onChange={(e) => handlePartnerSearchChange(e.target.value)}
+                  className={inputCls}
+                  placeholder="輸入姓名搜尋個案…"
+                />
+                {partnerSearching && (
+                  <p className="font-sans text-xs text-muted px-1 pt-1">搜尋中…</p>
+                )}
+                {partnerResults.length > 0 && (
+                  <div className="absolute z-10 top-full left-0 right-0 bg-paper border border-sand/30 shadow-sm">
+                    {partnerResults.map((c) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => selectPartner(c)}
+                        className="w-full text-left px-3 py-2 font-sans text-sm text-deep hover:bg-soft transition-colors border-b border-sand/10 last:border-0"
+                      >
+                        {c.full_name}
+                        {c.client_code && (
+                          <span className="ml-2 text-xs text-muted font-mono">{c.client_code}</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {partnerSearch && !partnerSearching && partnerResults.length === 0 && (
+                  <p className="font-sans text-xs text-muted/60 px-1 pt-1">找不到符合的個案</p>
+                )}
+              </div>
+            )}
+            <p className="font-sans text-[10px] text-muted/50">
+              連結後雙方各自保有獨立記錄，僅互相關聯。若對方記錄尚未建立，可稍後再連結。
+            </p>
+          </div>
+        )}
+      </div>
+
       {/* 基本資料 */}
       <div className="space-y-4">
         <h2 className="font-serif text-deep text-base">基本資料</h2>
@@ -468,17 +601,6 @@ export default function ClientEditor({
       {/* 派案資訊 */}
       <div className={sectionCls}>
         <h2 className="font-serif text-deep text-base">派案資訊</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className={labelCls}>服務類型</label>
-            <select value={form.service_type} onChange={(e) => setField("service_type", e.target.value)} className={inputCls} disabled={readonly}>
-              <option value="individual">個人諮商</option>
-              <option value="couple">伴侶諮商</option>
-              <option value="hoarding">囤積症諮商</option>
-              <option value="other">其他</option>
-            </select>
-          </div>
-        </div>
         <div>
           <label className={labelCls}>負責心理師</label>
           <select value={form.assigned_therapist_id} onChange={(e) => setField("assigned_therapist_id", e.target.value)} className={inputCls} disabled={readonly}>
