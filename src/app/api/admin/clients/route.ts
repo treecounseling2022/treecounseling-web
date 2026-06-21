@@ -49,6 +49,7 @@ export async function POST(req: NextRequest) {
     if (body.presenting_concerns !== undefined) sharedFields.presenting_concerns = body.presenting_concerns;
     if (body.relationship_duration !== undefined) sharedFields.relationship_duration = body.relationship_duration;
     if (body.children_info !== undefined) sharedFields.children_info = body.children_info;
+    if (body.intake_notes !== undefined) sharedFields.intake_notes = body.intake_notes;
     await db.from("clients").update(sharedFields).eq("id", partnerId);
   }
 

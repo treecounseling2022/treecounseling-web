@@ -612,17 +612,19 @@ export default function ClientEditor({
           <label className={labelCls}>轉介來源</label>
           <input value={form.referral_source} onChange={(e) => setField("referral_source", e.target.value)} className={inputCls} placeholder="例：朋友介紹、網路搜尋" disabled={readonly} />
         </div>
-        <div>
-          <label className={labelCls}>初次申請說明（個案填寫）</label>
-          <textarea
-            value={form.intake_notes}
-            onChange={(e) => setField("intake_notes", e.target.value)}
-            rows={4}
-            className={inputCls + " resize-none"}
-            placeholder="個案提供的背景資訊…"
-            disabled={readonly}
-          />
-        </div>
+        {form.service_type !== "couple" && (
+          <div>
+            <label className={labelCls}>初次申請說明（個案填寫）</label>
+            <textarea
+              value={form.intake_notes}
+              onChange={(e) => setField("intake_notes", e.target.value)}
+              rows={4}
+              className={inputCls + " resize-none"}
+              placeholder="個案提供的背景資訊…"
+              disabled={readonly}
+            />
+          </div>
+        )}
         {!readonly && (
           <div>
             <label className={labelCls}>舊系統已完成諮商次數</label>
@@ -683,8 +685,19 @@ export default function ClientEditor({
                   );
                 })}
               </div>
+              {/* 主訴說明 */}
+              <div>
+                <label className={labelCls}>主訴說明（共同）</label>
+                <textarea
+                  value={form.intake_notes}
+                  onChange={(e) => setField("intake_notes", e.target.value)}
+                  rows={4}
+                  className={inputCls + " resize-none"}
+                  placeholder="描述伴侶目前遇到的主要困擾與狀況…"
+                />
+              </div>
               {/* 伴侶專屬欄位 */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className={labelCls}>關係時長</label>
                   <input

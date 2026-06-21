@@ -100,6 +100,7 @@ export async function PATCH(
     if ("presenting_concerns" in rest) sharedFields.presenting_concerns = rest.presenting_concerns;
     if ("relationship_duration" in rest) sharedFields.relationship_duration = rest.relationship_duration;
     if ("children_info" in rest) sharedFields.children_info = rest.children_info;
+    if ("intake_notes" in rest) sharedFields.intake_notes = rest.intake_notes;
     if (Object.keys(sharedFields).length > 0) {
       await db.from("clients").update(sharedFields).eq("id", partnerId);
     }
