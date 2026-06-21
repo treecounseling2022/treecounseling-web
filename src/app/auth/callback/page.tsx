@@ -42,12 +42,37 @@ export default function AuthCallbackPage() {
       // PKCE flow: code is in ?code= query param
       const code = searchParams.get("code");
       if (code) {
-        const { error } = await supabase.auth.exchangeCodeForSession(code);
-        if (error) {
+        // Detect PASSWORD_RECOVERY via auth event (more reliable than ?next=,
+        // which Supabase may strip when validating redirectTo against allowed URLs).
+        const detectedEvent = await new Promise<string>((resolve) => {
+          const { data: { subscription } } = supabase.auth.onAuthStateChange(
+            (event) => {
+              // INITIAL_SESSION fires immediately on subscribe — skip it.
+              if (event === "INITIAL_SESSION") return;
+              subscription.unsubscribe();
+              resolve(event);
+            }
+          );
+
+          supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
+            if (error) {
+              subscription.unsubscribe();
+              resolve("ERROR");
+            }
+          });
+        });
+
+        if (detectedEvent === "ERROR") {
           router.replace("/admin/login?error=auth_failed");
           return;
         }
-        // If caller passed ?next= (e.g. invite or password reset), honour it
+
+        if (detectedEvent === "PASSWORD_RECOVERY") {
+          router.replace("/auth/set-password");
+          return;
+        }
+
+        // SIGNED_IN (invite or normal login) — honour ?next= if present
         if (nextParam) {
           router.replace(nextParam);
           return;
