@@ -9,7 +9,7 @@ import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-type Action = "assign" | "confirm" | "reject" | "lock" | "cancel" | "complete" | "reschedule";
+type Action = "assign" | "confirm" | "reject" | "lock" | "cancel" | "complete" | "reschedule" | "edit";
 
 export async function PATCH(
   req: NextRequest,
@@ -127,6 +127,20 @@ export async function PATCH(
   } else if (action === "cancel") {
     if (!isAdminLevel(auth.role)) return NextResponse.json({ error: "未授權" }, { status: 403 });
     update = { booking_status: "cancelled" };
+  } else if (action === "edit") {
+    // Admin or own therapist can edit appointment details
+    if (auth.role === "therapist" && appt.therapist_id !== auth.profileId) {
+      return NextResponse.json({ error: "未授權" }, { status: 403 });
+    }
+    const adminFields = ["session_fee", "room_id", "admin_notes", "arrangement_type", "currency", "is_first_session"];
+    const sharedFields = ["meeting_link", "is_online"];
+    const allowed = isAdminLevel(auth.role) ? [...sharedFields, ...adminFields] : sharedFields;
+    update = Object.fromEntries(
+      Object.entries(body as Record<string, unknown>)
+        .filter(([k]) => allowed.includes(k))
+    );
+    // If switching to offline, clear meeting_link
+    if (update.is_online === false) update.meeting_link = null;
   } else {
     // Generic update (admin only)
     if (!isAdminLevel(auth.role)) return NextResponse.json({ error: "未授權" }, { status: 403 });
@@ -329,6 +343,38 @@ export async function PATCH(
 
   const tdL = `style="color:#333;padding:8px 18px 8px 0;border-bottom:1px solid #e0e0e0;white-space:nowrap;font-size:14px;font-weight:600"`;
   const tdR = `style="padding:8px 0;border-bottom:1px solid #e0e0e0;font-size:14px;color:#111"`;
+
+  // After reschedule: notify therapist + client of new time
+  if (action === "reschedule" && data?.scheduled_at && process.env.RESEND_API_KEY) {
+    const [{ data: tProfile }, { data: cData }] = await Promise.all([
+      appt.therapist_id
+        ? db.from("therapist_profiles").select("name, email, title").eq("id", appt.therapist_id).single()
+        : Promise.resolve({ data: null }),
+      appt.client_id
+        ? db.from("clients").select("full_name, email").eq("id", appt.client_id).single()
+        : Promise.resolve({ data: null }),
+    ]);
+    const newTime = new Date(data.scheduled_at).toLocaleString("zh-TW", {
+      year: "numeric", month: "long", day: "numeric",
+      weekday: "long", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Macau",
+    });
+    const header = `<div style="background:#2d4a38;padding:20px 28px"><p style="margin:0;color:#a8c5b0;font-size:11px;letter-spacing:1.5px">TREE COUNSELING STUDIO</p><p style="margin:4px 0 0;color:#fff;font-size:17px;font-weight:600">預約時間更改通知</p></div>`;
+    const footer = `<div style="background:#f7f5ef;padding:12px 28px;text-align:center"><p style="margin:0;color:#999;font-size:11px">樹心理工作室 Tree Counseling Studio</p></div>`;
+    if (tProfile?.email) {
+      await resend.emails.send({
+        from: FROM, to: tProfile.email,
+        subject: "【樹心理工作室】預約時間已更改",
+        html: `<div style="font-family:sans-serif;max-width:520px;margin:0 auto;color:#111;font-size:14px;line-height:1.75">${header}<div style="background:#fff;padding:24px 28px"><p style="margin:0 0 12px">您好，<strong>${tProfile.name ?? ""}心理師</strong>，</p><p style="margin:0 0 16px;color:#444">以下預約的晤談時間已由行政更改：</p><table style="width:100%;border-collapse:collapse;margin:0 0 20px"><tr><td ${tdL}>個案</td><td ${tdR}>${cData?.full_name ?? "—"}</td></tr><tr><td ${tdL}>新時間</td><td ${tdR}><strong>${newTime}</strong></td></tr></table></div>${footer}</div>`,
+      }).catch(console.error);
+    }
+    if (cData?.email) {
+      await resend.emails.send({
+        from: FROM, to: cData.email,
+        subject: "【樹心理工作室】諮商預約時間更改通知",
+        html: `<div style="font-family:sans-serif;max-width:520px;margin:0 auto;color:#111;font-size:14px;line-height:1.75">${header}<div style="background:#fff;padding:24px 28px"><p style="margin:0 0 12px">您好，<strong>${cData.full_name}</strong>，</p><p style="margin:0 0 16px;color:#444">您的諮商晤談時間已更改如下：</p><table style="width:100%;border-collapse:collapse;margin:0 0 24px"><tr><td ${tdL}>新時間</td><td ${tdR}><strong>${newTime}</strong></td></tr></table><div style="background:#f0f5f1;border-left:3px solid #5a8a6a;padding:14px 18px;margin:0 0 20px"><p style="margin:0;color:#2d4a38;font-size:13px">如有任何疑問，請透過 WhatsApp 聯繫我們。</p></div><p><a href="${WHATSAPP_LINK}" style="display:inline-block;background:#25d366;color:#fff;padding:10px 22px;text-decoration:none;font-size:13px;font-weight:600">WhatsApp 聯繫我們 →</a></p></div>${footer}</div>`,
+      }).catch(console.error);
+    }
+  }
 
   // After admin assigns, send email to therapist (with inquiry PDF)
   if (action === "assign" && data?.therapist_id && process.env.RESEND_API_KEY) {

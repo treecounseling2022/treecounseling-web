@@ -102,6 +102,8 @@ export default function AppointmentsPage() {
   const [detailModal, setDetailModal] = useState<Appointment | null>(null);
   const [rescheduleModal, setRescheduleModal] = useState<Appointment | null>(null);
   const [rescheduleForm, setRescheduleForm] = useState({ scheduled_date: "", scheduled_time: "", room_id: "" });
+  const [editModal, setEditModal] = useState<Appointment | null>(null);
+  const [editForm, setEditForm] = useState({ is_online: false, meeting_link: "", room_id: "", session_fee: "", admin_notes: "", arrangement_type: "" });
 
   // New appointment form
   const [newForm, setNewForm] = useState({
@@ -281,6 +283,33 @@ export default function AppointmentsPage() {
       room_id: rescheduleForm.room_id || null,
     });
     if (ok) { setRescheduleModal(null); setRescheduleForm({ scheduled_date: "", scheduled_time: "", room_id: "" }); }
+  }
+
+  function openEditModal(appt: Appointment) {
+    setEditModal(appt);
+    setEditForm({
+      is_online: appt.is_online ?? false,
+      meeting_link: appt.meeting_link ?? "",
+      room_id: appt.room_id ?? "",
+      session_fee: appt.session_fee?.toString() ?? "",
+      admin_notes: appt.admin_notes ?? "",
+      arrangement_type: appt.arrangement_type ?? "",
+    });
+    setErr("");
+  }
+
+  async function doEdit() {
+    if (!editModal) return;
+    const ok = await action(editModal.id, {
+      action: "edit",
+      is_online: editForm.is_online,
+      meeting_link: editForm.is_online ? (editForm.meeting_link || null) : null,
+      room_id: editForm.room_id || null,
+      session_fee: editForm.session_fee ? parseFloat(editForm.session_fee) : null,
+      admin_notes: editForm.admin_notes || null,
+      arrangement_type: editForm.arrangement_type || null,
+    });
+    if (ok) { setEditModal(null); setDetailModal(null); }
   }
 
   const inputCls = "w-full border border-sand/30 px-3 py-2 font-sans text-sm text-deep focus:outline-none focus:border-forest/50";
@@ -914,9 +943,94 @@ export default function AppointmentsPage() {
                 <p className="font-sans text-xs text-muted">{detailModal.admin_notes}</p>
               </div>
             )}
-            <button onClick={() => setDetailModal(null)} className="w-full font-sans text-xs py-2 border border-sand/30 text-muted hover:bg-sand/10 transition-colors mt-2">
-              關閉
-            </button>
+            <div className="flex gap-2 mt-2">
+              <button onClick={() => setDetailModal(null)} className="flex-1 font-sans text-xs py-2 border border-sand/30 text-muted hover:bg-sand/10 transition-colors">
+                關閉
+              </button>
+              {["confirmed", "locked", "pending_therapist"].includes(detailModal.booking_status) && (
+                <button
+                  onClick={() => openEditModal(detailModal)}
+                  className="flex-1 font-sans text-xs py-2 bg-deep text-paper hover:bg-forest transition-colors"
+                >
+                  編輯詳情
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Edit Modal ── */}
+      {editModal && (
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50 p-4" onClick={() => setEditModal(null)}>
+          <div className="bg-white w-full max-w-sm shadow-sm overflow-y-auto max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6 space-y-4">
+              <div>
+                <h2 className="font-serif text-deep text-lg">編輯預約詳情</h2>
+                <p className="font-sans text-xs text-muted mt-0.5">{editModal.clients?.full_name}</p>
+              </div>
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={editForm.is_online}
+                      onChange={(e) => setEditForm((f) => ({
+                        ...f,
+                        is_online: e.target.checked,
+                        room_id: e.target.checked ? "" : f.room_id,
+                        meeting_link: e.target.checked ? f.meeting_link : "",
+                      }))}
+                      className="accent-forest w-4 h-4"
+                    />
+                    <span className="font-sans text-sm text-deep">線上諮商</span>
+                  </label>
+                  {editForm.is_online && (
+                    <div className="pl-6 border-l-2 border-forest/20">
+                      <label className="font-sans text-[11px] text-muted block mb-1">視訊連結</label>
+                      <input
+                        value={editForm.meeting_link}
+                        onChange={(e) => setEditForm((f) => ({ ...f, meeting_link: e.target.value }))}
+                        placeholder="https://meet.google.com/..."
+                        className={inputCls}
+                      />
+                    </div>
+                  )}
+                </div>
+                {!editForm.is_online && (
+                  <div>
+                    <label className="font-sans text-[11px] text-muted block mb-1">諮商室</label>
+                    <select value={editForm.room_id} onChange={(e) => setEditForm((f) => ({ ...f, room_id: e.target.value }))} className={inputCls}>
+                      <option value="">（未指定）</option>
+                      {rooms.filter((r) => r.is_active).map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                    </select>
+                  </div>
+                )}
+                {!isTherapist && (
+                  <>
+                    <div>
+                      <label className="font-sans text-[11px] text-muted block mb-1">費用</label>
+                      <input type="number" value={editForm.session_fee} onChange={(e) => setEditForm((f) => ({ ...f, session_fee: e.target.value }))} placeholder="0" min="0" step="0.5" className={inputCls} />
+                    </div>
+                    <div>
+                      <label className="font-sans text-[11px] text-muted block mb-1">排案說明</label>
+                      <input value={editForm.arrangement_type} onChange={(e) => setEditForm((f) => ({ ...f, arrangement_type: e.target.value }))} placeholder="…" className={inputCls} />
+                    </div>
+                    <div>
+                      <label className="font-sans text-[11px] text-muted block mb-1">行政備註</label>
+                      <textarea value={editForm.admin_notes} onChange={(e) => setEditForm((f) => ({ ...f, admin_notes: e.target.value }))} rows={2} className={inputCls + " resize-none"} placeholder="內部備註…" />
+                    </div>
+                  </>
+                )}
+              </div>
+              {err && <p className="font-sans text-xs text-red-500">{err}</p>}
+              <div className="flex gap-2 pt-2">
+                <button onClick={() => setEditModal(null)} className="flex-1 font-sans text-xs py-2 border border-sand/30 text-muted hover:bg-sand/10 transition-colors">取消</button>
+                <button onClick={doEdit} disabled={working} className="flex-1 font-sans text-xs py-2 bg-deep text-paper hover:bg-forest disabled:opacity-40 transition-colors">
+                  {working ? "儲存中…" : "儲存"}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
