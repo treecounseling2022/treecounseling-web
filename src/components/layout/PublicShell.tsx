@@ -16,7 +16,7 @@ export default function PublicShell({ children }: { children: React.ReactNode })
   return (
     <>
       <Navbar />
-      <main id="main-content" className="flex-1">{children}</main>
+      <main id="main-content" className="flex-1 pb-16 md:pb-0">{children}</main>
       <Footer />
       <AIChatWidget />
     </>
