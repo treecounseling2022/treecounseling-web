@@ -53,7 +53,7 @@ export default async function AdminLayout({
               pendingInquiries={pendingInquiries}
               pendingAppointments={pendingAppointments}
             />
-            <main className="admin-layout md:ml-52 p-5 md:p-8 max-w-5xl">
+            <main className="admin-layout md:ml-52 p-5 pb-20 md:p-8 md:pb-8 max-w-5xl">
               <AdminBreadcrumb />
               {children}
             </main>
