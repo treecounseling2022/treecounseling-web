@@ -5,22 +5,7 @@ export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
 export default async function Image() {
-  let fontData: ArrayBuffer | null = null;
-  try {
-    fontData = await fetch(
-      "https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-sc@5.2.9/files/noto-sans-sc-latin-600-normal.woff2"
-    ).then((r) => {
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      return r.arrayBuffer();
-    });
-  } catch (e) {
-    console.error("Font load failed:", e);
-  }
-
-  const opts = fontData
-    ? { width: 1200, height: 630, fonts: [{ name: "Noto", data: fontData, weight: 600 as const, style: "normal" as const }] }
-    : { width: 1200, height: 630 };
-
+  await Promise.resolve();
   return new ImageResponse(
     (
       <div
@@ -35,9 +20,9 @@ export default async function Image() {
           fontSize: 48,
         }}
       >
-        {`Font: ${fontData ? "OK" : "FAILED"} — Tree Counseling Studio`}
+        Async works
       </div>
     ),
-    opts
+    { width: 1200, height: 630 }
   );
 }
