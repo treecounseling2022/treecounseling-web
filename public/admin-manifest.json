@@ -2,7 +2,7 @@
   "name": "樹心理後台管理",
   "short_name": "樹心理後台",
   "description": "樹心理工作室後台管理系統",
-  "start_url": "/admin",
+  "start_url": "/admin/appointments/new",
   "scope": "/admin",
   "display": "standalone",
   "background_color": "#1a1a1a",
