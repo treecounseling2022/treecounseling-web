@@ -4,6 +4,7 @@ import "./globals.css";
 import PublicShell from "@/components/layout/PublicShell";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import PwaRegister from "@/components/PwaRegister";
+import GoogleAnalytics from "@/components/GoogleAnalytics";
 
 
 const notoSerifTC = Noto_Serif_TC({
@@ -75,6 +76,9 @@ export default function RootLayout({
           跳至主要內容
         </a>
         <PwaRegister />
+        {process.env.NEXT_PUBLIC_GA_ID && (
+          <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GA_ID} />
+        )}
         <ThemeProvider>
           <PublicShell>{children}</PublicShell>
         </ThemeProvider>
