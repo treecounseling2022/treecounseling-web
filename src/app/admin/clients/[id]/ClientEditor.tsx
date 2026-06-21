@@ -7,6 +7,8 @@ type Therapist = { id: string; name: string };
 
 type EmergencyContact = { name: string; phone: string; relationship: string };
 
+type PresentingConcern = { category: string; items: string[] };
+
 type ClientData = {
   id?: string;
   client_code: string;
@@ -31,14 +33,139 @@ type ClientData = {
   psychiatry_notes: string;
   has_prior_counseling: boolean | null;
   prior_counseling_notes: string;
-  presenting_concerns: string[];
+  presenting_concerns: PresentingConcern[];
   city: string;
   consent_signed_at: string;
 };
 
 const INDIVIDUAL_CONCERNS = [
-  "成癮問題", "自我探索", "家庭關係", "伴侶關係", "親子關係",
-  "工作壓力", "學業/生涯", "人際關係", "情緒困擾", "其他困擾",
+  {
+    id: "addiction",
+    label: "成癮問題",
+    items: [
+      "酒精成癮 (飲酒失控、戒酒困難)",
+      "藥物成癮 (非法藥物、處方藥依賴)",
+      "網路/手機成癮 (過度使用、影響生活)",
+      "購物成癮 (過度消費、無法自控)",
+      "性成癮 (過度性行為、色情依賴)",
+      "賭博成癮",
+      "其他",
+    ],
+  },
+  {
+    id: "self_explore",
+    label: "自我探索",
+    items: [
+      "自我認同 (價值、目標、人生方向)",
+      "性格特質探索",
+      "性別認同 / 性傾向",
+      "信仰 / 信念困擾",
+      "興趣與長處發掘",
+      "人生價值意義探尋",
+      "自我批判 / 自我接納議題",
+      "其他",
+    ],
+  },
+  {
+    id: "family",
+    label: "家庭關係",
+    items: [
+      "與父母衝突或疏離",
+      "與兄弟姊妹爭執或競爭",
+      "家庭溝通困難",
+      "家庭界線模糊 / 互動壓力",
+      "原生家庭創傷或影響",
+      "家庭成員疾病 / 失落壓力",
+      "其他",
+    ],
+  },
+  {
+    id: "couple_rel",
+    label: "伴侶關係",
+    items: [
+      "溝通模式困擾",
+      "信任 / 忠誠 / 背叛",
+      "伴侶間價值 / 目標落差",
+      "感情冷淡 / 疏離感",
+      "性生活 / 親密困擾",
+      "受暴 / 控制或依賴關係",
+      "分手 / 離婚調適",
+      "其他",
+    ],
+  },
+  {
+    id: "parenting",
+    label: "親子關係",
+    items: [
+      "與子女溝通困難",
+      "親子衝突與規範爭議",
+      "教養壓力 / 育兒困擾",
+      "子女行為 / 發展問題",
+      "距離 (遠距家庭、親子疏離)",
+      "特殊需求 (身心障礙、適應特殊情形)",
+      "其他",
+    ],
+  },
+  {
+    id: "work_press",
+    label: "工作壓力",
+    items: [
+      "職場人際衝突",
+      "工作負荷過重 / 疲勞",
+      "工作動力低落",
+      "工作倦怠 / 厭倦",
+      "職位 / 職稱調整困擾",
+      "失業 / 就業困難",
+      "職場霸凌 / 歧視",
+      "其他",
+    ],
+  },
+  {
+    id: "academic",
+    label: "學業/生涯",
+    items: [
+      "學習動機低落",
+      "考試 / 升學焦慮",
+      "成績壓力 / 退步",
+      "生涯規劃迷惘",
+      "將來職涯方向不明 / 轉換",
+      "家長 / 他人期待壓力",
+      "校園人際議題",
+      "其他",
+    ],
+  },
+  {
+    id: "interpersonal",
+    label: "人際關係",
+    items: [
+      "社交焦慮 / 害怕被拒絕",
+      "朋友疏離 / 被排擠",
+      "隱私或界線困難",
+      "難以建立深度連結",
+      "被批評 / 誤解困擾",
+      "團體適應困難",
+      "社交技巧困難",
+      "其他",
+    ],
+  },
+  {
+    id: "emotion",
+    label: "情緒困擾",
+    items: [
+      "長期憂鬱 / 低落感",
+      "容易緊張 / 焦慮不安",
+      "易怒 / 衝動情緒",
+      "情緒波動大",
+      "壓力難以排解",
+      "無明原因的哭泣 / 空虛感",
+      "其他",
+    ],
+  },
+  {
+    id: "other_issue",
+    label: "其他困擾",
+    items: [],
+  },
 ];
 
 const GENDER_OPTIONS = [
@@ -96,7 +223,7 @@ export default function ClientEditor({
     psychiatry_notes: (initialData as { psychiatry_notes?: string }).psychiatry_notes ?? "",
     has_prior_counseling: (initialData as { has_prior_counseling?: boolean | null }).has_prior_counseling ?? null,
     prior_counseling_notes: (initialData as { prior_counseling_notes?: string }).prior_counseling_notes ?? "",
-    presenting_concerns: (initialData as { presenting_concerns?: string[] }).presenting_concerns ?? [],
+    presenting_concerns: (initialData as { presenting_concerns?: PresentingConcern[] }).presenting_concerns ?? [],
     city: (initialData as { city?: string }).city ?? "",
     consent_signed_at: (initialData as { consent_signed_at?: string }).consent_signed_at ?? "",
   });
@@ -389,29 +516,69 @@ export default function ClientEditor({
           <h2 className="font-serif text-deep text-base">臨床背景</h2>
 
           {/* 主訴困擾 */}
-          <div>
+          <div className="space-y-3">
             <label className={labelCls}>主訴困擾類型（可多選）</label>
-            <div className="flex flex-wrap gap-2 mt-1">
-              {INDIVIDUAL_CONCERNS.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => {
-                    const next = form.presenting_concerns.includes(c)
-                      ? form.presenting_concerns.filter((x) => x !== c)
-                      : [...form.presenting_concerns, c];
-                    setField("presenting_concerns", next);
-                  }}
-                  className={`font-sans text-xs px-3 py-1 border transition-colors ${
-                    form.presenting_concerns.includes(c)
-                      ? "bg-forest/10 border-forest text-forest"
-                      : "border-sand/30 text-muted hover:border-sand/60"
-                  }`}
-                >
-                  {c}
-                </button>
-              ))}
+            {/* 主類別 */}
+            <div className="flex flex-wrap gap-2">
+              {INDIVIDUAL_CONCERNS.map((c) => {
+                const selected = form.presenting_concerns.some((pc) => pc.category === c.label);
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => {
+                      if (selected) {
+                        setField("presenting_concerns", form.presenting_concerns.filter((pc) => pc.category !== c.label));
+                      } else {
+                        setField("presenting_concerns", [...form.presenting_concerns, { category: c.label, items: [] }]);
+                      }
+                    }}
+                    className={`font-sans text-xs px-3 py-1 border transition-colors ${
+                      selected
+                        ? "bg-forest/10 border-forest text-forest"
+                        : "border-sand/30 text-muted hover:border-sand/60"
+                    }`}
+                  >
+                    {c.label}
+                  </button>
+                );
+              })}
             </div>
+            {/* 已選主類別的細項 */}
+            {INDIVIDUAL_CONCERNS.filter((c) => form.presenting_concerns.some((pc) => pc.category === c.label) && c.items.length > 0).map((c) => {
+              const entry = form.presenting_concerns.find((pc) => pc.category === c.label)!;
+              return (
+                <div key={c.id} className="pl-3 border-l-2 border-forest/30 space-y-1.5">
+                  <p className="font-sans text-[11px] text-forest font-medium">{c.label} — 細項</p>
+                  <div className="flex flex-wrap gap-2">
+                    {c.items.map((item) => {
+                      const checked = entry.items.includes(item);
+                      return (
+                        <label key={item} className="flex items-center gap-1.5 cursor-pointer font-sans text-xs text-muted">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => {
+                              const newItems = checked
+                                ? entry.items.filter((i) => i !== item)
+                                : [...entry.items, item];
+                              setField(
+                                "presenting_concerns",
+                                form.presenting_concerns.map((pc) =>
+                                  pc.category === c.label ? { ...pc, items: newItems } : pc
+                                )
+                              );
+                            }}
+                            className="w-3.5 h-3.5 border border-sand accent-forest"
+                          />
+                          {item}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
