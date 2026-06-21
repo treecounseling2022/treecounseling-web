@@ -1,22 +1,20 @@
 import { ImageResponse } from "next/og";
+import fs from "fs";
+import path from "path";
 import { TEAM } from "@/lib/data";
 
-export const runtime = "edge";
 export const dynamic = "force-dynamic";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
-async function loadFont(text: string) {
-  try {
-    const css = await fetch(
-      `https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@600&text=${encodeURIComponent(text)}`,
-      { headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" } }
-    ).then((r) => r.text());
-    const urls = [...css.matchAll(/url\(([^)]+\.woff2)\)/g)].map((m) => m[1]);
-    return await Promise.all(urls.map((url) => fetch(url).then((r) => r.arrayBuffer())));
-  } catch {
-    return [];
-  }
+function loadFonts() {
+  const base = path.join(process.cwd(), "node_modules/@fontsource/noto-sans-sc/files");
+  const chinese = fs.readFileSync(path.join(base, "noto-sans-sc-chinese-simplified-600-normal.woff2"));
+  const latin = fs.readFileSync(path.join(base, "noto-sans-sc-latin-600-normal.woff2"));
+  return [
+    { name: "Noto", data: Buffer.from(chinese), weight: 600 as const, style: "normal" as const },
+    { name: "Noto", data: Buffer.from(latin), weight: 600 as const, style: "normal" as const },
+  ];
 }
 
 export default async function Image({ params }: { params: Promise<{ id: string }> }) {
@@ -24,14 +22,7 @@ export default async function Image({ params }: { params: Promise<{ id: string }
   const member = TEAM.find((m) => m.id === id);
   if (!member) return new Response("Not found", { status: 404 });
 
-  const text = `樹心理工作室心理師介紹${member.name}${member.title}Tree Counseling Studio`;
-  const fontBuffers = await loadFont(text);
-  const fonts = fontBuffers.map((data) => ({
-    name: "Noto",
-    data,
-    weight: 600 as const,
-    style: "normal" as const,
-  }));
+  const fonts = loadFonts();
 
   return new ImageResponse(
     (
