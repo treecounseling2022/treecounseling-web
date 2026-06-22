@@ -199,11 +199,13 @@ export default function ClientEditor({
   therapists,
   readonly = false,
   hideContact = false,
+  isDirector = false,
 }: {
   initialData: Partial<ClientData> & { id?: string };
   therapists: Therapist[];
   readonly?: boolean;
   hideContact?: boolean;
+  isDirector?: boolean;
 }) {
   const router = useRouter();
   const isNew = !initialData.id;
@@ -358,6 +360,12 @@ export default function ClientEditor({
   async function archive() {
     if (!confirm("確定要封存此個案？封存後個案將不會出現在列表中。")) return;
     const res = await fetch(`/api/admin/clients/${initialData.id}`, { method: "DELETE" });
+    if (res.ok) router.push("/admin/clients");
+  }
+
+  async function hardDelete() {
+    if (!confirm("⚠️ 確定要永久刪除此個案？\n\n此操作無法復原，所有相關資料（預約、晤談記錄）將一併刪除。")) return;
+    const res = await fetch(`/api/admin/clients/${initialData.id}?permanent=true`, { method: "DELETE" });
     if (res.ok) router.push("/admin/clients");
   }
 
@@ -1043,12 +1051,22 @@ export default function ClientEditor({
               返回列表
             </a>
             {!isNew && (
-              <button
-                onClick={archive}
-                className="ml-auto font-sans text-xs text-red-400 hover:text-red-600 transition-colors"
-              >
-                封存個案
-              </button>
+              <div className="ml-auto flex items-center gap-4">
+                <button
+                  onClick={archive}
+                  className="font-sans text-xs text-red-400 hover:text-red-600 transition-colors"
+                >
+                  封存個案
+                </button>
+                {isDirector && (
+                  <button
+                    onClick={hardDelete}
+                    className="font-sans text-xs text-red-600 hover:text-red-800 underline underline-offset-2 transition-colors"
+                  >
+                    永久刪除
+                  </button>
+                )}
+              </div>
             )}
           </div>
         </>

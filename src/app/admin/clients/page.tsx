@@ -12,19 +12,21 @@ const GENDER_LABEL: Record<string, string> = {
 export default async function ClientsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; status?: string }>;
 }) {
   const auth = await requireAuth();
   const isAdmin = isAdminLevel(auth.role);
 
-  const { q } = await searchParams;
+  const { q, status = "active" } = await searchParams;
   const supabase = await createClient();
 
   let query = supabase
     .from("clients")
     .select("id, full_name, gender, phone, email, assigned_therapist_id, created_at, is_active, service_type, couple_partner_id")
-    .eq("is_active", true)
     .order("created_at", { ascending: false });
+
+  if (status === "active") query = query.eq("is_active", true);
+  else if (status === "archived") query = query.eq("is_active", false);
 
   // Therapists see assigned clients + clients with confirmed/locked appointments
   if (!isAdmin) {

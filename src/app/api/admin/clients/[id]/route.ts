@@ -110,13 +110,24 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const auth = await getAuthInfo();
   if (!auth || !isAdminLevel(auth.role)) return NextResponse.json({ error: "未授權" }, { status: 403 });
   const { id } = await params;
   const db = createAdminClient();
+
+  const permanent = new URL(req.url).searchParams.get("permanent") === "true";
+
+  if (permanent) {
+    // Hard delete — director only
+    if (auth.role !== "director") return NextResponse.json({ error: "僅所長可永久刪除個案" }, { status: 403 });
+    const { error } = await db.from("clients").delete().eq("id", id);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ success: true });
+  }
+
   // Soft delete
   const { error } = await db.from("clients").update({ is_active: false }).eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

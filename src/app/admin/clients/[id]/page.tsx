@@ -321,6 +321,7 @@ export default async function ClientDetailPage({ params }: Props) {
         therapists={therapists}
         readonly={!isAdmin}
         hideContact={!isAdmin}
+        isDirector={auth.role === "director"}
       />
 
       {/* AI 初談 */}

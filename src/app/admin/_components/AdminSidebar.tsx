@@ -106,6 +106,7 @@ const ITEM_ICON: Record<string, string> = {
   "/admin/salary":           "salary",
   "/admin/articles":         "articles",
   "/admin/invite":           "invite",
+  "/admin/import":           "clients",
   "/admin/appointments/new": "new",
   "/admin/my-salary":        "salary",
 };
@@ -146,6 +147,7 @@ export default function AdminSidebar({ role, email, profileId, pendingInquiries,
         ...(role === "director" ? [{ href: "/admin/salary", label: "薪酬計算" }] : []),
         { href: "/admin/articles",      label: "文章" },
         { href: "/admin/invite",        label: "邀請成員" },
+        { href: "/admin/import",        label: "匯入個案" },
       ],
     },
   ];
