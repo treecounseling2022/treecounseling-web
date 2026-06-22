@@ -16,11 +16,13 @@ export default function ClientContacts({
   initialContacts,
   currentUserId,
   isDirector,
+  isAdmin = true,
 }: {
   clientId: string;
   initialContacts: Contact[];
   currentUserId: string;
   isDirector: boolean;
+  isAdmin?: boolean;
 }) {
   const [contacts, setContacts] = useState<Contact[]>(initialContacts);
   const [newText, setNewText] = useState("");
@@ -92,29 +94,31 @@ export default function ClientContacts({
     <div className="space-y-3">
       <h2 className="font-serif text-deep text-lg">聯繫紀錄</h2>
 
-      {/* New contact input */}
-      <div className="space-y-2">
-        <textarea
-          value={newText}
-          onChange={(e) => setNewText(e.target.value)}
-          rows={2}
-          placeholder="記錄本次聯繫內容…"
-          className={inputCls + " resize-none"}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) addContact();
-          }}
-        />
-        {err && <p className="font-sans text-xs text-red-500">{err}</p>}
-        <div className="flex justify-end">
-          <button
-            onClick={addContact}
-            disabled={adding || !newText.trim()}
-            className="font-sans text-xs px-4 py-1.5 bg-deep text-paper hover:bg-forest disabled:opacity-40 transition-colors"
-          >
-            {adding ? "新增中…" : "+ 新增紀錄"}
-          </button>
+      {/* New contact input — admin only */}
+      {isAdmin && (
+        <div className="space-y-2">
+          <textarea
+            value={newText}
+            onChange={(e) => setNewText(e.target.value)}
+            rows={2}
+            placeholder="記錄本次聯繫內容…"
+            className={inputCls + " resize-none"}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) addContact();
+            }}
+          />
+          {err && <p className="font-sans text-xs text-red-500">{err}</p>}
+          <div className="flex justify-end">
+            <button
+              onClick={addContact}
+              disabled={adding || !newText.trim()}
+              className="font-sans text-xs px-4 py-1.5 bg-deep text-paper hover:bg-forest disabled:opacity-40 transition-colors"
+            >
+              {adding ? "新增中…" : "+ 新增紀錄"}
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Contact list */}
       {contacts.length === 0 ? (
@@ -162,7 +166,7 @@ export default function ClientContacts({
                     {fmtDate(c.created_at)}
                     {wasEdited && <span className="ml-1 italic">（已修改）</span>}
                   </p>
-                  {canEdit && !isEditing && (
+                  {isAdmin && canEdit && !isEditing && (
                     <div className="flex gap-3">
                       <button
                         onClick={() => { setEditId(c.id); setEditText(c.content); setErr(""); }}

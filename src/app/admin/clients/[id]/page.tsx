@@ -92,9 +92,7 @@ export default async function ClientDetailPage({ params }: Props) {
   let adminPayments: PaymentRow[] = [];
   let clientContacts: ContactRow[] = [];
 
-  if (isAdmin) {
-    const db = createAdminClient();
-
+  {
     const [{ data: contacts }, { data: appts }] = await Promise.all([
       db.from("client_contacts")
         .select("id, content, created_by, created_at, updated_at")
@@ -117,10 +115,12 @@ export default async function ClientDetailPage({ params }: Props) {
         tIds.length > 0
           ? db.from("therapist_profiles").select("id, name").in("id", tIds)
           : Promise.resolve({ data: [] }),
-        db.from("payments")
-          .select("id, appointment_id, amount, currency, payment_method, status, paid_at")
-          .in("appointment_id", apptIds)
-          .eq("status", "paid"),
+        isAdmin
+          ? db.from("payments")
+              .select("id, appointment_id, amount, currency, payment_method, status, paid_at")
+              .in("appointment_id", apptIds)
+              .eq("status", "paid")
+          : Promise.resolve({ data: [] }),
       ]);
 
       const nameMap = Object.fromEntries(((nameRes.data ?? []) as { id: string; name: string }[]).map((t) => [t.id, t.name]));
@@ -237,9 +237,8 @@ export default async function ClientDetailPage({ params }: Props) {
         </p>
       </div>
 
-      {/* Statistics — admin only */}
-      {isAdmin && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      {/* Statistics */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
             { label: "已確認次數", value: String(totalSessions), sub: "確認 + 鎖定" },
             { label: "總諮商費用", value: `MOP ${totalFees.toLocaleString()}`, sub: "全部累計" },
@@ -261,7 +260,6 @@ export default async function ClientDetailPage({ params }: Props) {
             </div>
           ))}
         </div>
-      )}
 
       {/* Couple partner info — shown for both admin and therapist */}
       {clientExt.service_type === "couple" && partnerData && (
@@ -325,34 +323,30 @@ export default async function ClientDetailPage({ params }: Props) {
         hideContact={!isAdmin}
       />
 
-      {/* Admin: AI 初談 */}
-      {isAdmin && (
-        <IntakePanel
-          clientId={id}
-          intakeToken={clientExt.intake_token ?? null}
-          intakeSummary={clientExt.intake_summary ?? null}
-          intakeSubmittedAt={clientExt.intake_submitted_at ?? null}
-        />
-      )}
+      {/* AI 初談 */}
+      <IntakePanel
+        clientId={id}
+        intakeToken={clientExt.intake_token ?? null}
+        intakeSummary={clientExt.intake_summary ?? null}
+        intakeSubmittedAt={clientExt.intake_submitted_at ?? null}
+      />
 
-      {/* Admin: appointments + payment records */}
-      {isAdmin && (
-        <AdminAppointmentPayments
-          clientId={id}
-          initialAppts={adminAppts}
-          initialPayments={adminPayments}
-        />
-      )}
+      {/* 預約紀錄 + 收款（心理師唯讀） */}
+      <AdminAppointmentPayments
+        clientId={id}
+        initialAppts={adminAppts}
+        initialPayments={adminPayments}
+        isAdmin={isAdmin}
+      />
 
-      {/* Admin: contact records */}
-      {isAdmin && (
-        <ClientContacts
-          clientId={id}
-          initialContacts={clientContacts}
-          currentUserId={auth.userId}
-          isDirector={auth.role === "director"}
-        />
-      )}
+      {/* 聯繫紀錄（心理師唯讀） */}
+      <ClientContacts
+        clientId={id}
+        initialContacts={clientContacts}
+        currentUserId={auth.userId}
+        isDirector={auth.role === "director"}
+        isAdmin={isAdmin}
+      />
 
       {/* Case closure — admin and therapist assigned to this client can both operate */}
       <CaseClosurePanel
@@ -362,11 +356,11 @@ export default async function ClientDetailPage({ params }: Props) {
         closedAt={clientExt.case_closed_at ?? null}
       />
 
-      {/* Therapist: appointments + session notes for this client */}
+      {/* Therapist: session notes for own appointments */}
       {!isAdmin && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="font-serif text-deep text-lg">預約與晤談紀錄</h2>
+            <h2 className="font-serif text-deep text-lg">我的晤談紀錄</h2>
             <Link
               href={`/admin/appointments/new?client_id=${client.id}`}
               className="font-sans text-xs bg-deep text-paper px-4 py-2 hover:bg-forest transition-colors"

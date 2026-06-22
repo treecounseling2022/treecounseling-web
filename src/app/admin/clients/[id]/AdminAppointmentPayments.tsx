@@ -34,10 +34,12 @@ export default function AdminAppointmentPayments({
   clientId,
   initialAppts,
   initialPayments,
+  isAdmin = true,
 }: {
   clientId: string;
   initialAppts: Appt[];
   initialPayments: Payment[];
+  isAdmin?: boolean;
 }) {
   const [paymentMap, setPaymentMap] = useState<Record<string, Payment>>(
     Object.fromEntries(initialPayments.map((p) => [p.appointment_id, p]))
@@ -129,16 +131,18 @@ export default function AdminAppointmentPayments({
                 {METHOD_LABEL[payment.payment_method] ?? payment.payment_method}
                 {payment.paid_at && ` · ${new Date(payment.paid_at).toLocaleDateString("zh-TW")}`}
               </p>
-              <a
-                href={`/admin/receipts/${payment.id}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-sans text-[10px] text-forest hover:underline mt-0.5 inline-block"
-              >
-                列印收據 →
-              </a>
+              {isAdmin && (
+                <a
+                  href={`/admin/receipts/${payment.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-sans text-[10px] text-forest hover:underline mt-0.5 inline-block"
+                >
+                  列印收據 →
+                </a>
+              )}
             </div>
-          ) : isBillable ? (
+          ) : isBillable && isAdmin ? (
             <button
               onClick={() => openModal(appt)}
               className="font-sans text-[11px] bg-deep text-paper px-3 py-1 hover:bg-forest transition-colors"
