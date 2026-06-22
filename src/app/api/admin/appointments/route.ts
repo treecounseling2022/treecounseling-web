@@ -14,7 +14,7 @@ export async function GET() {
 
   let query = db
     .from("appointments")
-    .select("*, clients(id, full_name, phone), rooms(id, name, color)")
+    .select("*, clients!client_id(id, full_name, phone), rooms!room_id(id, name, color)")
     .order("created_at", { ascending: false });
 
   if (auth.role === "therapist" && auth.profileId) {

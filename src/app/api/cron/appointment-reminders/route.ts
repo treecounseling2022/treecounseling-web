@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
 
   const { data: appointments } = await db
     .from("appointments")
-    .select("id, scheduled_at, is_online, meeting_link, therapist_id, clients(full_name, email), therapist_profiles:therapist_id(name, title)")
+    .select("id, scheduled_at, is_online, meeting_link, therapist_id, clients!client_id(full_name, email), therapist_profiles:therapist_id(name, title)")
     .eq("booking_status", "confirmed")
     .gte("scheduled_at", tomorrowStart.toISOString())
     .lt("scheduled_at", tomorrowEnd.toISOString());
