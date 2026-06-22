@@ -3,6 +3,26 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+const _DAY_ORDER = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"];
+
+function groupPreferredTimesHTML(raw: string): Array<{ day: string; slots: string[] }> {
+  const parts = raw.split(/[、,]\s*/);
+  const grouped = new Map<string, string[]>();
+  for (const part of parts) {
+    const match = part.trim().match(/^(星期[一二三四五六日])\s+(.+)$/);
+    if (match) {
+      const day = match[1];
+      const slot = match[2];
+      if (!grouped.has(day)) grouped.set(day, []);
+      grouped.get(day)!.push(slot);
+    }
+  }
+  if (grouped.size === 0) return [{ day: "", slots: [raw] }];
+  return [...grouped.entries()]
+    .sort(([a], [b]) => _DAY_ORDER.indexOf(a) - _DAY_ORDER.indexOf(b))
+    .map(([day, slots]) => ({ day, slots }));
+}
+
 type Inquiry = {
   id: string;
   service_type: string;
@@ -432,7 +452,14 @@ export default function InquiryDetailClient({
           {inquiry.preferred_times && (
             <div className="col-span-2">
               <span className="text-muted/60 text-xs block">偏好時段</span>
-              <span className="text-deep">{inquiry.preferred_times}</span>
+              <div className="space-y-0.5 mt-0.5">
+                {groupPreferredTimesHTML(inquiry.preferred_times).map(({ day, slots }) => (
+                  <div key={day} className="flex gap-2 font-sans text-sm text-deep">
+                    <span className="w-12 text-muted/70 flex-shrink-0">{day}</span>
+                    <span>{slots.join("、")}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>

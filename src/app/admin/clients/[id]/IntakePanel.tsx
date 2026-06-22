@@ -7,9 +7,10 @@ interface Props {
   intakeToken: string | null;
   intakeSummary: string | null;
   intakeSubmittedAt: string | null;
+  isAdmin?: boolean;
 }
 
-export default function IntakePanel({ clientId, intakeToken, intakeSummary, intakeSubmittedAt }: Props) {
+export default function IntakePanel({ clientId, intakeToken, intakeSummary, intakeSubmittedAt, isAdmin = true }: Props) {
   const [copied, setCopied] = useState(false);
   void clientId;
 
@@ -51,33 +52,35 @@ export default function IntakePanel({ clientId, intakeToken, intakeSummary, inta
       </div>
 
       <div className="px-5 py-4 space-y-4">
-        {/* 初談連結 */}
-        <div className="space-y-1.5">
-          <p className="font-sans text-[11px] text-muted">發送給個案的初談連結</p>
-          {intakeUrl ? (
-            <div className="flex gap-2">
-              <input
-                type="text"
-                readOnly
-                value={intakeUrl}
-                className="flex-1 px-3 py-2 font-sans text-xs text-muted bg-soft border border-sand/25 outline-none select-all cursor-text"
-              />
-              <button
-                onClick={handleCopy}
-                className="px-4 py-2 font-sans text-xs bg-deep hover:bg-forest text-paper transition-colors flex-shrink-0"
-              >
-                {copied ? "已複製 ✓" : "複製"}
-              </button>
-            </div>
-          ) : (
-            <p className="font-sans text-xs text-muted/50 bg-sand/10 px-3 py-2">
-              尚未產生初談 token，請執行 migration 021。
+        {/* 初談連結 — 僅行政可見 */}
+        {isAdmin && (
+          <div className="space-y-1.5">
+            <p className="font-sans text-[11px] text-muted">發送給個案的初談連結</p>
+            {intakeUrl ? (
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={intakeUrl}
+                  className="flex-1 px-3 py-2 font-sans text-xs text-muted bg-soft border border-sand/25 outline-none select-all cursor-text"
+                />
+                <button
+                  onClick={handleCopy}
+                  className="px-4 py-2 font-sans text-xs bg-deep hover:bg-forest text-paper transition-colors flex-shrink-0"
+                >
+                  {copied ? "已複製 ✓" : "複製"}
+                </button>
+              </div>
+            ) : (
+              <p className="font-sans text-xs text-muted/50 bg-sand/10 px-3 py-2">
+                尚未產生初談 token，請執行 migration 021。
+              </p>
+            )}
+            <p className="font-sans text-[10px] text-muted/50">
+              可直接貼到確認 email 或 WhatsApp，個案開啟後即可開始初談。
             </p>
-          )}
-          <p className="font-sans text-[10px] text-muted/50">
-            可直接貼到確認 email 或 WhatsApp，個案開啟後即可開始初談。
-          </p>
-        </div>
+          </div>
+        )}
 
         {/* 初談摘要 */}
         {intakeSummary ? (

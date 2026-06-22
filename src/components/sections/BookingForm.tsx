@@ -446,15 +446,22 @@ export default function BookingForm() {
     // 時間格式化
     let formattedTimes = "";
     if (serviceType === "individual" || serviceType === "hoarding") {
+      const dayOrder = ["一", "二", "三", "四", "五", "六", "日"];
       formattedTimes = Object.keys(selectedTimesGrid)
         .filter((key) => selectedTimesGrid[key])
-        .map((key) => {
-          const [day, slot] = key.split("-");
-          return `星期${day} ${slot}`;
+        .sort((a, b) => {
+          const dayA = a.charAt(0);
+          const dayB = b.charAt(0);
+          const slotA = a.slice(2);
+          const slotB = b.slice(2);
+          const dayDiff = dayOrder.indexOf(dayA) - dayOrder.indexOf(dayB);
+          if (dayDiff !== 0) return dayDiff;
+          return TIME_SLOTS.indexOf(slotA) - TIME_SLOTS.indexOf(slotB);
         })
-        .join(", ");
+        .map((key) => `星期${key.charAt(0)} ${key.slice(2)}`)
+        .join("、");
     } else if (serviceType === "couple") {
-      formattedTimes = selectedCoupleTimes.join(", ");
+      formattedTimes = selectedCoupleTimes.join("、");
     } else {
       formattedTimes = "機構合作，時間由行政後續口頭對接安排";
     }

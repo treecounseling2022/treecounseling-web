@@ -423,12 +423,114 @@ export default function ClientEditor({
         )}
 
         {/* 初次申請說明 */}
-        {form.intake_notes && (
+        {form.service_type !== "couple" && form.intake_notes && (
           <div className="pt-6 border-t border-sand/20 space-y-2">
             <h2 className="font-serif text-deep text-base">初次申請說明</h2>
             <p className="font-sans text-sm text-deep bg-sand/10 px-4 py-3 leading-relaxed whitespace-pre-wrap">
               {form.intake_notes}
             </p>
+          </div>
+        )}
+
+        {/* 臨床背景 — 唯讀版，心理師可見 */}
+        {(form.presenting_concerns.length > 0 ||
+          form.has_psychiatry_history !== null ||
+          form.has_prior_counseling !== null ||
+          form.native_language ||
+          form.preferred_meeting_type ||
+          (form.service_type === "couple" && (form.intake_notes || form.relationship_duration || form.children_info))) && (
+          <div className="pt-6 border-t border-sand/20 space-y-4">
+            <h2 className="font-serif text-deep text-base">臨床背景</h2>
+
+            {form.presenting_concerns.length > 0 && (
+              <div>
+                <p className={roLabelCls}>主訴困擾類型</p>
+                <div className="flex flex-wrap gap-2 mt-1">
+                  {form.presenting_concerns.map((pc) => (
+                    <span key={pc.category} className="font-sans text-xs bg-forest/10 text-forest border border-forest/20 px-2 py-0.5">
+                      {pc.category}
+                    </span>
+                  ))}
+                </div>
+                {form.presenting_concerns.some((pc) => pc.items.length > 0) && (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {form.presenting_concerns.flatMap((pc) => pc.items).map((item) => (
+                      <span key={item} className="font-sans text-xs bg-sand/20 text-muted border border-sand/20 px-2 py-0.5">
+                        {item}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {form.service_type === "couple" && form.intake_notes && (
+              <div>
+                <p className={roLabelCls}>主訴說明</p>
+                <p className="font-sans text-sm text-deep bg-sand/10 px-4 py-3 leading-relaxed whitespace-pre-wrap">{form.intake_notes}</p>
+              </div>
+            )}
+
+            {form.service_type === "couple" && (form.relationship_duration || form.children_info) && (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className={roLabelCls}>關係時長</p>
+                  <p className={roValueCls}>{form.relationship_duration || "—"}</p>
+                </div>
+                <div>
+                  <p className={roLabelCls}>子女資訊</p>
+                  <p className={roValueCls}>{form.children_info || "—"}</p>
+                </div>
+              </div>
+            )}
+
+            {(form.native_language || form.preferred_meeting_type) && (
+              <div className="grid grid-cols-2 gap-4">
+                {form.native_language && (
+                  <div>
+                    <p className={roLabelCls}>輔導語言</p>
+                    <p className={roValueCls}>
+                      {({ cantonese: "粵語", mandarin: "普通話 / 國語", english: "英語", other: "其他" } as Record<string,string>)[form.native_language] ?? form.native_language}
+                    </p>
+                  </div>
+                )}
+                {form.preferred_meeting_type && (
+                  <div>
+                    <p className={roLabelCls}>偏好晤談方式</p>
+                    <p className={roValueCls}>
+                      {({ face: "面談", online: "線上", both: "面談或線上均可" } as Record<string,string>)[form.preferred_meeting_type] ?? form.preferred_meeting_type}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {form.has_psychiatry_history !== null && (
+              <div>
+                <p className={roLabelCls}>曾有精神科就診經驗</p>
+                <p className={roValueCls}>{form.has_psychiatry_history === true ? "有" : "沒有"}</p>
+                {form.has_psychiatry_history === true && form.psychiatry_notes && (
+                  <p className="font-sans text-sm text-deep bg-sand/10 px-4 py-3 mt-1 leading-relaxed whitespace-pre-wrap">{form.psychiatry_notes}</p>
+                )}
+              </div>
+            )}
+
+            {form.has_prior_counseling !== null && (
+              <div>
+                <p className={roLabelCls}>曾有接受心理輔導或諮商經驗</p>
+                <p className={roValueCls}>{form.has_prior_counseling === true ? "有" : "沒有"}</p>
+                {form.has_prior_counseling === true && form.prior_counseling_notes && (
+                  <p className="font-sans text-sm text-deep bg-sand/10 px-4 py-3 mt-1 leading-relaxed whitespace-pre-wrap">{form.prior_counseling_notes}</p>
+                )}
+              </div>
+            )}
+
+            {form.city && (
+              <div>
+                <p className={roLabelCls}>居住城市</p>
+                <p className={roValueCls}>{form.city}</p>
+              </div>
+            )}
           </div>
         )}
 

@@ -329,6 +329,7 @@ export default async function ClientDetailPage({ params }: Props) {
         intakeToken={clientExt.intake_token ?? null}
         intakeSummary={clientExt.intake_summary ?? null}
         intakeSubmittedAt={clientExt.intake_submitted_at ?? null}
+        isAdmin={isAdmin}
       />
 
       {/* 預約紀錄 + 收款（心理師唯讀） */}

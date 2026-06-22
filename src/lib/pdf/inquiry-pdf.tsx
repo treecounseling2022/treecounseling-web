@@ -127,6 +127,25 @@ const MAIN_CATEGORY_LABEL: Record<string, string> = {
   other_issue: "其他困擾",
 };
 
+const DAY_ORDER = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"];
+
+function groupPreferredTimes(raw: string): Array<{ day: string; slots: string[] }> {
+  const parts = raw.split(/[、,]\s*/);
+  const grouped = new Map<string, string[]>();
+  for (const part of parts) {
+    const match = part.trim().match(/^(星期[一二三四五六日])\s+(.+)$/);
+    if (match) {
+      const day = match[1];
+      const slot = match[2];
+      if (!grouped.has(day)) grouped.set(day, []);
+      grouped.get(day)!.push(slot);
+    }
+  }
+  return [...grouped.entries()]
+    .sort(([a], [b]) => DAY_ORDER.indexOf(a) - DAY_ORDER.indexOf(b))
+    .map(([day, slots]) => ({ day, slots }));
+}
+
 function calcAgeStr(dob?: string): string | null {
   if (!dob) return null;
   try {
@@ -336,9 +355,22 @@ function InquiryDocument({ data }: { data: InquiryPDFData }) {
         {data.preferredTimes && (
           <View style={S.section}>
             <SectionTitle>可行時段</SectionTitle>
-            <Text style={{ color: "#333", lineHeight: 1.7, fontSize: 10 }}>
-              {data.preferredTimes}
-            </Text>
+            {(() => {
+              const groups = groupPreferredTimes(data.preferredTimes!);
+              if (groups.length === 0) {
+                return <Text style={{ color: "#333", lineHeight: 1.7, fontSize: 10 }}>{data.preferredTimes}</Text>;
+              }
+              return (
+                <View>
+                  {groups.map(({ day, slots }) => (
+                    <View key={day} style={{ flexDirection: "row", marginBottom: 4 }}>
+                      <Text style={{ width: 50, color: "#444", fontSize: 10, fontWeight: "bold" }}>{day}</Text>
+                      <Text style={{ flex: 1, color: "#111", fontSize: 10 }}>{slots.join("、")}</Text>
+                    </View>
+                  ))}
+                </View>
+              );
+            })()}
           </View>
         )}
 
