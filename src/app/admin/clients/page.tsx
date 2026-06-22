@@ -73,6 +73,12 @@ export default async function ClientsPage({
     partnerNameMap = Object.fromEntries(((partnersRes.data ?? []) as { id: string; full_name: string }[]).map((c) => [c.id, c.full_name]));
   }
 
+  const statusTabs = [
+    { value: "active", label: "使用中" },
+    { value: "archived", label: "已封存" },
+    { value: "all", label: "全部" },
+  ];
+
   return (
     <div className="space-y-6 pt-4">
       <div className="flex items-start justify-between">
@@ -94,8 +100,28 @@ export default async function ClientsPage({
         )}
       </div>
 
+      {/* Status tabs — admin only */}
+      {isAdmin && (
+        <div className="flex gap-1 border-b border-sand/20">
+          {statusTabs.map((tab) => (
+            <Link
+              key={tab.value}
+              href={`/admin/clients?status=${tab.value}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
+              className={`font-sans text-xs px-4 py-2 transition-colors border-b-2 -mb-px ${
+                status === tab.value
+                  ? "border-forest text-forest"
+                  : "border-transparent text-muted hover:text-deep"
+              }`}
+            >
+              {tab.label}
+            </Link>
+          ))}
+        </div>
+      )}
+
       {/* Search */}
       <form method="GET" className="flex gap-2">
+        <input type="hidden" name="status" value={status} />
         <input
           name="q"
           defaultValue={q ?? ""}
@@ -110,7 +136,7 @@ export default async function ClientsPage({
         </button>
         {q && (
           <Link
-            href="/admin/clients"
+            href={`/admin/clients?status=${status}`}
             className="font-sans text-xs px-4 py-2 text-muted/60 hover:text-muted transition-colors"
           >
             清除
@@ -147,10 +173,15 @@ export default async function ClientsPage({
               >
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <p className="font-sans text-sm text-deep">{client.full_name}</p>
+                    <p className={`font-sans text-sm ${client.is_active ? "text-deep" : "text-muted/50 line-through"}`}>{client.full_name}</p>
                     {isCouple && (
                       <span className="font-sans text-[10px] bg-rose-50 text-rose-500 border border-rose-200 px-1.5 py-0.5 leading-none flex-shrink-0">
                         伴侶
+                      </span>
+                    )}
+                    {!client.is_active && (
+                      <span className="font-sans text-[10px] bg-sand/20 text-muted/60 px-1.5 py-0.5 leading-none flex-shrink-0">
+                        已封存
                       </span>
                     )}
                   </div>
@@ -197,7 +228,7 @@ export default async function ClientsPage({
         </table>
         {(clients ?? []).length === 0 && (
           <div className="text-center py-16 font-sans text-xs text-muted/40">
-            {q ? `找不到「${q}」的相關個案。` : "尚未有個案資料。"}
+            {q ? `找不到「${q}」的相關個案。` : status === "archived" ? "沒有已封存的個案。" : "尚未有個案資料。"}
           </div>
         )}
       </div>

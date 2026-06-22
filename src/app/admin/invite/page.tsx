@@ -1,6 +1,5 @@
-import { requireAuth, isAdminLevel } from "@/lib/auth-role";
+import { requireAuth } from "@/lib/auth-role";
 import { createClient } from "@/lib/supabase/server";
-import { TEAM } from "@/lib/data";
 import InviteForm from "./InviteForm";
 
 export default async function InvitePage() {
@@ -9,16 +8,13 @@ export default async function InvitePage() {
   const supabase = await createClient();
   const { data: profiles } = await supabase
     .from("therapist_profiles")
-    .select("id, name, auth_user_id");
+    .select("id, name, auth_user_id")
+    .order("name");
 
-  const profileMap = Object.fromEntries(
-    (profiles ?? []).map((p) => [p.id, p])
-  );
-
-  const members = TEAM.map((m) => ({
-    id: m.id,
-    name: profileMap[m.id]?.name || m.id,
-    hasAccount: !!profileMap[m.id]?.auth_user_id,
+  const members = (profiles ?? []).map((p) => ({
+    id: p.id,
+    name: p.name || p.id,
+    hasAccount: !!p.auth_user_id,
   }));
 
   const roleLabel: Record<string, string> = {
