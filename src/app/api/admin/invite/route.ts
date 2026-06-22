@@ -44,7 +44,10 @@ export async function POST(req: NextRequest) {
   );
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    const msg = error.message && error.message !== "{}"
+      ? error.message
+      : `Supabase error (${error.status ?? "unknown"}): ${JSON.stringify(error)}`;
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 
   if (profileId && data.user && inviteRole === "therapist") {
