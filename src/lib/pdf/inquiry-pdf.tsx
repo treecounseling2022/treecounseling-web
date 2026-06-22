@@ -176,6 +176,9 @@ export type InquiryPDFData = {
   individualDetails?: {
     mainCategories?: string[];
     subCategories?: string[];
+    behaviorFrequency?: string;
+    behaviorImpact?: string[];
+    otherIssueText?: string;
     hasPsychiatryExp?: string;
     psychiatryDetails?: string;
     hasCounselingExp?: string;
@@ -248,6 +251,17 @@ function IndividualContent({ data }: { data: InquiryPDFData }) {
               ))}
             </View>
           )}
+        </View>
+      )}
+
+      {d && (d.behaviorFrequency || (d.behaviorImpact?.length ?? 0) > 0 || d.otherIssueText) && (
+        <View style={S.section}>
+          <SectionTitle>困擾補充說明</SectionTitle>
+          {d.behaviorFrequency && <Row label="成癮行為頻率" value={d.behaviorFrequency} />}
+          {(d.behaviorImpact?.length ?? 0) > 0 && (
+            <Row label="成癮影響面向" value={(d.behaviorImpact ?? []).join("、")} />
+          )}
+          {d.otherIssueText && <Row label="其他困擾說明" value={d.otherIssueText} />}
         </View>
       )}
 
