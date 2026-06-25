@@ -172,6 +172,7 @@ export type InquiryPDFData = {
   meetingType?: string;
   nativeLanguage?: string;
   preferredTherapist?: string;
+  devices?: string[];
   concern?: string;
   individualDetails?: {
     mainCategories?: string[];
@@ -231,6 +232,9 @@ function IndividualContent({ data }: { data: InquiryPDFData }) {
         <Row label="居住城市" value={data.city} />
         <Row label="晤談方式" value={MEETING_LABEL[data.meetingType ?? ""] ?? data.meetingType} />
         <Row label="母語" value={LANG_LABEL[data.nativeLanguage ?? ""] ?? data.nativeLanguage} />
+        {(data.devices?.length ?? 0) > 0 && (
+          <Row label="可用設備" value={(data.devices ?? []).join("、")} />
+        )}
         {data.preferredTherapist && (
           <Row label="偏好心理輔導人員" value={data.preferredTherapist} />
         )}
@@ -403,7 +407,7 @@ function InquiryDocument({ data }: { data: InquiryPDFData }) {
           </View>
         )}
 
-        <Text style={S.footer}>
+        <Text fixed style={S.footer}>
           此文件由樹心理工作室系統自動生成，僅供內部評估使用。個案聯絡方式請查閱後台管理系統。
         </Text>
       </Page>

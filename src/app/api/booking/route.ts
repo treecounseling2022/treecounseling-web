@@ -79,6 +79,7 @@ export async function POST(request: Request) {
             city: body.city ?? undefined,
             meetingType: body.meetingType ?? undefined,
             nativeLanguage: body.nativeLanguage ?? undefined,
+            devices: Array.isArray(body.devices) ? body.devices : undefined,
             preferredTherapist: body.preferredTherapist ?? undefined,
             concern: body.concern ?? undefined,
             individualDetails: body.individualDetails ?? undefined,
