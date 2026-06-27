@@ -43,7 +43,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   row: { flexDirection: "row", marginBottom: 5 },
-  label: { width: 100, fontSize: 9, color: "#666" },
+  label: { width: 100, flexShrink: 0, fontSize: 9, color: "#666" },
   value: { flex: 1, fontSize: 9, color: "#1a1a1a" },
   summaryBox: {
     backgroundColor: "#f7f5ef",

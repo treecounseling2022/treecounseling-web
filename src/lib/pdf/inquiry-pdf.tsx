@@ -45,7 +45,7 @@ const S = StyleSheet.create({
     paddingBottom: 4,
   },
   row: { flexDirection: "row", marginBottom: 6 },
-  label: { width: 100, color: "#444", fontSize: 11 },
+  label: { width: 100, flexShrink: 0, color: "#444", fontSize: 11 },
   value: { flex: 1, color: "#111", fontSize: 11 },
   valueBold: { flex: 1, color: "#000", fontWeight: "bold", fontSize: 11 },
   concernBox: {
@@ -53,8 +53,11 @@ const S = StyleSheet.create({
     padding: "12 14",
     borderLeft: "3pt solid #555",
     marginTop: 4,
+  },
+  concernBoxText: {
     lineHeight: 1.85,
     fontSize: 11,
+    color: "#111",
   },
   partnerBox: {
     border: "1pt solid #bbb",
@@ -403,7 +406,9 @@ function InquiryDocument({ data }: { data: InquiryPDFData }) {
         {data.concern && (
           <View style={S.section}>
             <SectionTitle>{concernLabel}</SectionTitle>
-            <Text style={S.concernBox}>{data.concern}</Text>
+            <View style={S.concernBox}>
+              <Text style={S.concernBoxText}>{data.concern}</Text>
+            </View>
           </View>
         )}
 
