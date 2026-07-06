@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { validateChatMessages } from "@/lib/ai-chat-guard";
 
 const SYSTEM_INSTRUCTION = `
 你是一位樹心理工作室（Tree Counseling Studio）的預約 AI 助寫助理。
@@ -24,9 +25,10 @@ const SYSTEM_INSTRUCTION = `
 
 export async function POST(req: NextRequest) {
   try {
-    const { messages } = await req.json();
+    const body = await req.json();
+    const messages = validateChatMessages(body.messages);
 
-    if (!messages || !Array.isArray(messages)) {
+    if (!messages) {
       return NextResponse.json({ error: "Invalid messages format" }, { status: 400 });
     }
 

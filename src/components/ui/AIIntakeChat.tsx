@@ -10,7 +10,7 @@ interface Message {
   parts: { text: string }[];
 }
 
-type Stage = "loading" | "invalid" | "already_done" | "chat" | "submitted";
+type Stage = "loading" | "invalid" | "already_done" | "chat" | "submitted" | "submit_error";
 
 export default function AIIntakeChat() {
   const searchParams = useSearchParams();
@@ -23,6 +23,7 @@ export default function AIIntakeChat() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasCrisisFlag, setHasCrisisFlag] = useState(false);
+  const [pendingSummary, setPendingSummary] = useState<string | null>(null);
   const chatViewportRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -65,7 +66,7 @@ export default function AIIntakeChat() {
       const res = await fetch("/api/intake", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: newMessages }),
+        body: JSON.stringify({ messages: newMessages, token }),
       });
 
       if (!res.ok) throw new Error("請求失敗");
@@ -102,15 +103,21 @@ export default function AIIntakeChat() {
 
   const autoSubmit = async (summary: string) => {
     setIsSubmitting(true);
+    setPendingSummary(summary);
     try {
-      await fetch("/api/intake", {
+      const res = await fetch("/api/intake", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "submit", token, messages: summary }),
       });
-    } catch { /* 靜默失敗，仍顯示完成 */ }
-    setStage("submitted");
-    setIsSubmitting(false);
+      if (!res.ok && res.status !== 409) throw new Error("submit failed");
+      // 409 = 先前重試時其實已成功送出過，視為完成
+      setStage("submitted");
+    } catch {
+      setStage("submit_error");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // ── Loading ────────────────────────────────────────────────────────────────
@@ -155,6 +162,35 @@ export default function AIIntakeChat() {
         <p className="font-sans text-sm text-muted leading-relaxed">
           你已完成初談，資料已傳送給心理輔導人員。期待與你相見。
         </p>
+      </div>
+    );
+  }
+
+  // ── 提交失敗 ──────────────────────────────────────────────────────────────
+  if (stage === "submit_error") {
+    return (
+      <div className="max-w-lg mx-auto bg-paper border border-sand/20 p-8 space-y-4 text-center">
+        <h2 className="font-serif text-deep text-xl">送出時發生問題</h2>
+        <p className="font-sans text-sm text-muted leading-relaxed">
+          你的初談內容尚未成功送出，請重試一次。如果重試仍然失敗，歡迎直接透過 WhatsApp 聯絡行政人員，我們會協助你完成初談。
+        </p>
+        <div className="flex items-center justify-center gap-3 flex-wrap">
+          <button
+            onClick={() => pendingSummary && autoSubmit(pendingSummary)}
+            disabled={isSubmitting}
+            className="px-5 py-2.5 bg-forest text-paper text-sm font-sans hover:bg-deep transition-colors disabled:opacity-50"
+          >
+            {isSubmitting ? "重試中…" : "重新送出"}
+          </button>
+          <a
+            href="https://wa.me/85362772234"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block px-5 py-2.5 border border-sand/30 text-sm font-sans text-muted hover:text-forest hover:border-forest/40 transition-colors"
+          >
+            WhatsApp 聯絡行政
+          </a>
+        </div>
       </div>
     );
   }

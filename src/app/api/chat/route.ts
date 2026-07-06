@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SYSTEM_INSTRUCTION } from "@/config/chat-prompt";
+import { validateChatMessages } from "@/lib/ai-chat-guard";
 
 export async function POST(req: NextRequest) {
   try {
-    const { messages } = await req.json();
+    const body = await req.json();
+    const messages = validateChatMessages(body.messages);
 
-    if (!messages || !Array.isArray(messages)) {
+    if (!messages) {
       return NextResponse.json({ error: "Invalid messages format" }, { status: 400 });
     }
 

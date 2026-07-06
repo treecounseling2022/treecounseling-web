@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateClientPDF } from "@/lib/generate-client-pdf";
+import { validateChatMessages } from "@/lib/ai-chat-guard";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -84,6 +85,43 @@ const SYSTEM_INSTRUCTION = `
 [SUMMARY_END]
 `;
 
+// 危機旗標偵測到時，不等個案完成/提交初談，立即通知行政（避免個案中途離開就完全無人知曉）
+async function notifyCrisisFlag(clientId: string) {
+  if (!process.env.RESEND_API_KEY) return;
+  try {
+    const db = createAdminClient();
+    const { data: client } = await db
+      .from("clients")
+      .select("full_name, email, phone")
+      .eq("id", clientId)
+      .maybeSingle();
+
+    const FROM = process.env.RESEND_FROM_EMAIL ?? "noreply@treecounseling.com";
+    const ADMIN_EMAIL = process.env.ADMIN_NOTIFICATION_EMAIL ?? "admin@treecounseling.com";
+
+    await resend.emails.send({
+      from: FROM,
+      to: ADMIN_EMAIL,
+      subject: `⚠️【緊急】AI 初談危機評估警示 — ${client?.full_name ?? "個案"}`,
+      html: `
+        <div style="font-family:sans-serif;max-width:520px;margin:0 auto;color:#111;font-size:14px;line-height:1.75">
+          <div style="background:#c0392b;padding:18px 24px">
+            <p style="margin:0;color:#fff;font-size:16px;font-weight:600">⚠️ AI 初談危機評估警示</p>
+          </div>
+          <div style="background:#fff;padding:22px 24px">
+            <p style="margin:0 0 10px"><strong>個案：</strong>${client?.full_name ?? "（未知）"}</p>
+            ${client?.phone ? `<p style="margin:0 0 10px"><strong>電話：</strong>${client.phone}</p>` : ""}
+            ${client?.email ? `<p style="margin:0 0 10px"><strong>Email：</strong>${client.email}</p>` : ""}
+            <p style="margin:16px 0 0;color:#c0392b">個案在 AI 初談對話中透露自傷/自殺意念相關內容，請盡快主動聯繫個案並評估是否需要即時介入。</p>
+          </div>
+        </div>
+      `,
+    });
+  } catch (err) {
+    console.error("Crisis flag notification failed:", err);
+  }
+}
+
 // ── GET：驗證 token，回傳個案姓名 ─────────────────────────────────────────────
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get("token");
@@ -112,6 +150,19 @@ export async function POST(req: NextRequest) {
     if (action === "submit" && token) {
       const summary = messages as string;
       const db = createAdminClient();
+
+      const { data: existing } = await db
+        .from("clients")
+        .select("id, intake_submitted_at")
+        .eq("intake_token", token)
+        .maybeSingle();
+
+      if (!existing) {
+        return NextResponse.json({ error: "Invalid token" }, { status: 404 });
+      }
+      if (existing.intake_submitted_at) {
+        return NextResponse.json({ error: "此初談已提交過，無法重複提交" }, { status: 409 });
+      }
 
       const { data: client, error } = await db
         .from("clients")
@@ -197,8 +248,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
-    // ── 一般對話 ───────────────────────────────────────────────────────────────
-    if (!messages || !Array.isArray(messages)) {
+    // ── 一般對話：需驗證 token 屬於真實個案，避免被當公開免費 AI 端點濫用 ───────────
+    if (!token) {
+      return NextResponse.json({ error: "Missing token" }, { status: 401 });
+    }
+    const db = createAdminClient();
+    const { data: tokenClient } = await db
+      .from("clients")
+      .select("id")
+      .eq("intake_token", token)
+      .maybeSingle();
+    if (!tokenClient) {
+      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+    }
+
+    const validMessages = validateChatMessages(messages);
+    if (!validMessages) {
       return NextResponse.json({ error: "Invalid messages format" }, { status: 400 });
     }
 
@@ -219,7 +284,7 @@ export async function POST(req: NextRequest) {
             model: "claude-haiku-4-5-20251001",
             max_tokens: 800,
             system: SYSTEM_INSTRUCTION,
-            messages: messages.map((m: { role: string; parts: { text: string }[] }) => ({
+            messages: validMessages.map((m) => ({
               role: m.role === "assistant" ? "assistant" : "user",
               content: m.parts[0]?.text ?? "",
             })),
@@ -229,6 +294,9 @@ export async function POST(req: NextRequest) {
         if (response.ok) {
           const data = await response.json();
           const replyText = data.content?.[0]?.text ?? "";
+          if (replyText.includes("[CRISIS_FLAG]")) {
+            notifyCrisisFlag(tokenClient.id).catch(console.error);
+          }
           return NextResponse.json({
             candidates: [{ content: { parts: [{ text: replyText }] } }],
           });
@@ -246,7 +314,7 @@ export async function POST(req: NextRequest) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          contents: messages.map((m: { role: string; parts: { text: string }[] }) => ({
+          contents: validMessages.map((m) => ({
             role: m.role === "assistant" ? "model" : m.role,
             parts: m.parts.map((p) => ({ text: p.text })),
           })),
@@ -262,6 +330,10 @@ export async function POST(req: NextRequest) {
       }
 
       const data = await response.json();
+      const geminiReplyText = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+      if (geminiReplyText.includes("[CRISIS_FLAG]")) {
+        notifyCrisisFlag(tokenClient.id).catch(console.error);
+      }
       return NextResponse.json(data);
     }
 
