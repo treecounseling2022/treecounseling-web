@@ -7,11 +7,11 @@ export async function GET() {
   if (!auth) return NextResponse.json({ error: "未授權" }, { status: 403 });
 
   const db = createAdminClient();
+  // 回傳完整費率歷史（含已失效的舊費率），讓薪酬計算能依場次日期對應到當時生效的費率
   let query = db
     .from("therapist_rates")
     .select("*")
-    .is("effective_to", null)
-    .order("created_at", { ascending: false });
+    .order("effective_from", { ascending: false });
 
   if (auth.role === "therapist") {
     if (!auth.profileId) return NextResponse.json([], { status: 200 });

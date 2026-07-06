@@ -1,17 +1,15 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import {
+  type Rate,
+  type BreakdownItem,
+  COMMISSION_TYPE_LABEL,
+  calcSessionCommission,
+  calcWorkshopCommission,
+} from "@/lib/commission";
 
 type Therapist = { id: string; name: string };
-type Rate = {
-  id: string;
-  therapist_id: string;
-  commission_type: "percentage" | "tiered" | "tiered_per_client" | "flat_per_session" | "event" | "workshop_pct";
-  commission_rate: number | null;
-  flat_amount: number | null;
-  free_sessions: number;
-  tier_config: { threshold: number; rate: number }[] | null;
-};
 type Appointment = {
   id: string;
   client_id: string;
@@ -30,136 +28,16 @@ type Workshop = {
   total_fee: number;
   status: string;
 };
-type BreakdownItem = {
-  date: string;
-  label: string;
-  fee: number;
-  commission: number;
-  type: "session" | "workshop";
-};
 type SalaryRow = {
   therapist: Therapist;
-  sessionRate: Rate | null;
-  workshopRate: Rate | null;
+  sessionRates: Rate[];
+  workshopRates: Rate[];
   sessions: number;
   workshops: number;
   gross: number;
   commission: number;
   net: number;
   breakdown: BreakdownItem[];
-};
-
-function calcSessionCommission(
-  rate: Rate | null,
-  sessions: Appointment[],
-  allAppointments: Appointment[],
-  priorSessionsMap: Record<string, number> = {}
-): { commission: number; breakdown: BreakdownItem[] } {
-  if (!rate || sessions.length === 0) return { commission: 0, breakdown: [] };
-
-  const sorted = [...sessions].sort(
-    (a, b) => new Date(a.scheduled_at ?? 0).getTime() - new Date(b.scheduled_at ?? 0).getTime()
-  );
-
-  // Pre-build counted set for tiered_per_client lookup
-  const countedAll = allAppointments.filter(
-    (a) =>
-      a.booking_status === "confirmed" ||
-      a.booking_status === "locked" ||
-      a.status === "completed"
-  );
-
-  const breakdown: BreakdownItem[] = [];
-  let totalCommission = 0;
-
-  sorted.forEach((appt, idx) => {
-    const fee = appt.session_fee ?? 0;
-    let c = 0;
-    const sessionNum = idx + 1;
-
-    if (rate.commission_type === "percentage") {
-      c = fee * (rate.commission_rate ?? 0);
-    } else if (rate.commission_type === "flat_per_session") {
-      const freeN = rate.free_sessions ?? 0;
-      c = sessionNum <= freeN ? 0 : (rate.flat_amount ?? 0);
-    } else if (rate.commission_type === "tiered" && rate.tier_config) {
-      const tiers = [...rate.tier_config].sort((a, b) => a.threshold - b.threshold);
-      let applicableRate = tiers[0]?.rate ?? 0;
-      for (const tier of tiers) {
-        if (sessionNum >= tier.threshold) applicableRate = tier.rate;
-      }
-      c = fee * applicableRate;
-    } else if (rate.commission_type === "tiered_per_client" && rate.tier_config) {
-      // Count all sessions for this client with this therapist up to and including this date,
-      // plus prior_sessions from old system as starting offset
-      const apptDate = new Date(appt.scheduled_at ?? 0).getTime();
-      const systemCount = countedAll.filter(
-        (a) =>
-          a.client_id === appt.client_id &&
-          a.therapist_id === appt.therapist_id &&
-          new Date(a.scheduled_at ?? 0).getTime() <= apptDate
-      ).length;
-      const priorOffset = priorSessionsMap[appt.client_id] ?? 0;
-      const clientCount = priorOffset + systemCount;
-      const tiers = [...rate.tier_config].sort((a, b) => a.threshold - b.threshold);
-      let applicableRate = tiers[0]?.rate ?? 0;
-      for (const tier of tiers) {
-        if (clientCount >= tier.threshold) applicableRate = tier.rate;
-      }
-      c = fee * applicableRate;
-    }
-
-    totalCommission += c;
-    const sessionLabel =
-      appt.couple_session_type === "joint"         ? "伴侶諮商（雙方）" :
-      appt.couple_session_type === "individual_a"  ? "伴侶個人諮商（A 方）" :
-      appt.couple_session_type === "individual_b"  ? "伴侶個人諮商（B 方）" :
-      "個人諮商";
-
-    breakdown.push({
-      date: appt.scheduled_at ? new Date(appt.scheduled_at).toLocaleDateString("zh-TW") : "—",
-      label: sessionLabel,
-      fee,
-      commission: Math.round(c),
-      type: "session",
-    });
-  });
-
-  return { commission: Math.round(totalCommission), breakdown };
-}
-
-function calcWorkshopCommission(
-  rate: Rate | null,
-  workshops: Workshop[]
-): { commission: number; breakdown: BreakdownItem[] } {
-  if (!rate || workshops.length === 0) return { commission: 0, breakdown: [] };
-
-  const breakdown: BreakdownItem[] = [];
-  let totalCommission = 0;
-
-  workshops.forEach((w) => {
-    const fee = w.total_fee ?? 0;
-    const c = fee * (rate.commission_rate ?? 0);
-    totalCommission += c;
-    breakdown.push({
-      date: new Date(w.scheduled_at).toLocaleDateString("zh-TW"),
-      label: w.title,
-      fee,
-      commission: Math.round(c),
-      type: "workshop",
-    });
-  });
-
-  return { commission: Math.round(totalCommission), breakdown };
-}
-
-const COMMISSION_TYPE_LABEL: Record<string, string> = {
-  percentage: "固定比例",
-  tiered: "階梯式（月累計）",
-  tiered_per_client: "階梯式（個案累計）",
-  flat_per_session: "每次固定",
-  event: "講座固定",
-  workshop_pct: "講座比例",
 };
 
 export default function SalaryClient() {
@@ -199,20 +77,21 @@ export default function SalaryClient() {
         if (c.prior_sessions) priorSessionsMap[c.id] = c.prior_sessions;
       }
 
-      // Build rate maps (session and workshop are separate buckets)
-      const sessionRateMap: Record<string, Rate> = {};
-      const workshopRateMap: Record<string, Rate> = {};
+      // Build rate history maps (session and workshop are separate buckets；含已失效的舊費率）
+      const sessionRateMap: Record<string, Rate[]> = {};
+      const workshopRateMap: Record<string, Rate[]> = {};
       for (const r of allRates) {
+        if (!r.therapist_id) continue;
         if (r.commission_type === "workshop_pct") {
-          if (!workshopRateMap[r.therapist_id]) workshopRateMap[r.therapist_id] = r;
+          (workshopRateMap[r.therapist_id] ??= []).push(r);
         } else if (r.commission_type !== "event") {
-          if (!sessionRateMap[r.therapist_id]) sessionRateMap[r.therapist_id] = r;
+          (sessionRateMap[r.therapist_id] ??= []).push(r);
         }
       }
 
       const result: SalaryRow[] = therapists.map((t) => {
-        const sessionRate = sessionRateMap[t.id] ?? null;
-        const workshopRate = workshopRateMap[t.id] ?? null;
+        const sessionRates = sessionRateMap[t.id] ?? [];
+        const workshopRates = workshopRateMap[t.id] ?? [];
 
         // Filter sessions for this therapist & month (confirmed / locked / completed)
         const mySessions = appointments.filter((a) => {
@@ -239,17 +118,17 @@ export default function SalaryClient() {
         const workshopGross = myWorkshops.reduce((s, w) => s + (w.total_fee ?? 0), 0);
 
         const { commission: sessionCommission, breakdown: sessionBreakdown } =
-          calcSessionCommission(sessionRate, mySessions, appointments, priorSessionsMap);
+          calcSessionCommission(sessionRates, mySessions, appointments, priorSessionsMap);
         const { commission: workshopCommission, breakdown: workshopBreakdown } =
-          calcWorkshopCommission(workshopRate, myWorkshops);
+          calcWorkshopCommission(workshopRates, myWorkshops);
 
         const gross = sessionGross + workshopGross;
         const commission = sessionCommission + workshopCommission;
 
         return {
           therapist: t,
-          sessionRate,
-          workshopRate,
+          sessionRates,
+          workshopRates,
           sessions: mySessions.length,
           workshops: myWorkshops.length,
           gross,
@@ -331,7 +210,10 @@ export default function SalaryClient() {
 
       {/* Per therapist */}
       <div className="space-y-2">
-        {rows.map((row) => (
+        {rows.map((row) => {
+          const currentSessionRate = row.sessionRates.find((r) => !r.effective_to) ?? null;
+          const currentWorkshopRate = row.workshopRates.find((r) => !r.effective_to) ?? null;
+          return (
           <div key={row.therapist.id} className="bg-white border border-sand/20">
             <div
               className="flex items-center gap-4 p-4 cursor-pointer hover:bg-sand/5 transition-colors"
@@ -341,15 +223,15 @@ export default function SalaryClient() {
                 <p className="font-serif text-deep">{row.therapist.name}</p>
                 <p className="font-sans text-[11px] text-muted">
                   {[
-                    row.sessionRate
-                      ? `諮商：${COMMISSION_TYPE_LABEL[row.sessionRate.commission_type]}${
-                          row.sessionRate.commission_type === "percentage" && row.sessionRate.commission_rate
-                            ? ` ${Math.round(row.sessionRate.commission_rate * 100)}%`
+                    currentSessionRate
+                      ? `諮商：${COMMISSION_TYPE_LABEL[currentSessionRate.commission_type]}${
+                          currentSessionRate.commission_type === "percentage" && currentSessionRate.commission_rate
+                            ? ` ${Math.round(currentSessionRate.commission_rate * 100)}%`
                             : ""
                         }`
                       : "諮商：未設定",
-                    row.workshopRate
-                      ? `講座：${Math.round((row.workshopRate.commission_rate ?? 0) * 100)}%`
+                    currentWorkshopRate
+                      ? `講座：${Math.round((currentWorkshopRate.commission_rate ?? 0) * 100)}%`
                       : null,
                   ]
                     .filter(Boolean)
@@ -401,7 +283,7 @@ export default function SalaryClient() {
                     <tbody>
                       {row.breakdown.map((b, i) => (
                         <tr key={i} className="border-t border-sand/10">
-                          <td className="py-1.5 text-muted w-24">{b.date}</td>
+                          <td className="py-1.5 text-muted w-24">{new Date(b.date).toLocaleDateString("zh-TW")}</td>
                           <td className="py-1.5 text-muted">
                             {b.type === "workshop" ? (
                               <span className="inline-flex items-center gap-1.5">
@@ -424,12 +306,12 @@ export default function SalaryClient() {
                     </tbody>
                   </table>
                 )}
-                {row.sessions > 0 && !row.sessionRate && (
+                {row.sessions > 0 && !currentSessionRate && (
                   <p className="font-sans text-xs text-amber-600 bg-amber-50 px-3 py-2 mt-2">
                     此心理師尚未設定諮商抽成，無法計算諮商分成。請至成員資料設定。
                   </p>
                 )}
-                {row.workshops > 0 && !row.workshopRate && (
+                {row.workshops > 0 && !currentWorkshopRate && (
                   <p className="font-sans text-xs text-amber-600 bg-amber-50 px-3 py-2 mt-2">
                     此心理師尚未設定講座抽成，無法計算講座分成。請至成員資料設定。
                   </p>
@@ -437,7 +319,8 @@ export default function SalaryClient() {
               </div>
             )}
           </div>
-        ))}
+          );
+        })}
 
         {rows.length === 0 && (
           <div className="text-center py-12 font-sans text-xs text-muted/40">
