@@ -4,6 +4,7 @@ import { getAuthInfo, isAdminLevel } from "@/lib/auth-role";
 import { checkTimeConflict } from "@/lib/appointments";
 import { Resend } from "resend";
 import { generateInquiryPDF } from "@/lib/pdf/inquiry-pdf";
+import { escapeHtml } from "@/lib/utils";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -104,21 +105,24 @@ export async function POST(
     return NextResponse.json({ error: "此申請已派案" }, { status: 409 });
   }
 
-  // Upsert client (match by email or phone)
+  // Upsert client（同時比對 email 與 phone，避免同一人換過聯絡方式就建重複個案）
   let clientId: string | null = null;
-  if (inquiry.email || inquiry.phone) {
-    const matchField = inquiry.email ? "email" : "phone";
-    const matchValue = inquiry.email ?? inquiry.phone;
-    const { data: existing } = await db
-      .from("clients")
-      .select("id")
-      .eq(matchField, matchValue)
-      .maybeSingle();
+  let createdNewClient = false;
+  {
+    const [byEmail, byPhone] = await Promise.all([
+      inquiry.email
+        ? db.from("clients").select("id, full_name").eq("email", inquiry.email).maybeSingle()
+        : Promise.resolve({ data: null }),
+      inquiry.phone
+        ? db.from("clients").select("id, full_name").eq("phone", inquiry.phone).maybeSingle()
+        : Promise.resolve({ data: null }),
+    ]);
+    const existing = byEmail.data ?? byPhone.data;
     if (existing) {
       clientId = existing.id;
-      // 以申請表的姓名更新個案，避免顯示舊的不正確名稱
+      // 只在既有個案尚未有姓名時才帶入申請表姓名，避免覆蓋既有正確資料
       const newName = extractClientName(inquiry);
-      if (newName && newName !== "未知") {
+      if (!existing.full_name && newName && newName !== "未知") {
         await db.from("clients").update({ full_name: newName }).eq("id", existing.id);
       }
     }
@@ -147,6 +151,7 @@ export async function POST(
       return NextResponse.json({ error: `建立個案失敗：${clientErr?.message}` }, { status: 500 });
     }
     clientId = newClient.id;
+    createdNewClient = true;
   }
 
   // Conflict check when a time slot has already been chosen
@@ -182,6 +187,10 @@ export async function POST(
     .select()
     .single();
   if (apptErr) {
+    // 若這次請求才剛建立新個案，預約卻建立失敗，清除避免留下孤兒個案
+    if (createdNewClient) {
+      await db.from("clients").delete().eq("id", clientId);
+    }
     return NextResponse.json({ error: `建立預約失敗：${apptErr.message}` }, { status: 500 });
   }
 
@@ -222,7 +231,7 @@ export async function POST(
 
       // Build table rows
       const tableRows: string[] = [];
-      tableRows.push(row("個案", `<strong>${clientName}</strong>`));
+      tableRows.push(row("個案", `<strong>${escapeHtml(clientName)}</strong>`));
       tableRows.push(row("服務類型", serviceLabel));
 
       // Birthday with age (individual/hoarding)
@@ -237,17 +246,17 @@ export async function POST(
 
       // Mother tongue
       if (nativeLanguage) {
-        tableRows.push(row("語言", LANG_LABEL[nativeLanguage] ?? nativeLanguage));
+        tableRows.push(row("語言", LANG_LABEL[nativeLanguage] ?? escapeHtml(nativeLanguage)));
       }
 
       // Meeting type — only show if NOT 到診 (face-to-face)
       if (meetingType && meetingType !== "face") {
-        tableRows.push(row("晤談方式", MEETING_LABEL[meetingType] ?? meetingType));
+        tableRows.push(row("晤談方式", MEETING_LABEL[meetingType] ?? escapeHtml(meetingType)));
       }
 
       // Preferred times
       if (inquiry.preferred_times) {
-        tableRows.push(row("偏好時段", `<span style="font-size:0.85rem">${inquiry.preferred_times}</span>`));
+        tableRows.push(row("偏好時段", `<span style="font-size:0.85rem">${escapeHtml(inquiry.preferred_times)}</span>`));
       }
 
       // Scheduled time (if already set)
@@ -318,7 +327,7 @@ export async function POST(
             <table style="width:100%;border-collapse:collapse;margin:0 0 20px">
               ${tableRows.join("\n")}
             </table>
-            ${concern ? `<div style="border-left:3px solid #ccc;padding:10px 14px;margin:0 0 20px;font-size:0.88rem;color:#333;line-height:1.65"><strong>個案說明：</strong><br>${concern.replace(/\n/g, "<br>")}</div>` : ""}
+            ${concern ? `<div style="border-left:3px solid #ccc;padding:10px 14px;margin:0 0 20px;font-size:0.88rem;color:#333;line-height:1.65"><strong>個案說明：</strong><br>${escapeHtml(concern).replace(/\n/g, "<br>")}</div>` : ""}
             <p><a href="${adminUrl}" style="color:#111;font-weight:bold;text-decoration:underline">前往後台確認 →</a></p>
             <p style="color:#888;font-size:0.8rem;margin-top:24px;border-top:1px solid #eee;padding-top:10px">樹心理工作室　Tree Counseling Studio</p>
           </div>

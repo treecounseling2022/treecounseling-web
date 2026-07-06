@@ -4,7 +4,7 @@ import { getAuthInfo, isAdminLevel } from "@/lib/auth-role";
 import { checkTimeConflict } from "@/lib/appointments";
 import { generateInquiryPDF } from "@/lib/pdf/inquiry-pdf";
 import { createCalendarEvent, updateCalendarEvent, deleteCalendarEvent, maskClientName } from "@/lib/google-calendar";
-import { getTherapistDisplayName } from "@/lib/utils";
+import { getTherapistDisplayName, escapeHtml } from "@/lib/utils";
 import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -30,6 +30,25 @@ export async function PATCH(
     .eq("id", id)
     .single();
   if (fetchErr || !appt) return NextResponse.json({ error: "找不到預約" }, { status: 404 });
+
+  // 狀態機：各 action 只能從特定的現行 booking_status 執行，避免例如對已取消的
+  // 預約按下「確認接案」這類不合理的狀態跳轉
+  const VALID_FROM_STATUS: Partial<Record<Action, string[]>> = {
+    assign: ["pending_admin"],
+    confirm: ["pending_therapist"],
+    reject: ["pending_therapist"],
+    reschedule: ["confirmed", "locked"],
+    lock: ["confirmed"],
+    complete: ["confirmed", "locked"],
+    cancel: ["pending_admin", "pending_therapist", "confirmed", "locked"],
+  };
+  const requiredFrom = VALID_FROM_STATUS[action];
+  if (requiredFrom && !requiredFrom.includes(appt.booking_status)) {
+    return NextResponse.json(
+      { error: `此預約目前狀態無法執行此操作（現行狀態：${appt.booking_status}）` },
+      { status: 409 }
+    );
+  }
 
   let update: Record<string, unknown> = {};
 
@@ -450,7 +469,7 @@ export async function PATCH(
               <p style="margin:0 0 12px">您好，<strong>${therapistProfile.name ?? ""}心理師</strong>，</p>
               <p style="margin:0 0 20px;color:#444">行政已為您安排一個新個案，個案預約資料請見附件 PDF。請登入後台確認是否接案。</p>
               <table style="width:100%;border-collapse:collapse;margin:0 0 24px">
-                <tr><td ${tdL}>個案</td><td ${tdR}><strong>${clientData?.full_name ?? "—"}</strong></td></tr>
+                <tr><td ${tdL}>個案</td><td ${tdR}><strong>${escapeHtml(clientData?.full_name ?? "—")}</strong></td></tr>
                 ${data.scheduled_at ? `<tr><td ${tdL}>預計時間</td><td ${tdR}>${new Date(data.scheduled_at).toLocaleString("zh-TW", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Macau" })}</td></tr>` : ""}
               </table>
               <p><a href="${adminUrl}" style="display:inline-block;background:#2d4a38;color:#fff;padding:10px 22px;text-decoration:none;font-size:13px;font-weight:600">前往後台確認 →</a></p>
@@ -489,9 +508,9 @@ export async function PATCH(
           <div style="background:#fff;padding:28px 32px">
             <p style="margin:0 0 20px;color:#444">以下預約已被心理師拒絕，請重新安排派案。</p>
             <table style="width:100%;border-collapse:collapse;margin:0 0 24px">
-              <tr><td ${tdL}>個案</td><td ${tdR}><strong>${clientData?.full_name ?? "—"}</strong></td></tr>
-              <tr><td ${tdL}>原心理師</td><td ${tdR}>${therapistProfile?.name ?? "—"}</td></tr>
-              ${body.rejection_reason ? `<tr><td ${tdL}>拒絕原因</td><td ${tdR}>${String(body.rejection_reason)}</td></tr>` : ""}
+              <tr><td ${tdL}>個案</td><td ${tdR}><strong>${escapeHtml(clientData?.full_name ?? "—")}</strong></td></tr>
+              <tr><td ${tdL}>原心理師</td><td ${tdR}>${escapeHtml(therapistProfile?.name ?? "—")}</td></tr>
+              ${body.rejection_reason ? `<tr><td ${tdL}>拒絕原因</td><td ${tdR}>${escapeHtml(String(body.rejection_reason))}</td></tr>` : ""}
             </table>
             <p><a href="${adminUrl}" style="display:inline-block;background:#7f1d1d;color:#fff;padding:10px 22px;text-decoration:none;font-size:13px;font-weight:600">前往後台重新派案 →</a></p>
           </div>
@@ -640,7 +659,7 @@ export async function PATCH(
               <p style="margin:0;color:#fff;font-size:18px;font-weight:600">諮商晤談預約確認</p>
             </div>
             <div style="background:#fff;padding:28px 32px">
-              <p style="margin:0 0 12px">您好，<strong>${client.full_name}</strong>，</p>
+              <p style="margin:0 0 12px">您好，<strong>${escapeHtml(client.full_name)}</strong>，</p>
               <p style="margin:0 0 20px;color:#444">您的諮商晤談預約已由心理輔導人員確認，詳情如下：</p>
               <table style="width:100%;border-collapse:collapse;margin:0 0 24px">
                 <tr><td ${tdL}>晤談時間</td><td ${tdR}><strong>${scheduledAt}</strong></td></tr>

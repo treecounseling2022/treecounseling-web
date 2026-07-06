@@ -3,6 +3,7 @@ import { Resend } from "resend";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateClientPDF } from "@/lib/generate-client-pdf";
 import { validateChatMessages } from "@/lib/ai-chat-guard";
+import { escapeHtml } from "@/lib/utils";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -193,11 +194,11 @@ export async function POST(req: NextRequest) {
               <div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#111;font-size:14px;line-height:1.75">
                 <div style="background:#2d4a38;padding:20px 28px">
                   <p style="margin:0;color:#a8c5b0;font-size:11px;letter-spacing:1.5px">TREE COUNSELING STUDIO</p>
-                  <p style="margin:4px 0 0;color:#fff;font-size:17px;font-weight:600">AI 初談資料 — ${client.full_name}</p>
+                  <p style="margin:4px 0 0;color:#fff;font-size:17px;font-weight:600">AI 初談資料 — ${escapeHtml(client.full_name)}</p>
                 </div>
                 <div style="background:#fff;padding:24px 28px">
                   <p style="margin:0 0 12px;color:#444">個案已完成 AI 初談，詳細摘要請見附件 PDF。</p>
-                  <pre style="white-space:pre-wrap;font-family:sans-serif;font-size:13px;color:#333;line-height:1.8;background:#f7f5ef;padding:16px;border-left:3px solid #5a8a6a">${summary}</pre>
+                  <pre style="white-space:pre-wrap;font-family:sans-serif;font-size:13px;color:#333;line-height:1.8;background:#f7f5ef;padding:16px;border-left:3px solid #5a8a6a">${escapeHtml(summary)}</pre>
                   ${driveNote}
                 </div>
                 <div style="background:#f7f5ef;padding:12px 28px;text-align:center">

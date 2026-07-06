@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { Resend } from "resend";
 import { generateInquiryPDF } from "@/lib/pdf/inquiry-pdf";
 import { uploadPDFToDrive } from "@/lib/google-drive";
+import { escapeHtml } from "@/lib/utils";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -209,9 +210,9 @@ export async function POST(request: Request) {
               <div style="font-family:sans-serif;max-width:520px;margin:0 auto;color:#111;line-height:1.7">
                 <h2 style="font-size:1.1rem;border-bottom:2px solid #111;padding-bottom:8px;margin-bottom:16px">新預約申請通知</h2>
                 <table style="width:100%;border-collapse:collapse;margin:0 0 20px">
-                  <tr><td ${tdL}>申請人</td><td ${tdR}><strong>${name}</strong></td></tr>
+                  <tr><td ${tdL}>申請人</td><td ${tdR}><strong>${escapeHtml(name)}</strong></td></tr>
                   <tr><td ${tdL}>服務類型</td><td ${tdR}>${serviceLabel}</td></tr>
-                  ${body.preferredTimes ? `<tr><td ${tdL} style="color:#555;padding:6px 16px 6px 0;border-bottom:1px solid #eee;white-space:nowrap;vertical-align:top;font-size:0.88rem">偏好時段</td><td ${tdR}><span style="font-size:0.85rem">${body.preferredTimes}</span></td></tr>` : ""}
+                  ${body.preferredTimes ? `<tr><td ${tdL} style="color:#555;padding:6px 16px 6px 0;border-bottom:1px solid #eee;white-space:nowrap;vertical-align:top;font-size:0.88rem">偏好時段</td><td ${tdR}><span style="font-size:0.85rem">${escapeHtml(body.preferredTimes)}</span></td></tr>` : ""}
                 </table>
                 <p style="color:#555;font-size:0.85rem">完整申請資料（不含聯絡方式）請見附件 PDF。如需聯絡申請人，請至後台查閱聯絡方式。</p>
                 <p><a href="${adminUrl}" style="color:#111;font-weight:bold;text-decoration:underline">前往後台查看申請 →</a></p>
@@ -252,7 +253,7 @@ export async function POST(request: Request) {
           </div>
           <!-- Body -->
           <div style="background:#ffffff;padding:28px 36px">
-            <p style="margin:0 0 14px;color:#2d4a38;font-size:15px;font-weight:600">您好，${recipientName}，</p>
+            <p style="margin:0 0 14px;color:#2d4a38;font-size:15px;font-weight:600">您好，${escapeHtml(recipientName)}，</p>
             <p style="margin:0 0 14px;color:#555;line-height:1.75">感謝您信任樹心理工作室。我們已收到您的 <strong style="color:#2d4a38">${serviceLabel}</strong> 預約申請。</p>
             <!-- Highlight box -->
             <div style="background:#f0f5f1;border-left:3px solid #5a8a6a;padding:14px 18px;margin:0 0 18px;border-radius:0 4px 4px 0">

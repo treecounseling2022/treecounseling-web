@@ -32,9 +32,27 @@ export async function PATCH(
   }
 
   const body = await req.json();
+  // 欄位白名單：不可透過此 API 改寫 appointment_id / therapist_id 等歸屬欄位
+  const ALLOWED_FIELDS = [
+    "session_topic",
+    "content",
+    "observations",
+    "assessment",
+    "plan",
+    "risk_level",
+    "risk_note",
+    "intake_background",
+    "is_submitted",
+    "submitted_at",
+  ] as const;
+  const update: Record<string, unknown> = {};
+  for (const key of ALLOWED_FIELDS) {
+    if (key in body) update[key] = body[key];
+  }
+
   const { data, error } = await db
     .from("session_notes")
-    .update(body)
+    .update(update)
     .eq("id", id)
     .select()
     .single();
