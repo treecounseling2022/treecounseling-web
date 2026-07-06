@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import AIConcernHelper from "@/components/ui/AIConcernHelper";
@@ -192,6 +193,30 @@ type SubmitState = "idle" | "loading" | "success" | "error";
 export default function BookingForm({ therapists = [] }: { therapists?: TherapistOption[] }) {
   const [submitState, setSubmitState] = useState<SubmitState>("idle");
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (submitState === "success") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }, [submitState]);
+
+  const searchParams = useSearchParams();
+
+  // 從 /team/[id]「預約 X 諮詢」或 /assessment 自評結果帶入預選心理師 / 困擾說明
+  useEffect(() => {
+    const therapistParam = searchParams.get("therapist");
+    const scoreParam = searchParams.get("score");
+
+    if (therapistParam && therapists.some((t) => t.id === therapistParam)) {
+      setServiceType((prev) => prev || "individual");
+      setPreferredTherapist(therapistParam);
+    }
+    if (scoreParam) {
+      setServiceType((prev) => prev || "individual");
+      setConcern((prev) => prev || `（透過網站自我評估量表，得分 ${scoreParam} 分，希望進一步了解狀況）`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ================= STATE DEFINITIONS =================
   
@@ -552,7 +577,6 @@ export default function BookingForm({ therapists = [] }: { therapists?: Therapis
   };
 
   if (submitState === "success") {
-    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
     return (
       <div className="bg-forest/10 border border-sand/30 p-10 text-center font-sans max-w-2xl mx-auto my-12">
         <div className="w-14 h-14 border border-sand flex items-center justify-center mx-auto mb-6">
@@ -689,8 +713,9 @@ export default function BookingForm({ therapists = [] }: { therapists?: Therapis
                 </h3>
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <Field label="姓名" required error={formErrors.name}>
+                  <Field label="姓名" required error={formErrors.name} id="name">
                     <input
+                      id="name"
                       type="text"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
@@ -719,8 +744,9 @@ export default function BookingForm({ therapists = [] }: { therapists?: Therapis
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <Field label="出生日期" required error={formErrors.birthday} hint="服務對象為 18 歲或以上">
+                  <Field label="出生日期" required error={formErrors.birthday} hint="服務對象為 18 歲或以上" id="birthday">
                     <input
+                      id="birthday"
                       type="date"
                       min="1900-01-01"
                       max={maxBirthdate}
@@ -730,8 +756,9 @@ export default function BookingForm({ therapists = [] }: { therapists?: Therapis
                     />
                   </Field>
 
-                  <Field label="居住城市" hint="例如：澳門">
+                  <Field label="居住城市" hint="例如：澳門" id="city">
                     <input
+                      id="city"
                       type="text"
                       value={city}
                       onChange={(e) => setCity(e.target.value)}
@@ -763,8 +790,9 @@ export default function BookingForm({ therapists = [] }: { therapists?: Therapis
                     </div>
                   </Field>
 
-                  <Field label="聯絡帳號 / ID" required error={formErrors.contactId} hint="如為 WhatsApp 請填手機號，Email 請填電郵">
+                  <Field label="聯絡帳號 / ID" required error={formErrors.contactId} hint="如為 WhatsApp 請填手機號，Email 請填電郵" id="contactId">
                     <input
+                      id="contactId"
                       type="text"
                       value={contactId}
                       onChange={(e) => setContactId(e.target.value)}
@@ -775,8 +803,9 @@ export default function BookingForm({ therapists = [] }: { therapists?: Therapis
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <Field label="電郵地址" required error={formErrors.email}>
+                  <Field label="電郵地址" required error={formErrors.email} id="email">
                     <input
+                      id="email"
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
@@ -785,8 +814,9 @@ export default function BookingForm({ therapists = [] }: { therapists?: Therapis
                     />
                   </Field>
 
-                  <Field label="手機號碼" required error={formErrors.phone}>
+                  <Field label="手機號碼" required error={formErrors.phone} id="phone">
                     <input
+                      id="phone"
                       type="tel"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
@@ -818,8 +848,9 @@ export default function BookingForm({ therapists = [] }: { therapists?: Therapis
                     </div>
                   </Field>
 
-                  <Field label="母語" required>
+                  <Field label="母語" required id="nativeLanguage">
                     <select
+                      id="nativeLanguage"
                       value={nativeLanguage}
                       onChange={(e) => setNativeLanguage(e.target.value)}
                       className={cn(inputClass(false), "cursor-pointer")}
@@ -848,8 +879,9 @@ export default function BookingForm({ therapists = [] }: { therapists?: Therapis
                   </div>
                 </Field>
 
-                <Field label="偏好心理輔導人員（選填）">
+                <Field label="偏好心理輔導人員（選填）" id="preferredTherapist">
                   <select
+                    id="preferredTherapist"
                     value={preferredTherapist}
                     onChange={(e) => setPreferredTherapist(e.target.value)}
                     className={cn(inputClass(false), "cursor-pointer w-full max-w-sm")}
@@ -918,8 +950,9 @@ export default function BookingForm({ therapists = [] }: { therapists?: Therapis
                           {mainIssue.id === "addiction" && (
                             <div className="pt-3 border-t border-sand/10 grid grid-cols-1 sm:grid-cols-2 gap-4">
                               <div>
-                                <label className="block text-[11px] text-deep mb-1 font-medium">成癮行為發生頻率 (近一個月)</label>
+                                <label htmlFor="behaviorFrequency" className="block text-[11px] text-deep mb-1 font-medium">成癮行為發生頻率 (近一個月)</label>
                                 <select
+                                  id="behaviorFrequency"
                                   value={behaviorFrequency}
                                   onChange={(e) => setBehaviorFrequency(e.target.value)}
                                   className={cn(inputClass(false), "py-1.5 text-xs bg-paper")}
@@ -982,8 +1015,9 @@ export default function BookingForm({ therapists = [] }: { therapists?: Therapis
                   </Field>
 
                   {hasPsychiatryExp === "yes" && (
-                    <Field label="請簡述狀況" required error={formErrors.psychiatryDetails} hint="內容儘量包含何時就診、是否有診斷、用藥情況等。">
+                    <Field label="請簡述狀況" required error={formErrors.psychiatryDetails} hint="內容儘量包含何時就診、是否有診斷、用藥情況等。" id="psychiatryDetails">
                       <textarea
+                        id="psychiatryDetails"
                         rows={3}
                         value={psychiatryDetails}
                         onChange={(e) => setPsychiatryDetails(e.target.value)}
@@ -1015,8 +1049,9 @@ export default function BookingForm({ therapists = [] }: { therapists?: Therapis
                   </Field>
 
                   {hasCounselingExp === "yes" && (
-                    <Field label="請簡述狀況" required error={formErrors.counselingDetails} hint="內容儘量包含何時接受輔導、持續時間、開始/結束原因。">
+                    <Field label="請簡述狀況" required error={formErrors.counselingDetails} hint="內容儘量包含何時接受輔導、持續時間、開始/結束原因。" id="counselingDetails">
                       <textarea
+                        id="counselingDetails"
                         rows={3}
                         value={counselingDetails}
                         onChange={(e) => setCounselingDetails(e.target.value)}
@@ -1030,7 +1065,7 @@ export default function BookingForm({ therapists = [] }: { therapists?: Therapis
                 {/* 困擾詳細描述文字域 + AI 助手按鈕 */}
                 <div className="pt-6 border-t border-sand/15 space-y-2">
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                    <label className="block font-sans text-sm text-deep">
+                    <label htmlFor="concern" className="block font-sans text-sm text-deep">
                       請簡述您目前遇到的困擾與狀態 <span className="text-sand ml-1">*</span>
                     </label>
                     <AIConcernHelper
@@ -1039,6 +1074,7 @@ export default function BookingForm({ therapists = [] }: { therapists?: Therapis
                     />
                   </div>
                   <textarea
+                    id="concern"
                     rows={5}
                     value={concern}
                     onChange={(e) => setConcern(e.target.value)}
@@ -1049,8 +1085,9 @@ export default function BookingForm({ therapists = [] }: { therapists?: Therapis
                 </div>
 
                 {/* 輔導人員要求 */}
-                <Field label="對於輔導人員的要求 (選填)" hint="如性別偏好、個人風格、流派等">
+                <Field label="對於輔導人員的要求 (選填)" hint="如性別偏好、個人風格、流派等" id="therapistRequirements">
                   <input
+                    id="therapistRequirements"
                     type="text"
                     value={therapistRequirements}
                     onChange={(e) => setTherapistRequirements(e.target.value)}
@@ -1075,8 +1112,9 @@ export default function BookingForm({ therapists = [] }: { therapists?: Therapis
                     「A」先生 / 小姐 個人基本資料
                   </h4>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <Field label="姓名" required error={formErrors.nameA}>
+                    <Field label="姓名" required error={formErrors.nameA} id="nameA">
                       <input
+                        id="nameA"
                         type="text"
                         value={nameA}
                         onChange={(e) => setNameA(e.target.value)}
@@ -1084,8 +1122,8 @@ export default function BookingForm({ therapists = [] }: { therapists?: Therapis
                         className={inputClass(!!formErrors.nameA)}
                       />
                     </Field>
-                    <Field label="性別" required error={formErrors.genderA}>
-                      <select value={genderA} onChange={(e) => setGenderA(e.target.value)} className={cn(inputClass(!!formErrors.genderA), "cursor-pointer")}>
+                    <Field label="性別" required error={formErrors.genderA} id="genderA">
+                      <select id="genderA" value={genderA} onChange={(e) => setGenderA(e.target.value)} className={cn(inputClass(!!formErrors.genderA), "cursor-pointer")}>
                         <option value="">選擇性別</option>
                         <option value="男">男</option>
                         <option value="女">女</option>
@@ -1094,8 +1132,9 @@ export default function BookingForm({ therapists = [] }: { therapists?: Therapis
                     </Field>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <Field label="出生日期" required error={formErrors.birthdayA} hint="18 歲或以上">
+                    <Field label="出生日期" required error={formErrors.birthdayA} hint="18 歲或以上" id="birthdayA">
                       <input
+                        id="birthdayA"
                         type="date"
                         min="1900-01-01"
                         max={maxBirthdate}
@@ -1104,8 +1143,8 @@ export default function BookingForm({ therapists = [] }: { therapists?: Therapis
                         className={inputClass(!!formErrors.birthdayA)}
                       />
                     </Field>
-                    <Field label="母語" required>
-                      <select value={languageA} onChange={(e) => setLanguageA(e.target.value)} className={cn(inputClass(false), "cursor-pointer")}>
+                    <Field label="母語" required id="languageA">
+                      <select id="languageA" value={languageA} onChange={(e) => setLanguageA(e.target.value)} className={cn(inputClass(false), "cursor-pointer")}>
                         <option value="cantonese">粵語</option>
                         <option value="mandarin">普通話 / 國語</option>
                         <option value="english">英語</option>
@@ -1121,8 +1160,9 @@ export default function BookingForm({ therapists = [] }: { therapists?: Therapis
                     「B」先生 / 小姐 個人基本資料
                   </h4>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <Field label="姓名" required error={formErrors.nameB}>
+                    <Field label="姓名" required error={formErrors.nameB} id="nameB">
                       <input
+                        id="nameB"
                         type="text"
                         value={nameB}
                         onChange={(e) => setNameB(e.target.value)}
@@ -1130,8 +1170,8 @@ export default function BookingForm({ therapists = [] }: { therapists?: Therapis
                         className={inputClass(!!formErrors.nameB)}
                       />
                     </Field>
-                    <Field label="性別" required error={formErrors.genderB}>
-                      <select value={genderB} onChange={(e) => setGenderB(e.target.value)} className={cn(inputClass(!!formErrors.genderB), "cursor-pointer")}>
+                    <Field label="性別" required error={formErrors.genderB} id="genderB">
+                      <select id="genderB" value={genderB} onChange={(e) => setGenderB(e.target.value)} className={cn(inputClass(!!formErrors.genderB), "cursor-pointer")}>
                         <option value="">選擇性別</option>
                         <option value="男">男</option>
                         <option value="女">女</option>
@@ -1140,8 +1180,9 @@ export default function BookingForm({ therapists = [] }: { therapists?: Therapis
                     </Field>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <Field label="出生日期" required error={formErrors.birthdayB} hint="18 歲或以上">
+                    <Field label="出生日期" required error={formErrors.birthdayB} hint="18 歲或以上" id="birthdayB">
                       <input
+                        id="birthdayB"
                         type="date"
                         min="1900-01-01"
                         max={maxBirthdate}
@@ -1150,8 +1191,8 @@ export default function BookingForm({ therapists = [] }: { therapists?: Therapis
                         className={inputClass(!!formErrors.birthdayB)}
                       />
                     </Field>
-                    <Field label="母語" required>
-                      <select value={languageB} onChange={(e) => setLanguageB(e.target.value)} className={cn(inputClass(false), "cursor-pointer")}>
+                    <Field label="母語" required id="languageB">
+                      <select id="languageB" value={languageB} onChange={(e) => setLanguageB(e.target.value)} className={cn(inputClass(false), "cursor-pointer")}>
                         <option value="cantonese">粵語</option>
                         <option value="mandarin">普通話 / 國語</option>
                         <option value="english">英語</option>
@@ -1187,8 +1228,9 @@ export default function BookingForm({ therapists = [] }: { therapists?: Therapis
                 </Field>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <Field label="開始伴侶關係多久？" required error={formErrors.relationshipDuration} hint="如：交往 3 年，或結婚 5 年">
+                  <Field label="開始伴侶關係多久？" required error={formErrors.relationshipDuration} hint="如：交往 3 年，或結婚 5 年" id="relationshipDuration">
                     <input
+                      id="relationshipDuration"
                       type="text"
                       value={relationshipDuration}
                       onChange={(e) => setRelationshipDuration(e.target.value)}
@@ -1196,8 +1238,9 @@ export default function BookingForm({ therapists = [] }: { therapists?: Therapis
                       className={inputClass(!!formErrors.relationshipDuration)}
                     />
                   </Field>
-                  <Field label="育有多少名子女" hint="可以的話，請把性別也列出 (選填)">
+                  <Field label="育有多少名子女" hint="可以的話，請把性別也列出 (選填)" id="childrenCount">
                     <input
+                      id="childrenCount"
                       type="text"
                       value={childrenCount}
                       onChange={(e) => setChildrenCount(e.target.value)}
@@ -1210,7 +1253,7 @@ export default function BookingForm({ therapists = [] }: { therapists?: Therapis
                 {/* 伴侶困擾文字域 + AI 助手按鈕 */}
                 <div className="space-y-2">
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                    <label className="block font-sans text-sm text-deep">
+                    <label htmlFor="coupleConcern" className="block font-sans text-sm text-deep">
                       請說明你們目前遇到的狀況 <span className="text-sand ml-1">*</span>
                     </label>
                     <AIConcernHelper
@@ -1219,6 +1262,7 @@ export default function BookingForm({ therapists = [] }: { therapists?: Therapis
                     />
                   </div>
                   <textarea
+                    id="coupleConcern"
                     rows={5}
                     value={coupleConcern}
                     onChange={(e) => setCoupleConcern(e.target.value)}
@@ -1269,29 +1313,29 @@ export default function BookingForm({ therapists = [] }: { therapists?: Therapis
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-sand/10 pt-4">
-                    <Field label="[A] 聯絡帳號 / ID (WhatsApp手機)" required error={formErrors.contactIdA}>
-                      <input type="text" value={contactIdA} onChange={(e) => setContactIdA(e.target.value)} placeholder="WhatsApp 手機號" className={inputClass(!!formErrors.contactIdA)} />
+                    <Field label="[A] 聯絡帳號 / ID (WhatsApp手機)" required error={formErrors.contactIdA} id="contactIdA">
+                      <input id="contactIdA" type="text" value={contactIdA} onChange={(e) => setContactIdA(e.target.value)} placeholder="WhatsApp 手機號" className={inputClass(!!formErrors.contactIdA)} />
                     </Field>
-                    <Field label="[B] 聯絡帳號 / ID (WhatsApp手機)" required error={formErrors.contactIdB}>
-                      <input type="text" value={contactIdB} onChange={(e) => setContactIdB(e.target.value)} placeholder="WhatsApp 手機號" className={inputClass(!!formErrors.contactIdB)} />
-                    </Field>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <Field label="[A] 電子郵件" required error={formErrors.emailA}>
-                      <input type="email" value={emailA} onChange={(e) => setEmailA(e.target.value)} placeholder="yourA@email.com" className={inputClass(!!formErrors.emailA)} />
-                    </Field>
-                    <Field label="[B] 電子郵件" required error={formErrors.emailB}>
-                      <input type="email" value={emailB} onChange={(e) => setEmailB(e.target.value)} placeholder="yourB@email.com" className={inputClass(!!formErrors.emailB)} />
+                    <Field label="[B] 聯絡帳號 / ID (WhatsApp手機)" required error={formErrors.contactIdB} id="contactIdB">
+                      <input id="contactIdB" type="text" value={contactIdB} onChange={(e) => setContactIdB(e.target.value)} placeholder="WhatsApp 手機號" className={inputClass(!!formErrors.contactIdB)} />
                     </Field>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <Field label="[A] 手機號碼" required error={formErrors.phoneA}>
-                      <input type="tel" value={phoneA} onChange={(e) => setPhoneA(e.target.value)} placeholder="手機號 A" className={inputClass(!!formErrors.phoneA)} />
+                    <Field label="[A] 電子郵件" required error={formErrors.emailA} id="emailA">
+                      <input id="emailA" type="email" value={emailA} onChange={(e) => setEmailA(e.target.value)} placeholder="yourA@email.com" className={inputClass(!!formErrors.emailA)} />
                     </Field>
-                    <Field label="[B] 手機號碼" required error={formErrors.phoneB}>
-                      <input type="tel" value={phoneB} onChange={(e) => setPhoneB(e.target.value)} placeholder="手機號 B" className={inputClass(!!formErrors.phoneB)} />
+                    <Field label="[B] 電子郵件" required error={formErrors.emailB} id="emailB">
+                      <input id="emailB" type="email" value={emailB} onChange={(e) => setEmailB(e.target.value)} placeholder="yourB@email.com" className={inputClass(!!formErrors.emailB)} />
+                    </Field>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Field label="[A] 手機號碼" required error={formErrors.phoneA} id="phoneA">
+                      <input id="phoneA" type="tel" value={phoneA} onChange={(e) => setPhoneA(e.target.value)} placeholder="手機號 A" className={inputClass(!!formErrors.phoneA)} />
+                    </Field>
+                    <Field label="[B] 手機號碼" required error={formErrors.phoneB} id="phoneB">
+                      <input id="phoneB" type="tel" value={phoneB} onChange={(e) => setPhoneB(e.target.value)} placeholder="手機號 B" className={inputClass(!!formErrors.phoneB)} />
                     </Field>
                   </div>
                 </div>
@@ -1307,8 +1351,9 @@ export default function BookingForm({ therapists = [] }: { therapists?: Therapis
                 <p className="text-xs text-muted/70">請提供您的機構或單位資訊，這能協助我們對接相應的心理方案。</p>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <Field label="機構 / 單位名稱" required error={formErrors.companyName}>
+                  <Field label="機構 / 單位名稱" required error={formErrors.companyName} id="companyName">
                     <input
+                      id="companyName"
                       type="text"
                       value={companyName}
                       onChange={(e) => setCompanyName(e.target.value)}
@@ -1317,8 +1362,9 @@ export default function BookingForm({ therapists = [] }: { therapists?: Therapis
                     />
                   </Field>
 
-                  <Field label="聯絡人姓名" required error={formErrors.contactPerson}>
+                  <Field label="聯絡人姓名" required error={formErrors.contactPerson} id="contactPerson">
                     <input
+                      id="contactPerson"
                       type="text"
                       value={contactPerson}
                       onChange={(e) => setContactPerson(e.target.value)}
@@ -1347,8 +1393,9 @@ export default function BookingForm({ therapists = [] }: { therapists?: Therapis
                     </div>
                   </Field>
 
-                  <Field label="聯絡帳號 / ID" required error={formErrors.contactIdOther} hint="如為 WhatsApp 請填手機號，Email 請填電郵">
+                  <Field label="聯絡帳號 / ID" required error={formErrors.contactIdOther} hint="如為 WhatsApp 請填手機號，Email 請填電郵" id="contactIdOther">
                     <input
+                      id="contactIdOther"
                       type="text"
                       value={contactIdOther}
                       onChange={(e) => setContactIdOther(e.target.value)}
@@ -1359,8 +1406,9 @@ export default function BookingForm({ therapists = [] }: { therapists?: Therapis
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <Field label="聯絡電子郵件" required error={formErrors.emailOther}>
+                  <Field label="聯絡電子郵件" required error={formErrors.emailOther} id="emailOther">
                     <input
+                      id="emailOther"
                       type="email"
                       value={emailOther}
                       onChange={(e) => setEmailOther(e.target.value)}
@@ -1369,8 +1417,9 @@ export default function BookingForm({ therapists = [] }: { therapists?: Therapis
                     />
                   </Field>
 
-                  <Field label="聯絡電話" required error={formErrors.phoneOther}>
+                  <Field label="聯絡電話" required error={formErrors.phoneOther} id="phoneOther">
                     <input
+                      id="phoneOther"
                       type="tel"
                       value={phoneOther}
                       onChange={(e) => setPhoneOther(e.target.value)}
@@ -1380,8 +1429,9 @@ export default function BookingForm({ therapists = [] }: { therapists?: Therapis
                   </Field>
                 </div>
 
-                <Field label="項目或活動主題 (選填)" hint="例如：大專生情緒調適講座，或員工心理健康方案計劃">
+                <Field label="項目或活動主題 (選填)" hint="例如：大專生情緒調適講座，或員工心理健康方案計劃" id="projectTheme">
                   <input
+                    id="projectTheme"
                     type="text"
                     value={projectTheme}
                     onChange={(e) => setProjectTheme(e.target.value)}
@@ -1392,11 +1442,12 @@ export default function BookingForm({ therapists = [] }: { therapists?: Therapis
 
                 {/* 詳細需求說明 */}
                 <div className="space-y-2">
-                  <label className="block font-sans text-sm text-deep font-medium">
+                  <label htmlFor="otherConcern" className="block font-sans text-sm text-deep font-medium">
                     詳細需求說明 <span className="text-sand ml-1">*</span>
                   </label>
                   <p className="text-xs text-muted/70">請簡單描述活動目的、對象、預算、期望舉辦的月份或其它具體合作細節。</p>
                   <textarea
+                    id="otherConcern"
                     rows={6}
                     value={otherConcern}
                     onChange={(e) => setOtherConcern(e.target.value)}
@@ -1581,22 +1632,24 @@ function Field({
   hint,
   required,
   children,
+  id,
 }: {
   label: string;
   error?: string;
   hint?: string;
   required?: boolean;
   children: React.ReactNode;
+  id?: string;
 }) {
   return (
     <div className="space-y-1.5 w-full">
-      <label className="block font-sans text-sm text-deep font-medium">
+      <label htmlFor={id} className="block font-sans text-sm text-deep font-medium">
         {label}
         {required && <span className="text-sand ml-1">*</span>}
       </label>
       {hint && <p className="text-xs font-sans text-muted/65 leading-relaxed">{hint}</p>}
       {children}
-      {error && <p className="text-xs text-red-500 font-sans font-medium">{error}</p>}
+      {error && <p role="alert" className="text-xs text-red-500 font-sans font-medium">{error}</p>}
     </div>
   );
 }
