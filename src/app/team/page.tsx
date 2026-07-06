@@ -28,9 +28,12 @@ export default async function TeamPage() {
   const supabase = await createClient();
   const { data: profiles } = await supabase
     .from("therapist_profiles")
-    .select("id, socials");
+    .select("id, socials, photo_url");
   const socialsMap: Record<string, Socials> = Object.fromEntries(
     (profiles ?? []).map((p) => [p.id, (p.socials as Socials) ?? {}])
+  );
+  const photoMap: Record<string, string | null> = Object.fromEntries(
+    (profiles ?? []).map((p) => [p.id, p.photo_url as string | null])
   );
   return (
     <div className="relative w-full overflow-hidden bg-background isolate">
@@ -88,7 +91,7 @@ export default async function TeamPage() {
                     >
                       <div className="relative aspect-[3/4] w-full overflow-hidden">
                         <Image
-                          src={member.photo}
+                          src={photoMap[member.id] || member.photo}
                           alt={member.name}
                           fill
                           className="object-cover object-top transition-transform duration-700 group-hover:scale-103"
