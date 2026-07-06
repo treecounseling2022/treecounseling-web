@@ -9,6 +9,9 @@ const ADMIN_EMAIL = process.env.ADMIN_NOTIFICATION_EMAIL;
 
 export async function GET(req: NextRequest) {
   // Verify the request is from Vercel Cron
+  if (!process.env.CRON_SECRET) {
+    return NextResponse.json({ error: "CRON_SECRET not configured" }, { status: 401 });
+  }
   const authHeader = req.headers.get("authorization");
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

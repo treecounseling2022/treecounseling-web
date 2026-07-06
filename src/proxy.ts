@@ -2,13 +2,19 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function proxy(request: NextRequest) {
-  const isAdminRoute = request.nextUrl.pathname.startsWith("/admin");
+  const isAdminApiRoute = request.nextUrl.pathname.startsWith("/api/admin");
+  const isAdminRoute = request.nextUrl.pathname.startsWith("/admin") || isAdminApiRoute;
   const isLoginPage = request.nextUrl.pathname === "/admin/login";
+
+  const blockUnauthorized = () =>
+    isAdminApiRoute
+      ? NextResponse.json({ error: "未授權" }, { status: 401 })
+      : NextResponse.redirect(new URL("/admin/login", request.url));
 
   // If Supabase is not configured, allow login page and block all other admin routes
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
     if (isAdminRoute && !isLoginPage) {
-      return NextResponse.redirect(new URL("/admin/login", request.url));
+      return blockUnauthorized();
     }
     return NextResponse.next({ request });
   }
@@ -42,7 +48,7 @@ export async function proxy(request: NextRequest) {
     } = await supabase.auth.getUser();
 
     if (isAdminRoute && !isLoginPage && !user) {
-      return NextResponse.redirect(new URL("/admin/login", request.url));
+      return blockUnauthorized();
     }
 
     if (isLoginPage && user) {
@@ -51,7 +57,7 @@ export async function proxy(request: NextRequest) {
   } catch {
     // Auth check failed — allow login page, block other admin routes
     if (isAdminRoute && !isLoginPage) {
-      return NextResponse.redirect(new URL("/admin/login", request.url));
+      return blockUnauthorized();
     }
   }
 
@@ -59,5 +65,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*"],
+  matcher: ["/admin/:path*", "/api/admin/:path*"],
 };
