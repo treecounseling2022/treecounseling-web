@@ -94,12 +94,10 @@ async function getProfileFromDB(id: string): Promise<DBProfile | null> {
 
 export default async function TherapistPage({ params }: Props) {
   const { id } = await params;
-  const member = TEAM.find((m) => m.id === id);
-  if (!member) {
+  const dbProfile = await getProfileFromDB(id);
+  if (!dbProfile) {
     notFound();
   }
-
-  const dbProfile = await getProfileFromDB(id);
 
   const displayName   = dbProfile?.name      || "";
   const displayNameEn = dbProfile?.name_en   || "";
@@ -191,7 +189,7 @@ export default async function TherapistPage({ params }: Props) {
                 {/* CTA */}
                 <div className="pt-2">
                   <Link
-                    href={`/booking?therapist=${member.id}`}
+                    href={`/booking?therapist=${id}`}
                     className="w-full inline-flex items-center justify-center py-3 bg-forest text-paper text-xs font-sans tracking-wide hover:bg-deep transition-colors cursor-pointer"
                   >
                     預約 {displayName} 諮詢

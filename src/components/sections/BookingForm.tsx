@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-import { TEAM } from "@/lib/data";
 import AIConcernHelper from "@/components/ui/AIConcernHelper";
 import SignatureCanvas from "@/components/ui/SignatureCanvas";
+
+type TherapistOption = { id: string; name: string; title: string | null };
 
 // 個人輔導十大困擾及其細項
 const INDIVIDUAL_ISSUES = [
@@ -188,7 +189,7 @@ const COUPLE_TIME_SLOTS = [
 
 type SubmitState = "idle" | "loading" | "success" | "error";
 
-export default function BookingForm() {
+export default function BookingForm({ therapists = [] }: { therapists?: TherapistOption[] }) {
   const [submitState, setSubmitState] = useState<SubmitState>("idle");
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
@@ -854,9 +855,9 @@ export default function BookingForm() {
                     className={cn(inputClass(false), "cursor-pointer w-full max-w-sm")}
                   >
                     <option value="">由工作室為您配對合適心理輔導人員</option>
-                    {TEAM.map((member) => (
+                    {therapists.map((member) => (
                       <option key={member.id} value={member.id}>
-                        {member.name} ({member.title})
+                        {member.name}{member.title ? `（${member.title}）` : ""}
                       </option>
                     ))}
                   </select>

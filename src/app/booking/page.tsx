@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import FadeIn from "@/components/ui/FadeIn";
 import BookingForm from "@/components/sections/BookingForm";
+import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
   title: "預約諮商輔導",
@@ -9,7 +10,18 @@ export const metadata: Metadata = {
     "填寫預約表單，樹心理工作室將盡快與您確認諮商晤談時段。所有資料嚴格保密。",
 };
 
-export default function BookingPage() {
+async function getTherapistOptions() {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("therapist_profiles")
+    .select("id, name, title")
+    .not("name", "is", null)
+    .order("name");
+  return data ?? [];
+}
+
+export default async function BookingPage() {
+  const therapists = await getTherapistOptions();
   return (
     <>
       {/* Header */}
@@ -88,7 +100,7 @@ export default function BookingPage() {
             {/* Form */}
             <FadeIn direction="right" delay={150} className="md:col-span-2">
               <Suspense fallback={<div className="bg-soft border border-sand/20 p-10 text-center font-sans text-muted text-sm">載入預約表單中...</div>}>
-                <BookingForm />
+                <BookingForm therapists={therapists} />
               </Suspense>
             </FadeIn>
           </div>

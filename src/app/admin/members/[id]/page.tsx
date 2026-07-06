@@ -1,5 +1,4 @@
 import { notFound, redirect } from "next/navigation";
-import { TEAM } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAuth } from "@/lib/auth-role";
@@ -12,13 +11,8 @@ interface Props {
 
 export default async function MemberEditPage({ params }: Props) {
   const { id } = await params;
-  if (!TEAM.find((m) => m.id === id)) notFound();
 
   const auth = await requireAuth();
-
-  if (auth.role === "therapist" && auth.profileId !== id) {
-    redirect(auth.profileId ? `/admin/members/${auth.profileId}` : "/admin");
-  }
 
   const supabase = await createClient();
   const [{ data: profile }, { data: availability }] = await Promise.all([
@@ -30,6 +24,12 @@ export default async function MemberEditPage({ params }: Props) {
       .order("day_of_week")
       .order("start_time"),
   ]);
+
+  if (!profile) notFound();
+
+  if (auth.role === "therapist" && auth.profileId !== id) {
+    redirect(auth.profileId ? `/admin/members/${auth.profileId}` : "/admin");
+  }
 
   const displayName = profile?.name || id;
 
