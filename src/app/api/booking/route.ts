@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { Resend } from "resend";
 import { generateInquiryPDF } from "@/lib/pdf/inquiry-pdf";
@@ -18,12 +19,82 @@ const SERVICE_LABEL: Record<string, string> = {
   other: "其他行政查詢",
 };
 
+const MAX_PAYLOAD_CHARS = 200_000; // 擋灌爆／超大簽名附件
+
+const emailField = z.string().trim().max(200).regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, "電郵格式不正確").optional().or(z.literal(""));
+const shortText = z.string().trim().max(200).optional();
+const longText = z.string().trim().max(5000).optional();
+const birthdayField = z
+  .string()
+  .refine((v) => {
+    if (!v) return true;
+    const birth = new Date(v);
+    if (isNaN(birth.getTime())) return false;
+    const today = new Date();
+    let age = today.getFullYear() - birth.getFullYear();
+    const m = today.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+    return age >= 18;
+  }, "申請人須年滿 18 歲")
+  .optional();
+
+const partnerSchema = z
+  .object({
+    name: shortText,
+    gender: shortText,
+    birthday: birthdayField,
+    email: emailField,
+    phone: shortText,
+    language: shortText,
+    contactId: shortText,
+  })
+  .partial()
+  .optional();
+
+const bookingSchema = z.object({
+  serviceType: z.enum(["individual", "couple", "hoarding", "workshop", "proposal", "other"]),
+  name: shortText,
+  email: emailField,
+  phone: shortText,
+  birthday: birthdayField,
+  concern: longText,
+  preferredTimes: z.string().trim().max(3000).optional(),
+  signature: z.string().max(500_000).optional(),
+  coupleDetails: z
+    .object({
+      partnerA: partnerSchema,
+      partnerB: partnerSchema,
+      issues: z.array(z.string().max(200)).max(50).optional(),
+      duration: shortText,
+      children: shortText,
+      meetingType: shortText,
+    })
+    .partial()
+    .optional(),
+});
+
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
+    const rawBody = await request.text();
+    if (rawBody.length > MAX_PAYLOAD_CHARS) {
+      return NextResponse.json({ error: "提交內容過大" }, { status: 413 });
+    }
 
-    if (!body.serviceType) {
-      return NextResponse.json({ error: "缺少服務類型" }, { status: 400 });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let body: any;
+    try {
+      body = JSON.parse(rawBody);
+    } catch {
+      return NextResponse.json({ error: "格式錯誤" }, { status: 400 });
+    }
+
+    const parsed = bookingSchema.safeParse(body);
+    if (!parsed.success) {
+      const firstIssue = parsed.error.issues[0];
+      return NextResponse.json(
+        { error: firstIssue?.message ?? "表單內容不正確" },
+        { status: 400 }
+      );
     }
 
     const db = createAdminClient();

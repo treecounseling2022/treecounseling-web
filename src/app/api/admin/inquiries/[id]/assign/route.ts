@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAuthInfo, isAdminLevel } from "@/lib/auth-role";
+import { checkTimeConflict } from "@/lib/appointments";
 import { Resend } from "resend";
 import { generateInquiryPDF } from "@/lib/pdf/inquiry-pdf";
 
@@ -146,6 +147,14 @@ export async function POST(
       return NextResponse.json({ error: `建立個案失敗：${clientErr?.message}` }, { status: 500 });
     }
     clientId = newClient.id;
+  }
+
+  // Conflict check when a time slot has already been chosen
+  if (body.scheduled_at) {
+    const conflict = await checkTimeConflict(db, body.therapist_id, body.scheduled_at);
+    if (conflict) {
+      return NextResponse.json({ error: conflict }, { status: 409 });
+    }
   }
 
   // Auto-detect intake: first ever appointment for this client

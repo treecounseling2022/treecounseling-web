@@ -137,6 +137,8 @@ export async function POST(req: NextRequest) {
         admin_notes: body.admin_notes ?? null,
         booking_status: "confirmed",
         session_type: sessionType,
+        couple_session_type: body.couple_session_type ?? null,
+        couple_partner_client_id: body.couple_partner_client_id ?? null,
       })
       .select()
       .single();
