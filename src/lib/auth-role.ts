@@ -1,10 +1,11 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
-// director = 所長（最高權限，初始帳號無 metadata 者）
+// director = 所長（最高權限，需明確設定 user_metadata.role = "director"）
 // admin    = 行政（可管理成員、文章、邀請；不可邀請 director）
 // therapist = 心理師（只能編輯自己的資料頁）
-export type UserRole = "director" | "admin" | "therapist";
+// none     = 未設定角色或角色值不明 → 視為無權限
+export type UserRole = "director" | "admin" | "therapist" | "none";
 
 export type AuthInfo = {
   userId: string;
@@ -27,7 +28,9 @@ export async function getAuthInfo(): Promise<AuthInfo | null> {
         ? "therapist"
         : meta.role === "admin"
         ? "admin"
-        : "director"; // no metadata or role: "director" → 所長
+        : meta.role === "director"
+        ? "director"
+        : "none"; // 無 metadata 或不明角色值 → 無權限
 
     let profileId: string | null = null;
     if (role === "therapist") {
@@ -54,7 +57,7 @@ export function isAdminLevel(role: UserRole): boolean {
 // Redirects to login if unauthenticated, /admin if wrong role.
 export async function requireAuth(allowedRoles?: UserRole[]): Promise<AuthInfo> {
   const auth = await getAuthInfo();
-  if (!auth) {
+  if (!auth || auth.role === "none") {
     redirect("/admin/login");
   }
   if (allowedRoles && !allowedRoles.includes(auth.role)) {
