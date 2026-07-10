@@ -5,18 +5,13 @@ import { notFound } from "next/navigation";
 import React from "react";
 import FadeIn from "@/components/ui/FadeIn";
 import TherapistTabs, { type TherapistDetail } from "@/components/ui/TherapistTabs";
-import { TEAM } from "@/lib/data";
 
+// 心理師資料以 DB (therapist_profiles) 為唯一真實來源，非靜態 TEAM 清單，
+// 因此不使用 generateStaticParams 預先產生頁面——那份清單可能跟後台新增的成員對不上。
 export const dynamic = "force-dynamic";
 
 interface Props {
   params: Promise<{ id: string }>;
-}
-
-export async function generateStaticParams() {
-  return TEAM.map((member) => ({
-    id: member.id,
-  }));
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
