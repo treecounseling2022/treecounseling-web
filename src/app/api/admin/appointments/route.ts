@@ -7,15 +7,25 @@ import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-export async function GET() {
+// 薪酬計算只需要這幾欄；不需要 clients/rooms join 或 notes 等大欄位。
+// tiered_per_client 抽成需要「個案累計場次」，橫跨所有月份，所以仍抓全部歷史，
+// 只是把欄位縮到最小以減少傳輸量（H7 效能待辦）。
+const SALARY_FIELDS =
+  "id, client_id, therapist_id, session_fee, status, scheduled_at, booking_status, couple_session_type";
+
+export async function GET(req: NextRequest) {
   const auth = await getAuthInfo();
   if (!auth) return NextResponse.json({ error: "未授權" }, { status: 403 });
   const db = createAdminClient();
 
-  let query = db
-    .from("appointments")
-    .select("*, clients!client_id(id, full_name, phone), rooms!room_id(id, name, color)")
-    .order("created_at", { ascending: false });
+  const isSalaryScope = new URL(req.url).searchParams.get("scope") === "salary";
+
+  let query = isSalaryScope
+    ? db.from("appointments").select(SALARY_FIELDS).order("scheduled_at", { ascending: false })
+    : db
+        .from("appointments")
+        .select("*, clients!client_id(id, full_name, phone), rooms!room_id(id, name, color)")
+        .order("created_at", { ascending: false });
 
   if (auth.role === "therapist" && auth.profileId) {
     query = query.eq("therapist_id", auth.profileId);
@@ -25,6 +35,10 @@ export async function GET() {
 
   const { data: appointments, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  if (isSalaryScope) {
+    return NextResponse.json({ appointments: appointments ?? [], therapistMap: {} });
+  }
 
   const therapistIds = [
     ...new Set((appointments ?? []).map((a) => a.therapist_id).filter(Boolean)),
