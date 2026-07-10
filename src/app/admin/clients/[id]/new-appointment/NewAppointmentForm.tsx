@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { todayInMacau } from "@/lib/utils";
 
 type Room = { id: string; name: string; color: string; is_online?: boolean };
 type Plan = { id: string; name: string; price_per_session: number; currency: string };
@@ -17,7 +18,7 @@ export default function NewAppointmentForm({ clientId, clientName, rooms, plans 
   const router = useRouter();
 
   const defaultPlan = plans[0] ?? null;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayInMacau();
 
   const [date, setDate] = useState("");
   const [time, setTime] = useState("10:00");

@@ -3,6 +3,7 @@ import { createElement, type ReactElement, type ComponentProps } from "react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ClientIntakePDF } from "@/lib/intake-pdf";
 import { uploadPDFToDrive } from "@/lib/google-drive";
+import { todayInMacau } from "@/lib/utils";
 
 export interface ClientPDFResult {
   pdfBuffer: Buffer;
@@ -76,7 +77,7 @@ export async function generateClientPDF(
   const pdfBuffer = Buffer.from(await renderToBuffer(pdfElement));
 
   const safeName = client.full_name.replace(/[/\\?%*:|"<>]/g, "_");
-  const dateStr = new Date().toISOString().slice(0, 10);
+  const dateStr = todayInMacau();
   const fileName = `${dateStr}_${safeName}_${label}.pdf`;
 
   let driveUrl: string | null = null;

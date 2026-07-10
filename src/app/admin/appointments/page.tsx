@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { todayInMacau } from "@/lib/utils";
 
 // ─── Types ───────────────────────────────────────────────────
 type BookingStatus =
@@ -110,7 +111,7 @@ export default function AppointmentsPage() {
     client_id: "",
     therapist_id: "",
     room_id: "",
-    scheduled_date: new Date().toISOString().slice(0, 10),
+    scheduled_date: todayInMacau(),
     scheduled_time: "",
     plan_id: "",
     session_fee: "",
@@ -124,7 +125,7 @@ export default function AppointmentsPage() {
   });
   const resetNewForm = () => setNewForm({
     client_id: "", therapist_id: "", room_id: "",
-    scheduled_date: new Date().toISOString().slice(0, 10), scheduled_time: "",
+    scheduled_date: todayInMacau(), scheduled_time: "",
     plan_id: "", session_fee: "", is_first_session: false,
     is_online: false, meeting_link: "", use_custom_link: false,
     client_intake_notes: "", admin_notes: "", direct_entry: false,
@@ -137,7 +138,7 @@ export default function AppointmentsPage() {
     is_online: false,
     meeting_link: "",
     use_custom_link: false,
-    scheduled_date: new Date().toISOString().slice(0, 10),
+    scheduled_date: todayInMacau(),
     scheduled_time: "",
     session_fee: "",
     arrangement_type: "",
@@ -304,7 +305,7 @@ export default function AppointmentsPage() {
     });
     if (ok) {
       setAssignModal(null);
-      setAssignForm({ therapist_id: "", room_id: "", is_online: false, meeting_link: "", use_custom_link: false, scheduled_date: new Date().toISOString().slice(0, 10), scheduled_time: "", session_fee: "", arrangement_type: "" });
+      setAssignForm({ therapist_id: "", room_id: "", is_online: false, meeting_link: "", use_custom_link: false, scheduled_date: todayInMacau(), scheduled_time: "", session_fee: "", arrangement_type: "" });
     }
   }
 
@@ -888,7 +889,7 @@ export default function AppointmentsPage() {
               <div>
                 <label className="font-sans text-[11px] text-muted block mb-1">預定時間（今天之後）</label>
                 <div className="flex gap-2 items-center">
-                  <input type="date" value={assignForm.scheduled_date} min={new Date().toISOString().slice(0, 10)} onChange={(e) => setAssignForm((f) => ({ ...f, scheduled_date: e.target.value }))} className="flex-1 border border-sand/30 px-3 py-2 font-sans text-sm text-deep focus:outline-none focus:border-forest/50" />
+                  <input type="date" value={assignForm.scheduled_date} min={todayInMacau()} onChange={(e) => setAssignForm((f) => ({ ...f, scheduled_date: e.target.value }))} className="flex-1 border border-sand/30 px-3 py-2 font-sans text-sm text-deep focus:outline-none focus:border-forest/50" />
                   <select value={assignForm.scheduled_time ? assignForm.scheduled_time.slice(0, 2) : ""} onChange={(e) => { const hh = e.target.value; const mm = assignForm.scheduled_time ? (assignForm.scheduled_time.slice(3, 5) || "00") : "00"; setAssignForm((f) => ({ ...f, scheduled_time: hh ? `${hh}:${mm}` : "" })); }} className="border border-sand/30 px-2 py-2 font-sans text-sm text-deep bg-white focus:outline-none focus:border-forest/50"><option value="">時</option>{Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0")).map((h) => <option key={h} value={h}>{h}</option>)}</select>
                   <span className="text-muted text-sm">:</span>
                   <select value={assignForm.scheduled_time ? assignForm.scheduled_time.slice(3, 5) : ""} onChange={(e) => { const mm = e.target.value; const hh = assignForm.scheduled_time ? (assignForm.scheduled_time.slice(0, 2) || "09") : "09"; setAssignForm((f) => ({ ...f, scheduled_time: mm ? `${hh}:${mm}` : "" })); }} className="border border-sand/30 px-2 py-2 font-sans text-sm text-deep bg-white focus:outline-none focus:border-forest/50"><option value="">分</option>{["00", "15", "30", "45"].map((m) => <option key={m} value={m}>{m}</option>)}</select>
@@ -959,7 +960,7 @@ export default function AppointmentsPage() {
               <div>
                 <label className="font-sans text-xs text-muted block mb-1">新的預約時間</label>
                 <div className="flex gap-2 items-center">
-                  <input type="date" value={rescheduleForm.scheduled_date} min={new Date().toISOString().slice(0, 10)} onChange={(e) => setRescheduleForm((f) => ({ ...f, scheduled_date: e.target.value }))} className="flex-1 border border-sand/30 px-3 py-2 font-sans text-sm text-deep focus:outline-none focus:border-forest/50" autoFocus />
+                  <input type="date" value={rescheduleForm.scheduled_date} min={todayInMacau()} onChange={(e) => setRescheduleForm((f) => ({ ...f, scheduled_date: e.target.value }))} className="flex-1 border border-sand/30 px-3 py-2 font-sans text-sm text-deep focus:outline-none focus:border-forest/50" autoFocus />
                   <select value={rescheduleForm.scheduled_time ? rescheduleForm.scheduled_time.slice(0, 2) : ""} onChange={(e) => { const hh = e.target.value; const mm = rescheduleForm.scheduled_time ? (rescheduleForm.scheduled_time.slice(3, 5) || "00") : "00"; setRescheduleForm((f) => ({ ...f, scheduled_time: hh ? `${hh}:${mm}` : "" })); }} className="border border-sand/30 px-2 py-2 font-sans text-sm text-deep bg-white focus:outline-none focus:border-forest/50"><option value="">時</option>{Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0")).map((h) => <option key={h} value={h}>{h}</option>)}</select>
                   <span className="text-muted text-sm">:</span>
                   <select value={rescheduleForm.scheduled_time ? rescheduleForm.scheduled_time.slice(3, 5) : ""} onChange={(e) => { const mm = e.target.value; const hh = rescheduleForm.scheduled_time ? (rescheduleForm.scheduled_time.slice(0, 2) || "09") : "09"; setRescheduleForm((f) => ({ ...f, scheduled_time: mm ? `${hh}:${mm}` : "" })); }} className="border border-sand/30 px-2 py-2 font-sans text-sm text-deep bg-white focus:outline-none focus:border-forest/50"><option value="">分</option>{["00", "15", "30", "45"].map((m) => <option key={m} value={m}>{m}</option>)}</select>

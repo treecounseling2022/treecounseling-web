@@ -1,8 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { requireAuth } from "@/lib/auth-role";
 import ArticleEditor from "../ArticleEditor";
+import { todayInMacau } from "@/lib/utils";
 
-const today = new Date().toISOString().split("T")[0];
+const today = todayInMacau();
 
 export default async function NewArticlePage() {
   const auth = await requireAuth();

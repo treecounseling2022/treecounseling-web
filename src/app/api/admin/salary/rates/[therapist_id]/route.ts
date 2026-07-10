@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAuthInfo, isAdminLevel } from "@/lib/auth-role";
+import { todayInMacau } from "@/lib/utils";
 
 const SESSION_TYPES = ["percentage", "tiered", "tiered_per_client", "flat_per_session"];
 const EVENT_TYPES = ["event"];
@@ -65,7 +66,7 @@ export async function POST(
   const isEvent = EVENT_TYPES.includes(body.commission_type);
   const isWorkshop = WORKSHOP_TYPES.includes(body.commission_type);
   const typesToClose = isWorkshop ? WORKSHOP_TYPES : isEvent ? EVENT_TYPES : SESSION_TYPES;
-  const today = new Date().toISOString().split("T")[0];
+  const today = todayInMacau();
   const effectiveFrom = body.effective_from || today;
 
   const db = createAdminClient();

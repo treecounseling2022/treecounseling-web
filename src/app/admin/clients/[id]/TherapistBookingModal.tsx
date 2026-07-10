@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { todayInMacau } from "@/lib/utils";
 
 type Room = { id: string; name: string; color: string; is_online?: boolean };
 
@@ -16,7 +17,7 @@ export function TherapistBookingModal({ clientId, clientName, clientEmail, rooms
   const router = useRouter();
   const [open, setOpen] = useState(false);
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayInMacau();
 
   const [date, setDate] = useState("");
   const [time, setTime] = useState("10:00");

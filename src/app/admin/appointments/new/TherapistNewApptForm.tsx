@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { todayInMacau } from "@/lib/utils";
 
 type Client = { id: string; full_name: string };
 type Room   = { id: string; name: string; color: string; is_online?: boolean };
@@ -20,7 +21,7 @@ export default function TherapistNewApptForm({ clients, defaultClientId, rooms, 
   const router = useRouter();
 
   const defaultPlan = plans[0] ?? null;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayInMacau();
 
   const [clientId,        setClientId]        = useState(defaultClientId ?? "");
   const [date,            setDate]            = useState("");

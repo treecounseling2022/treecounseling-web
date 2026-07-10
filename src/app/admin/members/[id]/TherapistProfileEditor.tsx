@@ -2,7 +2,7 @@
 
 import { useRef, useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { cn } from "@/lib/utils";
+import { cn, todayInMacau } from "@/lib/utils";
 
 type ExperienceItem = { role: string; org: string; period: string };
 type PublicationItem = { title: string; year?: string; note?: string };
@@ -80,7 +80,7 @@ type AddWorkshopForm = {
 type RateSaveState = { saving: boolean; saved: boolean; error: string };
 
 function todayStr() {
-  return new Date().toISOString().split("T")[0];
+  return todayInMacau();
 }
 
 const EMPTY_SESSION_FORM: AddSessionForm = {

@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getAuthInfo, isAdminLevel } from "@/lib/auth-role";
 import { uploadPDFToDrive } from "@/lib/google-drive";
 import { ClientIntakePDF } from "@/lib/intake-pdf";
+import { todayInMacau } from "@/lib/utils";
 
 export async function POST(
   _req: NextRequest,
@@ -72,7 +73,7 @@ export async function POST(
   const pdfBuffer = Buffer.from(await renderToBuffer(pdfElement));
 
   const safeName = client.full_name.replace(/[/\\?%*:|"<>]/g, "_");
-  const dateStr = new Date().toISOString().slice(0, 10);
+  const dateStr = todayInMacau();
   const fileName = `${dateStr}_${safeName}_個案資料.pdf`;
 
   const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID;

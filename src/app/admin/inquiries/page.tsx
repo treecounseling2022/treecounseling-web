@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { todayInMacau } from "@/lib/utils";
 
 type Inquiry = {
   id: string;
@@ -92,7 +93,7 @@ export default function InquiriesPage() {
   const [therapists, setTherapists] = useState<Therapist[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [assignTarget, setAssignTarget] = useState<Inquiry | null>(null);
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = todayInMacau();
   const [assignForm, setAssignForm] = useState({ therapist_id: "", room_id: "", scheduled_date: todayStr, scheduled_time: "", session_fee: "", is_online: false });
   const [assigning, setAssigning] = useState(false);
   const [assignErr, setAssignErr] = useState("");
@@ -139,7 +140,7 @@ export default function InquiriesPage() {
 
   function openAssign(inq: Inquiry) {
     setAssignTarget(inq);
-    setAssignForm({ therapist_id: "", room_id: "", scheduled_date: new Date().toISOString().slice(0, 10), scheduled_time: "", session_fee: "", is_online: false });
+    setAssignForm({ therapist_id: "", room_id: "", scheduled_date: todayInMacau(), scheduled_time: "", session_fee: "", is_online: false });
     setAssignErr("");
   }
 
@@ -369,7 +370,7 @@ export default function InquiriesPage() {
                   <input
                     type="date"
                     value={assignForm.scheduled_date}
-                    min={new Date().toISOString().slice(0, 10)}
+                    min={todayInMacau()}
                     onChange={(e) => setAssignForm((f) => ({ ...f, scheduled_date: e.target.value }))}
                     className="flex-1 border border-sand/30 px-3 py-2 font-sans text-sm text-deep focus:outline-none focus:border-forest/50"
                   />

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
-import { cn } from "@/lib/utils";
+import { cn, todayInMacau } from "@/lib/utils";
 import Link from "next/link";
 import AIConcernHelper from "@/components/ui/AIConcernHelper";
 import SignatureCanvas from "@/components/ui/SignatureCanvas";
@@ -286,11 +286,10 @@ export default function BookingForm({ therapists = [] }: { therapists?: Therapis
   const [signature, setSignature] = useState<string | null>(null);
   const [consent, setConsent] = useState(false);
 
-  // 出生日期最大值：18 歲前（不服務 18 歲以下）
+  // 出生日期最大值：18 歲前（不服務 18 歲以下），以澳門時區的「今天」為基準
   const maxBirthdate = (() => {
-    const d = new Date();
-    d.setFullYear(d.getFullYear() - 18);
-    return d.toISOString().slice(0, 10);
+    const [y, m, d] = todayInMacau().split("-");
+    return `${Number(y) - 18}-${m}-${d}`;
   })();
 
   // ================= MUTATORS =================
