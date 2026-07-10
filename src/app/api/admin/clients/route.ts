@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAuthInfo, isAdminLevel } from "@/lib/auth-role";
+import { CLIENT_CODE_PATTERN, generateNextClientCode } from "@/lib/client-code";
 
 export async function GET(req: NextRequest) {
   const auth = await getAuthInfo();
@@ -37,7 +38,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "請填寫姓名" }, { status: 400 });
   }
   const db = createAdminClient();
-  const { data, error } = await db.from("clients").insert(body).select().single();
+  let insertBody = body;
+  let data, error;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    ({ data, error } = await db.from("clients").insert(insertBody).select().single());
+    if (!error) break;
+    const isCodeCollision =
+      error.code === "23505" && CLIENT_CODE_PATTERN.test(insertBody.client_code ?? "");
+    if (!isCodeCollision) break;
+    insertBody = { ...insertBody, client_code: await generateNextClientCode(db) };
+  }
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   // 新建伴侶個案時：同步共同欄位到對方，並互相建立反向連結
