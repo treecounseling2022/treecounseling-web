@@ -4,7 +4,6 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
-import { TEAM } from "@/lib/data";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import TextAlign from "@tiptap/extension-text-align";
@@ -130,6 +129,15 @@ export default function ArticleEditor({
   const [deleting, setDeleting] = useState(false);
   const [showMedia, setShowMedia] = useState(false);
   const [error, setError] = useState("");
+  const [therapists, setTherapists] = useState<{ id: string; name: string }[]>([]);
+
+  useEffect(() => {
+    if (lockedAuthor) return;
+    fetch("/api/admin/therapists")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((list: { id: string; name: string }[]) => setTherapists(list))
+      .catch(() => {});
+  }, [lockedAuthor]);
 
   // IG state
   const [igUrl, setIgUrl] = useState("");
@@ -379,7 +387,7 @@ export default function ArticleEditor({
               <input value={lockedAuthor} disabled className={cn(inputCls, "opacity-60 cursor-not-allowed")} />
             ) : (
               <select value={data.author} onChange={set("author")} className={inputCls}>
-                {TEAM.map((m) => <option key={m.id}>{m.name}</option>)}
+                {therapists.map((m) => <option key={m.id}>{m.name}</option>)}
                 <option>工作室行政</option>
               </select>
             )}

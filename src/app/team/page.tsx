@@ -4,8 +4,9 @@ import Link from "next/link";
 import FadeIn from "@/components/ui/FadeIn";
 import ScrollDivider from "@/components/ui/ScrollDivider";
 import { VibrantTreeCrown, LushFern } from "@/components/ui/VibrantPlants";
-import { TEAM } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
+
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "專業團隊",
@@ -14,6 +15,14 @@ export const metadata: Metadata = {
 };
 
 type Socials = { instagram?: string; facebook?: string; threads?: string };
+type TeamMember = {
+  id: string;
+  name: string;
+  nameEn: string;
+  title: string;
+  bio: string;
+  photo: string;
+};
 
 function ThreadsIcon() {
   return (
@@ -24,16 +33,26 @@ function ThreadsIcon() {
 }
 
 export default async function TeamPage() {
-  // Fetch social links from Supabase (DB is source of truth; data.ts is fallback)
+  // 心理師資料以 DB (therapist_profiles) 為唯一真實來源，避免後台編輯的
+  // 姓名/職稱/簡介跟公開列表頁對不上（曾發生：個別頁面已改讀 DB，這頁還在讀舊的靜態清單）。
   const supabase = await createClient();
   const { data: profiles } = await supabase
     .from("therapist_profiles")
-    .select("id, socials, photo_url");
+    .select("id, name, name_en, title, bio, photo_url, socials, display_order")
+    .not("name", "is", null)
+    .order("display_order", { ascending: true, nullsFirst: false })
+    .order("name", { ascending: true });
+
+  const TEAM: TeamMember[] = (profiles ?? []).map((p) => ({
+    id: p.id,
+    name: p.name ?? "",
+    nameEn: p.name_en ?? p.name ?? "",
+    title: p.title ?? "",
+    bio: p.bio ?? "",
+    photo: (p.photo_url as string | null) ?? "",
+  }));
   const socialsMap: Record<string, Socials> = Object.fromEntries(
     (profiles ?? []).map((p) => [p.id, (p.socials as Socials) ?? {}])
-  );
-  const photoMap: Record<string, string | null> = Object.fromEntries(
-    (profiles ?? []).map((p) => [p.id, p.photo_url as string | null])
   );
   return (
     <div className="relative w-full overflow-hidden bg-background isolate">
@@ -76,10 +95,7 @@ export default async function TeamPage() {
           <div className="max-w-6xl mx-auto px-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-x-16 lg:gap-y-16">
               {TEAM.map((member, i) => {
-                const dbSocials = socialsMap[member.id] ?? {};
-                const instagram = dbSocials.instagram ?? ("instagram" in member ? (member as {instagram?:string}).instagram : undefined);
-                const facebook  = dbSocials.facebook  ?? ("facebook"  in member ? (member as {facebook?:string}).facebook   : undefined);
-                const threads   = dbSocials.threads   ?? ("threads"   in member ? (member as {threads?:string}).threads     : undefined);
+                const { instagram, facebook, threads } = socialsMap[member.id] ?? {};
                 return (
                 <FadeIn key={member.id} direction="up" delay={i * 80}>
                   <div className="group flex flex-row gap-6 items-start h-full">
@@ -90,14 +106,18 @@ export default async function TeamPage() {
                       className="block group cursor-pointer overflow-hidden bg-sand/5 flex-shrink-0 w-28 sm:w-36"
                     >
                       <div className="relative aspect-[3/4] w-full overflow-hidden">
-                        <Image
-                          src={photoMap[member.id] || member.photo}
-                          alt={member.name}
-                          fill
-                          className="object-cover object-top transition-transform duration-700 group-hover:scale-103"
-                          sizes="(max-width: 768px) 120px, 150px"
-                          unoptimized
-                        />
+                        {member.photo ? (
+                          <Image
+                            src={member.photo}
+                            alt={member.name}
+                            fill
+                            className="object-cover object-top transition-transform duration-700 group-hover:scale-103"
+                            sizes="(max-width: 768px) 120px, 150px"
+                            unoptimized
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-sand/10" />
+                        )}
                       </div>
                     </Link>
 

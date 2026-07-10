@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { requireAuth } from "@/lib/auth-role";
-import { TEAM } from "@/lib/data";
 
 export default async function AdminDashboard() {
   const auth = await requireAuth();
@@ -28,20 +27,23 @@ export default async function AdminDashboard() {
   let clientCount = 0;
   let pendingApptCount = 0;
   let pendingInqCount = 0;
+  let memberCount = 0;
 
   try {
-    const [pub, draft, clients, pendingAppts, pendingInq] = await Promise.all([
+    const [pub, draft, clients, pendingAppts, pendingInq, members] = await Promise.all([
       supabase.from("articles").select("*", { count: "exact", head: true }).eq("published", true),
       supabase.from("articles").select("*", { count: "exact", head: true }).eq("published", false),
       supabase.from("clients").select("*", { count: "exact", head: true }).eq("is_active", true),
       supabase.from("appointments").select("*", { count: "exact", head: true }).eq("booking_status", "pending_admin"),
       supabase.from("booking_inquiries").select("*", { count: "exact", head: true }).eq("status", "new"),
+      supabase.from("therapist_profiles").select("*", { count: "exact", head: true }).not("name", "is", null),
     ]);
     articleCount = pub.count ?? 0;
     draftCount = draft.count ?? 0;
     clientCount = clients.count ?? 0;
     pendingApptCount = pendingAppts.count ?? 0;
     pendingInqCount = pendingInq.count ?? 0;
+    memberCount = members.count ?? 0;
   } catch {
     // tables may not be set up yet
   }
@@ -99,7 +101,7 @@ export default async function AdminDashboard() {
       href: "/admin/members",
       label: "成員資料",
       desc: "更新各成員的學歷、證照、學會、服務收費",
-      stat: `${TEAM.length} 位成員`,
+      stat: `${memberCount} 位成員`,
       urgent: false,
       wide: false,
     },
