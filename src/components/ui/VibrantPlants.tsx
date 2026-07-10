@@ -225,7 +225,7 @@ export function VibrantTreeCrown({ className, style, mirror, variant = "default"
       )}
       style={style}
     >
-      <svg viewBox="0 0 120 110" fill="none" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYBottom meet" className="w-full h-full overflow-visible">
+      <svg viewBox="0 0 120 110" fill="none" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMax meet" className="w-full h-full overflow-visible">
         <defs>
           <filter id={`sumi-ink-${id}`} x="-20%" y="-20%" width="140%" height="140%">
             <feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="4" result="noise" />
