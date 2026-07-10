@@ -4,7 +4,8 @@ import { getAuthInfo, isAdminLevel } from "@/lib/auth-role";
 import { checkTimeConflict } from "@/lib/appointments";
 import { Resend } from "resend";
 import { generateInquiryPDF } from "@/lib/pdf/inquiry-pdf";
-import { escapeHtml } from "@/lib/utils";
+import { escapeHtml, todayInMacau } from "@/lib/utils";
+import { resolveTherapistName } from "@/lib/therapist-name";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -280,7 +281,7 @@ export async function POST(
           city: fd.city as string | undefined,
           meetingType: fd.meetingType as string | undefined,
           nativeLanguage: fd.nativeLanguage as string | undefined,
-          preferredTherapist: fd.preferredTherapist as string | undefined,
+          preferredTherapist: await resolveTherapistName(db, fd.preferredTherapist as string | undefined),
           concern: inquiry.concern ?? undefined,
           individualDetails: fd.individualDetails as Parameters<typeof generateInquiryPDF>[0]["individualDetails"],
           coupleDetails: cd
@@ -306,7 +307,7 @@ export async function POST(
           otherDetails: fd.otherDetails as Parameters<typeof generateInquiryPDF>[0]["otherDetails"],
           submittedAt: inquiry.created_at ?? new Date().toISOString(),
         });
-        const dateStr = new Date().toISOString().slice(0, 10);
+        const dateStr = todayInMacau();
         pdfAttachment = {
           filename: `booking_inquiry_${dateStr}.pdf`,
           content: pdfBuffer.toString("base64"),

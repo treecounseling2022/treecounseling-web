@@ -4,7 +4,8 @@ import { getAuthInfo, isAdminLevel } from "@/lib/auth-role";
 import { checkTimeConflict } from "@/lib/appointments";
 import { generateInquiryPDF } from "@/lib/pdf/inquiry-pdf";
 import { createCalendarEvent, updateCalendarEvent, deleteCalendarEvent, maskClientName } from "@/lib/google-calendar";
-import { getTherapistDisplayName, escapeHtml } from "@/lib/utils";
+import { getTherapistDisplayName, escapeHtml, todayInMacau } from "@/lib/utils";
+import { resolveTherapistName } from "@/lib/therapist-name";
 import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -434,7 +435,7 @@ export async function PATCH(
             meetingType: fd.meetingType as string | undefined,
             nativeLanguage: fd.nativeLanguage as string | undefined,
             devices: Array.isArray(fd.devices) ? fd.devices as string[] : undefined,
-            preferredTherapist: fd.preferredTherapist as string | undefined,
+            preferredTherapist: await resolveTherapistName(db, fd.preferredTherapist as string | undefined),
             concern: assignInquiry.concern ?? undefined,
             individualDetails: fd.individualDetails as Parameters<typeof generateInquiryPDF>[0]["individualDetails"],
             coupleDetails: cd ? {
@@ -448,7 +449,7 @@ export async function PATCH(
             otherDetails: fd.otherDetails as Parameters<typeof generateInquiryPDF>[0]["otherDetails"],
             submittedAt: assignInquiry.created_at ?? new Date().toISOString(),
           });
-          const dateStr = new Date().toISOString().slice(0, 10);
+          const dateStr = todayInMacau();
           assignPdfAttachment = { filename: `booking_inquiry_${dateStr}.pdf`, content: pdfBuf };
         } catch (pdfErr) {
           console.error("Assign therapist PDF generation failed:", pdfErr);
@@ -572,7 +573,7 @@ export async function PATCH(
                 meetingType: fd.meetingType as string | undefined,
                 nativeLanguage: fd.nativeLanguage as string | undefined,
                 devices: Array.isArray(fd.devices) ? fd.devices as string[] : undefined,
-                preferredTherapist: fd.preferredTherapist as string | undefined,
+                preferredTherapist: await resolveTherapistName(db, fd.preferredTherapist as string | undefined),
                 concern: inquiry.concern ?? undefined,
                 individualDetails: fd.individualDetails as Parameters<typeof generateInquiryPDF>[0]["individualDetails"],
                 coupleDetails: cd ? {
@@ -586,7 +587,7 @@ export async function PATCH(
                 otherDetails: fd.otherDetails as Parameters<typeof generateInquiryPDF>[0]["otherDetails"],
                 submittedAt: inquiry.created_at ?? new Date().toISOString(),
               });
-              const dateStr = new Date().toISOString().slice(0, 10);
+              const dateStr = todayInMacau();
               pdfAttachment = { filename: `booking_inquiry_${dateStr}.pdf`, content: pdfBuf };
             } catch (pdfErr) {
               console.error("Confirm therapist PDF generation failed:", pdfErr);

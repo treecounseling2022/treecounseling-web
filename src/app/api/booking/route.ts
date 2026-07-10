@@ -4,7 +4,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { Resend } from "resend";
 import { generateInquiryPDF } from "@/lib/pdf/inquiry-pdf";
 import { uploadPDFToDrive } from "@/lib/google-drive";
-import { escapeHtml } from "@/lib/utils";
+import { escapeHtml, todayInMacau } from "@/lib/utils";
+import { resolveTherapistName } from "@/lib/therapist-name";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -152,7 +153,7 @@ export async function POST(request: Request) {
             meetingType: body.meetingType ?? undefined,
             nativeLanguage: body.nativeLanguage ?? undefined,
             devices: Array.isArray(body.devices) ? body.devices : undefined,
-            preferredTherapist: body.preferredTherapist ?? undefined,
+            preferredTherapist: await resolveTherapistName(db, body.preferredTherapist ?? undefined),
             concern: body.concern ?? undefined,
             individualDetails: body.individualDetails ?? undefined,
             coupleDetails: coupleDetails
@@ -179,7 +180,7 @@ export async function POST(request: Request) {
             submittedAt: new Date().toISOString(),
           });
 
-          const dateStr = new Date().toISOString().slice(0, 10);
+          const dateStr = todayInMacau();
           const pdfFileName = `${dateStr}_${(body.name ?? "未知").replace(/[/\\?%*:|"<>]/g, "_")}_預約查詢.pdf`;
           pdfAttachment = {
             filename: pdfFileName,

@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAuth, isAdminLevel } from "@/lib/auth-role";
 import { notFound } from "next/navigation";
 import PrintTrigger from "./PrintTrigger";
+import { resolveTherapistName } from "@/lib/therapist-name";
 
 export default async function InquiryPrintPage({
   params,
@@ -50,7 +51,13 @@ export default async function InquiryPrintPage({
 
   const formData = inquiry.form_data as Record<string, unknown>;
   const skip = new Set(["serviceType", "name", "email", "phone", "preferredTimes", "concern", "signature", "individualDetails", "coupleDetails", "otherDetails"]);
-  const extra = Object.entries(formData).filter(([k]) => !skip.has(k));
+  const preferredTherapistName = await resolveTherapistName(
+    db,
+    formData.preferredTherapist as string | undefined
+  );
+  const extra = Object.entries(formData)
+    .filter(([k]) => !skip.has(k))
+    .map(([k, v]) => (k === "preferredTherapist" ? [k, preferredTherapistName] as const : [k, v] as const));
   const sig = formData.signature as string | undefined;
   const ind = formData.individualDetails as Record<string, unknown> | undefined;
   const couple = formData.coupleDetails as Record<string, unknown> | undefined;

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { todayInMacau } from "@/lib/utils";
 
 const _DAY_ORDER = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"];
 
@@ -180,7 +181,7 @@ function OtherDetails({ d }: { d: Record<string, unknown> }) {
   );
 }
 
-function FormDataDisplay({ data }: { data: Record<string, unknown> }) {
+function FormDataDisplay({ data, therapists }: { data: Record<string, unknown>; therapists: Therapist[] }) {
   const topFields = Object.entries(data).filter(([k]) => !SKIP_TOP.has(k) && k !== "signature");
   const sig = data.signature as string | undefined;
   const ind = data.individualDetails as Record<string, unknown> | undefined;
@@ -192,9 +193,13 @@ function FormDataDisplay({ data }: { data: Record<string, unknown> }) {
       {/* Top-level fields */}
       {topFields.length > 0 && (
         <div className="space-y-0">
-          {topFields.map(([k, v]) => (
-            <FieldRow key={k} label={FIELD_LABEL[k] ?? k} value={v} />
-          ))}
+          {topFields.map(([k, v]) => {
+            const value =
+              k === "preferredTherapist" && typeof v === "string"
+                ? therapists.find((t) => t.id === v)?.name ?? v
+                : v;
+            return <FieldRow key={k} label={FIELD_LABEL[k] ?? k} value={value} />;
+          })}
         </div>
       )}
 
@@ -252,7 +257,7 @@ export default function InquiryDetailClient({
   const [assignForm, setAssignForm] = useState({
     therapist_id: "",
     room_id: "",
-    scheduled_date: new Date().toISOString().slice(0, 10),
+    scheduled_date: todayInMacau(),
     scheduled_time: "",
     session_fee: "",
     is_online: false,
@@ -479,7 +484,7 @@ export default function InquiryDetailClient({
       {inquiry.form_data && Object.keys(inquiry.form_data).length > 0 && (
         <section className="bg-white border border-sand/20 p-5 space-y-3">
           <h2 className="font-serif text-deep text-base border-b border-sand/10 pb-2">詳細表單資料</h2>
-          <FormDataDisplay data={inquiry.form_data} />
+          <FormDataDisplay data={inquiry.form_data} therapists={therapists} />
           <details className="mt-2">
             <summary className="font-sans text-[11px] text-muted/50 cursor-pointer hover:text-muted">
               查看原始 JSON ▸
@@ -597,7 +602,7 @@ export default function InquiryDetailClient({
                   <input
                     type="date"
                     value={assignForm.scheduled_date}
-                    min={new Date().toISOString().slice(0, 10)}
+                    min={todayInMacau()}
                     onChange={(e) => setAssignForm((f) => ({ ...f, scheduled_date: e.target.value }))}
                     className="flex-1 border border-sand/30 px-3 py-2 font-sans text-sm text-deep focus:outline-none focus:border-forest/50"
                   />
