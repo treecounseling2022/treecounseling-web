@@ -40,6 +40,9 @@ export async function POST(req: NextRequest) {
   if (!body.appointment_id || !body.client_id || !body.amount) {
     return NextResponse.json({ error: "缺少必要欄位" }, { status: 400 });
   }
+  if (typeof body.amount !== "number" || !Number.isFinite(body.amount) || body.amount <= 0) {
+    return NextResponse.json({ error: "金額必須是大於 0 的數字" }, { status: 400 });
+  }
 
   const db = createAdminClient();
   const { data, error } = await db
