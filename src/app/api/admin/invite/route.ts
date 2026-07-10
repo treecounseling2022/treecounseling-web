@@ -20,8 +20,8 @@ export async function POST(req: NextRequest) {
   }
 
   // Only director can create admin accounts
-  const inviteRole =
-    targetRole === "admin" && auth.role === "director" ? "admin" : "therapist";
+  const downgradedFromAdmin = targetRole === "admin" && auth.role !== "director";
+  const inviteRole = targetRole === "admin" && auth.role === "director" ? "admin" : "therapist";
 
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
     return NextResponse.json(
@@ -69,5 +69,8 @@ export async function POST(req: NextRequest) {
     success: true,
     userId: data.user?.id,
     inviteRole,
+    warning: downgradedFromAdmin
+      ? "您沒有建立行政帳號的權限，此邀請已改以「心理師」身份發送。如需邀請行政帳號，請聯絡所長。"
+      : undefined,
   });
 }
