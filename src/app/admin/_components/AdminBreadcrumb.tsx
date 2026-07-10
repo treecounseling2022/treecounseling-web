@@ -23,6 +23,10 @@ const SEGMENT_LABELS: Record<string, string> = {
   print: "列印",
 };
 
+// Segments with no corresponding index page (only reachable via a specific
+// child route) — render as plain text instead of a dead link.
+const NO_INDEX_SEGMENTS = new Set(["receipts"]);
+
 export default function AdminBreadcrumb() {
   const pathname = usePathname();
   const segments = pathname.split("/").filter(Boolean);
@@ -34,7 +38,7 @@ export default function AdminBreadcrumb() {
     const isId = /^[0-9a-f-]{8,}$/.test(seg) || (seg.length > 12 && !SEGMENT_LABELS[seg]);
     const label = SEGMENT_LABELS[seg] ?? (isId ? "詳情" : seg);
     const isLast = i === segments.length - 1;
-    return { href, label, isLast };
+    return { href, label, isLast: isLast || NO_INDEX_SEGMENTS.has(seg) };
   });
 
   return (
