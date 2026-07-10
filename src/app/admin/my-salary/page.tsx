@@ -63,9 +63,10 @@ export default function MySalaryPage() {
           if (!a.scheduled_at) return false;
           const d = new Date(a.scheduled_at);
           const counted =
-            a.booking_status === "confirmed" ||
-            a.booking_status === "locked" ||
-            a.status === "completed";
+            a.status !== "no_show" &&
+            (a.booking_status === "confirmed" ||
+              a.booking_status === "locked" ||
+              a.status === "completed");
           return d.getFullYear() === y && d.getMonth() + 1 === m && counted;
         });
         setSessions(filtered);

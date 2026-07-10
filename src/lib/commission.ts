@@ -97,9 +97,10 @@ export function calcSessionCommission(
 
   const countedAll = allAppointments.filter(
     (a) =>
-      a.booking_status === "confirmed" ||
-      a.booking_status === "locked" ||
-      a.status === "completed"
+      a.status !== "no_show" &&
+      (a.booking_status === "confirmed" ||
+        a.booking_status === "locked" ||
+        a.status === "completed")
   );
 
   const breakdown: BreakdownItem[] = [];

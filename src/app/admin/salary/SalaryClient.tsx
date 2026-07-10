@@ -54,7 +54,7 @@ export default function SalaryClient() {
       const [tRes, rateRes, apptRes, workshopRes, clientRes] = await Promise.all([
         fetch("/api/admin/therapists"),
         fetch("/api/admin/salary/rates"),
-        fetch("/api/admin/appointments"),
+        fetch("/api/admin/appointments?scope=salary"),
         fetch("/api/admin/workshops"),
         fetch("/api/admin/clients"),
       ]);
@@ -97,9 +97,10 @@ export default function SalaryClient() {
         const mySessions = appointments.filter((a) => {
           if (a.therapist_id !== t.id) return false;
           const counted =
-            a.booking_status === "confirmed" ||
-            a.booking_status === "locked" ||
-            a.status === "completed";
+            a.status !== "no_show" &&
+            (a.booking_status === "confirmed" ||
+              a.booking_status === "locked" ||
+              a.status === "completed");
           if (!counted) return false;
           if (!a.scheduled_at) return false;
           const d = new Date(a.scheduled_at);
