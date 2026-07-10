@@ -107,9 +107,17 @@ export default function Footer() {
           <p className="text-xs text-paper/30 font-sans">
             © {new Date().getFullYear()} 樹心理工作室. All rights reserved.
           </p>
-          <p className="text-xs text-paper/30 font-sans">
-            服務對象：18歲或以上 · 非緊急情形
-          </p>
+          <div className="flex items-center gap-4">
+            <Link href="/privacy" className="text-xs text-paper/40 hover:text-sand transition-colors font-sans">
+              隱私權政策
+            </Link>
+            <Link href="/terms" className="text-xs text-paper/40 hover:text-sand transition-colors font-sans">
+              服務條款
+            </Link>
+            <p className="text-xs text-paper/30 font-sans">
+              服務對象：18歲或以上 · 非緊急情形
+            </p>
+          </div>
         </div>
       </div>
     </footer>
