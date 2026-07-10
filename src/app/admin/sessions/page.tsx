@@ -74,7 +74,7 @@ export default async function SessionsPage({ searchParams }: Props) {
       .from("session_notes")
       .select(
         `id, risk_level, is_submitted, submitted_at, updated_at, therapist_id, appointment_id,
-         appointments!inner(scheduled_at, clients(full_name))`,
+         appointments!inner(scheduled_at, clients!appointments_client_id_fkey(full_name))`,
         { count: "exact" }
       )
       .order("created_at", { ascending: false })
@@ -110,7 +110,7 @@ export default async function SessionsPage({ searchParams }: Props) {
   if (isTherapist && auth.profileId && !needsApptFilter) {
     const { data: appts } = await supabase
       .from("appointments")
-      .select("id, scheduled_at, clients(full_name)")
+      .select("id, scheduled_at, clients!appointments_client_id_fkey(full_name)")
       .eq("therapist_id", auth.profileId)
       .in("booking_status", ["confirmed", "locked"])
       .order("scheduled_at", { ascending: false });

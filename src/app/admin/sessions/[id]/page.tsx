@@ -44,7 +44,7 @@ export default async function SessionDetailPage({ params }: Props) {
 
   let noteQuery = supabase
     .from("session_notes")
-    .select("*, appointments!inner(scheduled_at, session_type, clients(full_name))")
+    .select("*, appointments!inner(scheduled_at, session_type, clients!appointments_client_id_fkey(full_name))")
     .eq("id", id);
 
   if (auth.role === "therapist") {

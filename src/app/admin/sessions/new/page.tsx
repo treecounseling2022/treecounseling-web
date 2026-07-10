@@ -17,7 +17,7 @@ export default async function NewSessionPage({ searchParams }: Props) {
   // Get therapist's confirmed/locked appointments without a note yet
   const { data: appointments } = await supabase
     .from("appointments")
-    .select("id, scheduled_at, session_type, clients(full_name)")
+    .select("id, scheduled_at, session_type, clients!appointments_client_id_fkey(full_name)")
     .eq("therapist_id", auth.profileId)
     .in("booking_status", ["confirmed", "locked"])
     .order("scheduled_at", { ascending: false })
