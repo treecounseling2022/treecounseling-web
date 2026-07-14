@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { Resend } from "resend";
@@ -187,14 +187,17 @@ export async function POST(request: Request) {
             content: pdfBuffer.toString("base64"),
           };
 
-          // 上傳至 Google Drive（背景執行，不阻擋 email 發送）
+          // 上傳至 Google Drive（用 after() 延續到 response 送出之後才執行，
+          // 避免 serverless function 在 fire-and-forget 的 promise 完成前就被凍結）
           if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
-            uploadPDFToDrive(
-              pdfBuffer,
-              pdfFileName,
-              process.env.GOOGLE_DRIVE_FOLDER_ID ?? undefined,
-              body.name ?? "未知申請人"
-            ).catch((e) => console.error("Drive upload failed:", e));
+            after(() =>
+              uploadPDFToDrive(
+                pdfBuffer,
+                pdfFileName,
+                process.env.GOOGLE_DRIVE_FOLDER_ID ?? undefined,
+                body.name ?? "未知申請人"
+              ).catch((e) => console.error("Drive upload failed:", e))
+            );
           }
         } catch (pdfErr) {
           console.error("PDF generation failed:", pdfErr);

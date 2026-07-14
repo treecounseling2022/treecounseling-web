@@ -18,6 +18,12 @@ Font.register({
   ],
 });
 
+// react-pdf 預設只在空白處斷行，中文長句沒有空白會整段溢出框外；
+// 逐字元切開讓它能在任意中文字之間換行。
+Font.registerHyphenationCallback((word) =>
+  word.split("").flatMap((char) => [char, ""])
+);
+
 const S = StyleSheet.create({
   page: {
     fontFamily: "NotoSansSC",

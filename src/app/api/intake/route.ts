@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { Resend } from "resend";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateClientPDF } from "@/lib/generate-client-pdf";
@@ -184,6 +184,7 @@ export async function POST(req: NextRequest) {
       const ADMIN_EMAIL = process.env.ADMIN_NOTIFICATION_EMAIL ?? "admin@treecounseling.com";
 
       if (process.env.RESEND_API_KEY) {
+        after(() =>
         generateClientPDF(client.id, "初談資料")
           .then(async ({ pdfBuffer, fileName, driveUrl }) => {
             const driveNote = driveUrl
@@ -243,7 +244,8 @@ export async function POST(req: NextRequest) {
 
             await Promise.all(sends);
           })
-          .catch(console.error);
+          .catch(console.error)
+        );
       }
 
       return NextResponse.json({ ok: true });
