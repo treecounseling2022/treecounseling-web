@@ -32,9 +32,19 @@ type Appointment = {
   rejection_reason: string | null;
   admin_notes: string | null;
   created_at: string;
+  couple_session_type: string | null;
   clients: { id: string; full_name: string; phone: string | null } | null;
+  couple_partner: { id: string; full_name: string } | null;
   rooms: { id: string; name: string; color: string } | null;
 };
+
+// 伴侶 joint 場次顯示兩人姓名，其餘只顯示個案本人
+function clientLabel(appt: Appointment): string {
+  if (appt.couple_session_type === "joint" && appt.couple_partner) {
+    return `${appt.clients?.full_name ?? "（未知個案）"} ＆ ${appt.couple_partner.full_name}`;
+  }
+  return appt.clients?.full_name ?? "（未知個案）";
+}
 
 type Client = { id: string; full_name: string; phone: string | null; assigned_therapist_id: string | null; service_type: string | null; couple_partner_id: string | null };
 type Room = { id: string; name: string; color: string; is_active: boolean };
@@ -362,7 +372,7 @@ export default function AppointmentsPage() {
       <div className="bg-white border border-sand/20 p-4 space-y-3 hover:border-sand/40 transition-colors">
         <div className="flex items-start justify-between gap-2">
           <div>
-            <p className="font-serif text-deep">{appt.clients?.full_name ?? "（未知個案）"}</p>
+            <p className="font-serif text-deep">{clientLabel(appt)}</p>
             {appt.clients?.phone && (
               <p className="font-sans text-[11px] text-muted/60">{appt.clients.phone}</p>
             )}
@@ -790,7 +800,7 @@ export default function AppointmentsPage() {
       {assignModal && (
         <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50 p-4" onClick={() => setAssignModal(null)}>
           <div className="bg-white p-6 w-full max-w-md space-y-4 shadow-sm" onClick={(e) => e.stopPropagation()}>
-            <h2 className="font-serif text-deep text-lg">排案 — {assignModal.clients?.full_name}</h2>
+            <h2 className="font-serif text-deep text-lg">排案 — {clientLabel(assignModal)}</h2>
 
             <div className="space-y-3">
               <div>
@@ -952,7 +962,7 @@ export default function AppointmentsPage() {
             <div>
               <h2 className="font-serif text-deep text-lg">修改預約時間</h2>
               <p className="font-sans text-xs text-muted mt-1">
-                個案：{rescheduleModal.clients?.full_name}
+                個案：{clientLabel(rescheduleModal)}
                 {rescheduleModal.therapist_id && ` · 心理師：${data.therapistMap[rescheduleModal.therapist_id] ?? "—"}`}
               </p>
             </div>
@@ -996,7 +1006,7 @@ export default function AppointmentsPage() {
         <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50 p-4" onClick={() => setDetailModal(null)}>
           <div className="bg-white p-6 w-full max-w-md space-y-3 shadow-sm max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
-              <h2 className="font-serif text-deep text-lg">{detailModal.clients?.full_name}</h2>
+              <h2 className="font-serif text-deep text-lg">{clientLabel(detailModal)}</h2>
               <span className={`font-sans text-[10px] px-2 py-0.5 ${STATUS_COLOR[detailModal.booking_status]}`}>
                 {STATUS_LABEL[detailModal.booking_status]}
               </span>
@@ -1068,7 +1078,7 @@ export default function AppointmentsPage() {
             <div className="p-6 space-y-4">
               <div>
                 <h2 className="font-serif text-deep text-lg">編輯預約詳情</h2>
-                <p className="font-sans text-xs text-muted mt-0.5">{editModal.clients?.full_name}</p>
+                <p className="font-sans text-xs text-muted mt-0.5">{clientLabel(editModal)}</p>
               </div>
               <div className="space-y-3">
                 <div className="space-y-2">
