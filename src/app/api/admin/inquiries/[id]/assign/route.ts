@@ -132,7 +132,8 @@ export async function POST(
     };
 
     const resolvePartnerClient = async (
-      partner: { name?: string; gender?: string; birthday?: string; email?: string; phone?: string } | undefined
+      partner: { name?: string; gender?: string; birthday?: string; email?: string; phone?: string } | undefined,
+      excludeClientId?: string | null
     ): Promise<string> => {
       const email = partner?.email || undefined;
       const phone = partner?.phone || undefined;
@@ -140,7 +141,12 @@ export async function POST(
         email ? db.from("clients").select("id, full_name").eq("email", email).maybeSingle() : Promise.resolve({ data: null }),
         phone ? db.from("clients").select("id, full_name").eq("phone", phone).maybeSingle() : Promise.resolve({ data: null }),
       ]);
-      const existing = byEmail.data ?? byPhone.data;
+      let existing = byEmail.data ?? byPhone.data;
+      // 伴侶常共用同一組聯絡方式（同一支 WhatsApp）；若比對到的正好是剛解析好的另一半，
+      // 不能當成同一人，強制視為「未找到」以便為這一位另外建立獨立個案
+      if (existing && excludeClientId && existing.id === excludeClientId) {
+        existing = null;
+      }
       if (existing) {
         if (!existing.full_name && partner?.name) {
           await db.from("clients").update({ full_name: partner.name }).eq("id", existing.id);
@@ -170,7 +176,7 @@ export async function POST(
 
     try {
       clientId = await resolvePartnerClient(cd?.partnerA);
-      partnerClientId = await resolvePartnerClient(cd?.partnerB);
+      partnerClientId = await resolvePartnerClient(cd?.partnerB, clientId);
     } catch (e) {
       for (const cid of createdClientIds) await db.from("clients").delete().eq("id", cid);
       return NextResponse.json(
