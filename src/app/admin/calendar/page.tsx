@@ -232,7 +232,7 @@ export default function CalendarPage() {
                               title={`${timeRangeLabel(a)} · ${clientLabel(a)} · ${a.rooms?.name ?? ""}`}
                             >
                               {new Date(a.scheduled_at!).toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Macau" })}
-                              {" "}{a.clients?.full_name}
+                              {" "}{clientLabel(a)}
                             </div>
                           );
                         }
