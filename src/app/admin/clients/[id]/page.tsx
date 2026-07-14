@@ -45,7 +45,7 @@ export default async function ClientDetailPage({ params }: Props) {
       const { data: appt } = await supabase
         .from("appointments")
         .select("id")
-        .eq("client_id", id)
+        .or(`client_id.eq.${id},couple_partner_client_id.eq.${id}`)
         .eq("therapist_id", auth.profileId)
         .in("booking_status", ["confirmed", "locked"])
         .limit(1)
@@ -100,7 +100,7 @@ export default async function ClientDetailPage({ params }: Props) {
         .order("created_at", { ascending: false }),
       db.from("appointments")
         .select("id, scheduled_at, booking_status, session_fee, currency, therapist_id")
-        .eq("client_id", id)
+        .or(`client_id.eq.${id},couple_partner_client_id.eq.${id}`)
         .neq("booking_status", "cancelled")
         .order("scheduled_at", { ascending: false }),
     ]);
@@ -145,7 +145,7 @@ export default async function ClientDetailPage({ params }: Props) {
     const { data: appts } = await supabase
       .from("appointments")
       .select("id, scheduled_at, booking_status")
-      .eq("client_id", id)
+      .or(`client_id.eq.${id},couple_partner_client_id.eq.${id}`)
       .eq("therapist_id", auth.profileId)
       .neq("booking_status", "cancelled")
       .order("scheduled_at", { ascending: false });
