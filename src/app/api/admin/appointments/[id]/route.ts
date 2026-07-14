@@ -690,9 +690,14 @@ export async function PATCH(
           .maybeSingle();
         partner = partnerRow;
       }
+      console.log(
+        "[Confirm Email] couple_session_type:", data.couple_session_type,
+        "| couple_partner_client_id:", data.couple_partner_client_id,
+        "| partner:", partner ? `${partner.full_name} <${partner.email}>` : "NONE"
+      );
 
-      const sendConfirmEmail = (recipientName: string, recipientEmail: string) =>
-        resend.emails.send({
+      const sendConfirmEmail = async (recipientName: string, recipientEmail: string) => {
+        const result = await resend.emails.send({
           from: FROM,
           to: recipientEmail,
           subject: "【樹心理工作室】諮商晤談預約確認",
@@ -723,11 +728,20 @@ export async function PATCH(
               </div>
             </div>
           `,
-        }).catch(console.error);
+        }).catch((err) => ({ data: null, error: err }));
+        if (result.error) {
+          console.error("[Confirm Email] send FAILED for", recipientEmail, "-", JSON.stringify(result.error));
+        } else {
+          console.log("[Confirm Email] send OK for", recipientEmail, "- id:", result.data?.id);
+        }
+        return result;
+      };
 
       await sendConfirmEmail(client.full_name, client.email);
       if (partner?.email && partner.email !== client.email) {
         await sendConfirmEmail(partner.full_name, partner.email);
+      } else {
+        console.log("[Confirm Email] partner send skipped — partner.email:", partner?.email, "| client.email:", client.email);
       }
     }
   }
