@@ -276,16 +276,31 @@ export async function POST(request: Request) {
         </div>
       `;
 
-      await Promise.allSettled(
-        clientRecipients.map((recipient) =>
-          resend.emails.send({
+      // 伴侶預約會有兩位收件人；跟上面的管理員通知信幾乎同時發生，
+      // 改用 batch API 一次請求送出，避免連續呼叫撞到 Resend 每秒 2 次的速率限制
+      if (clientRecipients.length === 1) {
+        const result = await resend.emails
+          .send({
             from: FROM,
-            to: recipient.email,
+            to: clientRecipients[0].email,
             subject: "【樹心理工作室】已收到您的預約申請",
-            html: confirmHtml(recipient.name),
+            html: confirmHtml(clientRecipients[0].name),
           })
-        )
-      );
+          .catch((err) => ({ data: null, error: err }));
+        if (result.error) console.error("Booking confirmation email failed:", JSON.stringify(result.error));
+      } else if (clientRecipients.length > 1) {
+        const result = await resend.batch
+          .send(
+            clientRecipients.map((recipient) => ({
+              from: FROM,
+              to: recipient.email,
+              subject: "【樹心理工作室】已收到您的預約申請",
+              html: confirmHtml(recipient.name),
+            }))
+          )
+          .catch((err) => ({ data: null, error: err }));
+        if (result.error) console.error("Booking confirmation batch email failed:", JSON.stringify(result.error));
+      }
     }
 
     return NextResponse.json({ success: true });

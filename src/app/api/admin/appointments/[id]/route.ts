@@ -696,52 +696,56 @@ export async function PATCH(
         "| partner:", partner ? `${partner.full_name} <${partner.email}>` : "NONE"
       );
 
-      const sendConfirmEmail = async (recipientName: string, recipientEmail: string) => {
-        const result = await resend.emails.send({
-          from: FROM,
-          to: recipientEmail,
-          subject: "【樹心理工作室】諮商晤談預約確認",
-          html: `
-            <div style="font-family:sans-serif;max-width:520px;margin:0 auto;color:#111;line-height:1.75;font-size:14px">
-              <div style="background:#2d4a38;padding:24px 32px 20px">
-                <p style="margin:0 0 4px;color:#a8c5b0;font-size:11px;letter-spacing:1.5px">TREE COUNSELING STUDIO</p>
-                <p style="margin:0;color:#fff;font-size:18px;font-weight:600">諮商晤談預約確認</p>
-              </div>
-              <div style="background:#fff;padding:28px 32px">
-                <p style="margin:0 0 12px">您好，<strong>${escapeHtml(recipientName)}</strong>，</p>
-                <p style="margin:0 0 20px;color:#444">您的諮商晤談預約已由心理輔導人員確認，詳情如下：</p>
-                <table style="width:100%;border-collapse:collapse;margin:0 0 24px">
-                  <tr><td ${tdL}>晤談時間</td><td ${tdR}><strong>${scheduledAtRange}</strong></td></tr>
-                  ${therapistProfile?.name ? `<tr><td ${tdL}>晤談人員</td><td ${tdR}>${therapistProfile.name} ${(therapistProfile as unknown as { title?: string | null }).title ?? "心理輔導師"}</td></tr>` : ""}
-                  <tr><td ${tdL}>晤談方式</td><td ${tdR}>${data.is_online ? "線上晤談（視訊）" : "面談"}</td></tr>
-                  ${data.is_online && data.meeting_link ? `<tr><td ${tdL}>視訊連結</td><td ${tdR}><a href="${data.meeting_link}" style="color:#2d4a38;word-break:break-all">${data.meeting_link}</a></td></tr>` : ""}
-                </table>
-                ${intakeSection}
-                <div style="background:#f0f5f1;border-left:3px solid #5a8a6a;padding:14px 18px;margin:0 0 20px">
-                  <p style="margin:0;color:#2d4a38;font-size:13px;line-height:1.7">如需更改時間或取消，請於晤談前 <strong>24 小時</strong> 聯繫行政人員。</p>
-                </div>
-                <p style="margin:0 0 8px;color:#555;font-size:13px">有任何問題，歡迎透過 WhatsApp 聯繫我們：</p>
-                <p><a href="${WHATSAPP_LINK}" style="display:inline-block;background:#25d366;color:#fff;padding:10px 22px;text-decoration:none;font-size:13px;font-weight:600">WhatsApp 聯繫我們 →</a></p>
-              </div>
-              <div style="background:#f7f5ef;padding:14px 32px;text-align:center">
-                <p style="margin:0;color:#999;font-size:11px">樹心理工作室　Tree Counseling Studio</p>
-              </div>
+      const confirmSubject = "【樹心理工作室】諮商晤談預約確認";
+      const confirmHtml = (recipientName: string) => `
+        <div style="font-family:sans-serif;max-width:520px;margin:0 auto;color:#111;line-height:1.75;font-size:14px">
+          <div style="background:#2d4a38;padding:24px 32px 20px">
+            <p style="margin:0 0 4px;color:#a8c5b0;font-size:11px;letter-spacing:1.5px">TREE COUNSELING STUDIO</p>
+            <p style="margin:0;color:#fff;font-size:18px;font-weight:600">諮商晤談預約確認</p>
+          </div>
+          <div style="background:#fff;padding:28px 32px">
+            <p style="margin:0 0 12px">您好，<strong>${escapeHtml(recipientName)}</strong>，</p>
+            <p style="margin:0 0 20px;color:#444">您的諮商晤談預約已由心理輔導人員確認，詳情如下：</p>
+            <table style="width:100%;border-collapse:collapse;margin:0 0 24px">
+              <tr><td ${tdL}>晤談時間</td><td ${tdR}><strong>${scheduledAtRange}</strong></td></tr>
+              ${therapistProfile?.name ? `<tr><td ${tdL}>晤談人員</td><td ${tdR}>${therapistProfile.name} ${(therapistProfile as unknown as { title?: string | null }).title ?? "心理輔導師"}</td></tr>` : ""}
+              <tr><td ${tdL}>晤談方式</td><td ${tdR}>${data.is_online ? "線上晤談（視訊）" : "面談"}</td></tr>
+              ${data.is_online && data.meeting_link ? `<tr><td ${tdL}>視訊連結</td><td ${tdR}><a href="${data.meeting_link}" style="color:#2d4a38;word-break:break-all">${data.meeting_link}</a></td></tr>` : ""}
+            </table>
+            ${intakeSection}
+            <div style="background:#f0f5f1;border-left:3px solid #5a8a6a;padding:14px 18px;margin:0 0 20px">
+              <p style="margin:0;color:#2d4a38;font-size:13px;line-height:1.7">如需更改時間或取消，請於晤談前 <strong>24 小時</strong> 聯繫行政人員。</p>
             </div>
-          `,
-        }).catch((err) => ({ data: null, error: err }));
-        if (result.error) {
-          console.error("[Confirm Email] send FAILED for", recipientEmail, "-", JSON.stringify(result.error));
-        } else {
-          console.log("[Confirm Email] send OK for", recipientEmail, "- id:", result.data?.id);
-        }
-        return result;
-      };
+            <p style="margin:0 0 8px;color:#555;font-size:13px">有任何問題，歡迎透過 WhatsApp 聯繫我們：</p>
+            <p><a href="${WHATSAPP_LINK}" style="display:inline-block;background:#25d366;color:#fff;padding:10px 22px;text-decoration:none;font-size:13px;font-weight:600">WhatsApp 聯繫我們 →</a></p>
+          </div>
+          <div style="background:#f7f5ef;padding:14px 32px;text-align:center">
+            <p style="margin:0;color:#999;font-size:11px">樹心理工作室　Tree Counseling Studio</p>
+          </div>
+        </div>
+      `;
 
-      await sendConfirmEmail(client.full_name, client.email);
+      // 一次同時發生的多封信（伴侶雙方）改用 batch API 一次請求送出，
+      // 避免連續呼叫 .send() 撞到 Resend 每秒 2 次的速率限制（曾導致其中一封被靜默拒絕）
+      const recipients: { name: string; email: string }[] = [{ name: client.full_name, email: client.email }];
       if (partner?.email && partner.email !== client.email) {
-        await sendConfirmEmail(partner.full_name, partner.email);
+        recipients.push({ name: partner.full_name, email: partner.email });
       } else {
         console.log("[Confirm Email] partner send skipped — partner.email:", partner?.email, "| client.email:", client.email);
+      }
+
+      if (recipients.length === 1) {
+        const result = await resend.emails
+          .send({ from: FROM, to: recipients[0].email, subject: confirmSubject, html: confirmHtml(recipients[0].name) })
+          .catch((err) => ({ data: null, error: err }));
+        if (result.error) console.error("[Confirm Email] send FAILED for", recipients[0].email, "-", JSON.stringify(result.error));
+        else console.log("[Confirm Email] send OK for", recipients[0].email);
+      } else {
+        const result = await resend.batch
+          .send(recipients.map((r) => ({ from: FROM, to: r.email, subject: confirmSubject, html: confirmHtml(r.name) })))
+          .catch((err) => ({ data: null, error: err }));
+        if (result.error) console.error("[Confirm Email] batch send FAILED -", JSON.stringify(result.error));
+        else console.log("[Confirm Email] batch send OK for", recipients.map((r) => r.email).join(", "));
       }
     }
   }
