@@ -9,10 +9,31 @@ type Appointment = {
   is_online: boolean;
   session_fee: number | null;
   duration_minutes: number | null;
+  couple_session_type: string | null;
   clients: { id: string; full_name: string } | null;
+  couple_partner: { id: string; full_name: string } | null;
   rooms: { name: string; color: string } | null;
   therapist_id: string | null;
 };
+
+// 伴侶 joint 場次顯示兩人姓名，其餘只顯示個案本人
+function clientLabel(a: Appointment): string {
+  if (a.couple_session_type === "joint" && a.couple_partner) {
+    return `${a.clients?.full_name ?? "—"} ＆ ${a.couple_partner.full_name}`;
+  }
+  return a.clients?.full_name ?? "—";
+}
+
+// 依 duration_minutes 算出結束時間，回傳「HH:mm–HH:mm」
+function timeRangeLabel(a: Appointment): string {
+  if (!a.scheduled_at) return "（待定）";
+  const start = new Date(a.scheduled_at);
+  const startStr = start.toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Macau" });
+  if (!a.duration_minutes) return startStr;
+  const end = new Date(start.getTime() + a.duration_minutes * 60_000);
+  const endStr = end.toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Macau" });
+  return `${startStr}–${endStr}`;
+}
 
 type Workshop = {
   id: string;
@@ -208,7 +229,7 @@ export default function CalendarPage() {
                               key={`a-${a.id}`}
                               className="font-sans text-[9px] px-1 py-0.5 rounded truncate text-white"
                               style={{ backgroundColor: STATUS_COLOR[a.booking_status] ?? "#9ca3af" }}
-                              title={`${a.clients?.full_name} · ${a.rooms?.name ?? ""}`}
+                              title={`${timeRangeLabel(a)} · ${clientLabel(a)} · ${a.rooms?.name ?? ""}`}
                             >
                               {new Date(a.scheduled_at!).toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Macau" })}
                               {" "}{a.clients?.full_name}
@@ -266,9 +287,9 @@ export default function CalendarPage() {
                       style={{ backgroundColor: a.rooms?.color ?? STATUS_COLOR[a.booking_status] }}
                     />
                     <span className="text-deep font-medium">
-                      {new Date(a.scheduled_at!).toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Macau" })}
+                      {timeRangeLabel(a)}
                     </span>
-                    <span className="text-muted">{a.clients?.full_name}</span>
+                    <span className="text-muted">{clientLabel(a)}</span>
                     {a.rooms && <span className="text-muted/60 text-xs">{a.rooms.name}</span>}
                     <span className="text-[10px] px-1.5 py-0.5 ml-auto flex-shrink-0"
                       style={{ background: `${STATUS_COLOR[a.booking_status]}18`, color: STATUS_COLOR[a.booking_status] }}>
@@ -316,17 +337,20 @@ export default function CalendarPage() {
               {[
                 {
                   label: "個案",
-                  value: detailAppt.clients?.full_name ?? "—",
+                  value: clientLabel(detailAppt),
                   href: detailAppt.clients?.id ? `/admin/clients/${detailAppt.clients.id}` : null,
                 },
                 {
                   label: "時間",
                   value: detailAppt.scheduled_at
-                    ? new Date(detailAppt.scheduled_at).toLocaleString("zh-TW", {
+                    ? `${new Date(detailAppt.scheduled_at).toLocaleString("zh-TW", {
                         year: "numeric", month: "long", day: "numeric",
                         weekday: "short", hour: "2-digit", minute: "2-digit",
                         timeZone: "Asia/Macau",
-                      })
+                      })} – ${detailAppt.duration_minutes
+                        ? new Date(new Date(detailAppt.scheduled_at).getTime() + detailAppt.duration_minutes * 60_000)
+                            .toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Macau" })
+                        : "?"}`
                     : "（待定）",
                 },
                 {

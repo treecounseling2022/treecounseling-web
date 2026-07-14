@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
     ? db.from("appointments").select(SALARY_FIELDS).order("scheduled_at", { ascending: false })
     : db
         .from("appointments")
-        .select("*, clients!client_id(id, full_name, phone), rooms!room_id(id, name, color)")
+        .select("*, clients!client_id(id, full_name, phone), couple_partner:clients!couple_partner_client_id(id, full_name), rooms!room_id(id, name, color)")
         .order("created_at", { ascending: false });
 
   if (auth.role === "therapist" && auth.profileId) {
