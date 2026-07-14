@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAuthInfo, isAdminLevel } from "@/lib/auth-role";
 import { checkTimeConflict } from "@/lib/appointments";
@@ -11,6 +12,21 @@ import { Resend } from "resend";
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 type Action = "assign" | "confirm" | "reject" | "lock" | "cancel" | "complete" | "reschedule" | "edit";
+
+// 伴侶 joint 場次：日曆標題顯示「A&B-次數」；其餘場次維持「個案-次數」
+async function buildCalendarClientLabel(
+  db: SupabaseClient,
+  fullName: string | null | undefined,
+  coupleSessionType: string | null | undefined,
+  couplePartnerClientId: string | null | undefined
+): Promise<string> {
+  const masked = maskClientName(fullName ?? "個案");
+  if (coupleSessionType === "joint" && couplePartnerClientId) {
+    const { data: partnerRow } = await db.from("clients").select("full_name").eq("id", couplePartnerClientId).single();
+    return `${masked}&${maskClientName(partnerRow?.full_name ?? "個案")}`;
+  }
+  return masked;
+}
 
 export async function PATCH(
   req: NextRequest,
@@ -218,7 +234,12 @@ export async function PATCH(
           .lte("scheduled_at", data.scheduled_at);
         const sessionNumber = sessionCount ?? 1;
 
-        const maskedName = maskClientName(clientRow?.full_name ?? "個案");
+        const maskedName = await buildCalendarClientLabel(
+          db,
+          clientRow?.full_name,
+          (data as Record<string, unknown>).couple_session_type as string | null,
+          (data as Record<string, unknown>).couple_partner_client_id as string | null
+        );
         const therapistFirstName = getTherapistDisplayName(therapistRow?.name ?? "");
         const therapistCalId = therapistRow?.google_calendar_id;
         const therapistSummary = isOnline
@@ -282,7 +303,12 @@ export async function PATCH(
           .lte("scheduled_at", data.scheduled_at);
         const sessionNumber = sessionCount ?? 1;
 
-        const maskedName = maskClientName(clientRow?.full_name ?? "個案");
+        const maskedName = await buildCalendarClientLabel(
+          db,
+          clientRow?.full_name,
+          apptAny.couple_session_type as string | null,
+          apptAny.couple_partner_client_id as string | null
+        );
         const therapistFirstName = getTherapistDisplayName(therapistRow?.name ?? "");
         const therapistSummary = isOnline
           ? `${maskedName}-${sessionNumber}-Online`

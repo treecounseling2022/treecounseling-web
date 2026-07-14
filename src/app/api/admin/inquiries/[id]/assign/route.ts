@@ -106,10 +106,87 @@ export async function POST(
     return NextResponse.json({ error: "此申請已派案" }, { status: 409 });
   }
 
-  // Upsert client（同時比對 email 與 phone，避免同一人換過聯絡方式就建重複個案）
+  const isCouple = inquiry.service_type === "couple";
+  const GENDER_MAP: Record<string, string> = { "男": "male", "女": "female", "其他": "other" };
+
+  // Upsert client(s)（同時比對 email 與 phone，避免同一人換過聯絡方式就建重複個案）
   let clientId: string | null = null;
-  let createdNewClient = false;
-  {
+  let partnerClientId: string | null = null;
+  const createdClientIds: string[] = [];
+
+  if (isCouple) {
+    const fd = (inquiry.form_data as Record<string, unknown>) ?? {};
+    const cd = fd.coupleDetails as {
+      partnerA?: { name?: string; gender?: string; birthday?: string; email?: string; phone?: string };
+      partnerB?: { name?: string; gender?: string; birthday?: string; email?: string; phone?: string };
+      duration?: string;
+      children?: string;
+      issues?: string[];
+    } | undefined;
+
+    const coupleExtra = {
+      relationship_duration: cd?.duration ?? null,
+      children_info: cd?.children ?? null,
+      presenting_concerns: cd?.issues ?? [],
+      intake_notes: inquiry.concern ?? null,
+    };
+
+    const resolvePartnerClient = async (
+      partner: { name?: string; gender?: string; birthday?: string; email?: string; phone?: string } | undefined
+    ): Promise<string> => {
+      const email = partner?.email || undefined;
+      const phone = partner?.phone || undefined;
+      const [byEmail, byPhone] = await Promise.all([
+        email ? db.from("clients").select("id, full_name").eq("email", email).maybeSingle() : Promise.resolve({ data: null }),
+        phone ? db.from("clients").select("id, full_name").eq("phone", phone).maybeSingle() : Promise.resolve({ data: null }),
+      ]);
+      const existing = byEmail.data ?? byPhone.data;
+      if (existing) {
+        if (!existing.full_name && partner?.name) {
+          await db.from("clients").update({ full_name: partner.name }).eq("id", existing.id);
+        }
+        return existing.id;
+      }
+      const { data: newClient, error } = await db
+        .from("clients")
+        .insert({
+          full_name: partner?.name || "未知",
+          email: email ?? null,
+          phone: phone ?? null,
+          dob: partner?.birthday || null,
+          gender: partner?.gender ? (GENDER_MAP[partner.gender] ?? null) : null,
+          service_type: "couple",
+          is_active: true,
+          ...coupleExtra,
+        })
+        .select("id")
+        .single();
+      if (error || !newClient) {
+        throw new Error(error?.message ?? "建立個案失敗");
+      }
+      createdClientIds.push(newClient.id);
+      return newClient.id;
+    };
+
+    try {
+      clientId = await resolvePartnerClient(cd?.partnerA);
+      partnerClientId = await resolvePartnerClient(cd?.partnerB);
+    } catch (e) {
+      for (const cid of createdClientIds) await db.from("clients").delete().eq("id", cid);
+      return NextResponse.json(
+        { error: `建立個案失敗：${e instanceof Error ? e.message : String(e)}` },
+        { status: 500 }
+      );
+    }
+
+    // 互相連結為伴侶
+    if (clientId !== partnerClientId) {
+      await Promise.all([
+        db.from("clients").update({ couple_partner_id: partnerClientId, service_type: "couple" }).eq("id", clientId),
+        db.from("clients").update({ couple_partner_id: clientId, service_type: "couple" }).eq("id", partnerClientId),
+      ]);
+    }
+  } else {
     const [byEmail, byPhone] = await Promise.all([
       inquiry.email
         ? db.from("clients").select("id, full_name").eq("email", inquiry.email).maybeSingle()
@@ -126,38 +203,35 @@ export async function POST(
       if (!existing.full_name && newName && newName !== "未知") {
         await db.from("clients").update({ full_name: newName }).eq("id", existing.id);
       }
-    }
-  }
+    } else {
+      const formData = (inquiry.form_data as Record<string, unknown>) ?? {};
+      const rawGender = formData.gender as string | undefined;
+      const clientName = extractClientName(inquiry);
 
-  if (!clientId) {
-    const formData = (inquiry.form_data as Record<string, unknown>) ?? {};
-    const GENDER_MAP: Record<string, string> = { "男": "male", "女": "female", "其他": "other" };
-    const rawGender = formData.gender as string | undefined;
-    const clientName = extractClientName(inquiry);
-
-    const { data: newClient, error: clientErr } = await db
-      .from("clients")
-      .insert({
-        full_name: clientName,
-        email: inquiry.email ?? null,
-        phone: inquiry.phone ?? null,
-        dob: (formData.birthday as string) || null,
-        gender: rawGender ? (GENDER_MAP[rawGender] ?? null) : null,
-        intake_notes: inquiry.concern ?? null,
-        is_active: true,
-      })
-      .select("id")
-      .single();
-    if (clientErr || !newClient) {
-      return NextResponse.json({ error: `建立個案失敗：${clientErr?.message}` }, { status: 500 });
+      const { data: newClient, error: clientErr } = await db
+        .from("clients")
+        .insert({
+          full_name: clientName,
+          email: inquiry.email ?? null,
+          phone: inquiry.phone ?? null,
+          dob: (formData.birthday as string) || null,
+          gender: rawGender ? (GENDER_MAP[rawGender] ?? null) : null,
+          intake_notes: inquiry.concern ?? null,
+          is_active: true,
+        })
+        .select("id")
+        .single();
+      if (clientErr || !newClient) {
+        return NextResponse.json({ error: `建立個案失敗：${clientErr?.message}` }, { status: 500 });
+      }
+      clientId = newClient.id;
+      createdClientIds.push(newClient.id);
     }
-    clientId = newClient.id;
-    createdNewClient = true;
   }
 
   // Conflict check when a time slot has already been chosen
   if (body.scheduled_at) {
-    const conflict = await checkTimeConflict(db, body.therapist_id, body.scheduled_at);
+    const conflict = await checkTimeConflict(db, body.therapist_id, body.scheduled_at, isCouple ? 80 : 50);
     if (conflict) {
       return NextResponse.json({ error: conflict }, { status: 409 });
     }
@@ -184,13 +258,16 @@ export async function POST(
       is_online: body.is_online ?? false,
       booking_status: "pending_therapist",
       session_type: sessionType,
+      duration_minutes: isCouple ? 80 : 50,
+      couple_session_type: isCouple ? "joint" : null,
+      couple_partner_client_id: isCouple ? partnerClientId : null,
     })
     .select()
     .single();
   if (apptErr) {
     // 若這次請求才剛建立新個案，預約卻建立失敗，清除避免留下孤兒個案
-    if (createdNewClient) {
-      await db.from("clients").delete().eq("id", clientId);
+    for (const cid of createdClientIds) {
+      await db.from("clients").delete().eq("id", cid);
     }
     return NextResponse.json({ error: `建立預約失敗：${apptErr.message}` }, { status: 500 });
   }
@@ -201,11 +278,12 @@ export async function POST(
     .update({ status: "converted", client_id: clientId, appointment_id: appt.id })
     .eq("id", id);
 
-  // Sync assigned_therapist_id so therapist can see the client immediately
+  // Sync assigned_therapist_id so therapist can see the client(s) immediately
+  const assignedClientIds = isCouple && partnerClientId ? [clientId, partnerClientId] : [clientId];
   await db
     .from("clients")
     .update({ assigned_therapist_id: body.therapist_id })
-    .eq("id", clientId);
+    .in("id", assignedClientIds as string[]);
 
   // Send email notification to therapist
   if (process.env.RESEND_API_KEY) {

@@ -105,7 +105,7 @@ export async function POST(req: NextRequest) {
 
     const [{ data: assignedClient }, { data: prevAppt }] = await Promise.all([
       db.from("clients")
-        .select("id, full_name, email")
+        .select("id, full_name, email, service_type")
         .eq("id", body.client_id)
         .eq("assigned_therapist_id", auth.profileId)
         .maybeSingle(),
@@ -123,8 +123,9 @@ export async function POST(req: NextRequest) {
     }
 
     const client = assignedClient ?? (
-      await db.from("clients").select("id, full_name, email").eq("id", body.client_id).single()
+      await db.from("clients").select("id, full_name, email, service_type").eq("id", body.client_id).single()
     ).data;
+    const defaultDuration = client?.service_type === "couple" ? 80 : 50;
 
     const { count: existingCount } = await db
       .from("appointments")
@@ -133,7 +134,7 @@ export async function POST(req: NextRequest) {
       .neq("booking_status", "cancelled");
     const sessionType = (existingCount ?? 0) === 0 ? "intake" : "followup";
 
-    const conflict = await checkTimeConflict(db, auth.profileId, body.scheduled_at, body.duration_minutes ?? 50);
+    const conflict = await checkTimeConflict(db, auth.profileId, body.scheduled_at, body.duration_minutes ?? defaultDuration);
     if (conflict) return NextResponse.json({ error: conflict }, { status: 409 });
 
     const { data: newAppt, error } = await db
@@ -145,7 +146,7 @@ export async function POST(req: NextRequest) {
         room_id: body.room_id ?? null,
         session_fee: body.session_fee ?? null,
         plan_id: body.plan_id ?? null,
-        duration_minutes: body.duration_minutes ?? 50,
+        duration_minutes: body.duration_minutes ?? defaultDuration,
         is_online: body.is_online ?? false,
         meeting_link: body.is_online ? (body.meeting_link ?? null) : null,
         admin_notes: body.admin_notes ?? null,
@@ -246,15 +247,18 @@ export async function POST(req: NextRequest) {
   }
   if (!body.client_id) return NextResponse.json({ error: "請選擇個案" }, { status: 400 });
 
-  const { count: existingCount } = await db
-    .from("appointments")
-    .select("id", { count: "exact", head: true })
-    .eq("client_id", body.client_id)
-    .neq("booking_status", "cancelled");
+  const [{ count: existingCount }, { data: bookingClient }] = await Promise.all([
+    db.from("appointments")
+      .select("id", { count: "exact", head: true })
+      .eq("client_id", body.client_id)
+      .neq("booking_status", "cancelled"),
+    db.from("clients").select("service_type").eq("id", body.client_id).maybeSingle(),
+  ]);
   const autoSessionType = (existingCount ?? 0) === 0 ? "intake" : "followup";
+  const defaultDuration = bookingClient?.service_type === "couple" ? 80 : 50;
 
   if (body.therapist_id && body.scheduled_at) {
-    const conflict = await checkTimeConflict(db, body.therapist_id, body.scheduled_at, body.duration_minutes ?? 50);
+    const conflict = await checkTimeConflict(db, body.therapist_id, body.scheduled_at, body.duration_minutes ?? defaultDuration);
     if (conflict) return NextResponse.json({ error: conflict }, { status: 409 });
   }
 
@@ -263,6 +267,7 @@ export async function POST(req: NextRequest) {
     .from("appointments")
     .insert({
       ...body,
+      duration_minutes: body.duration_minutes ?? defaultDuration,
       booking_status: body.booking_status ?? autoStatus,
       session_type: body.session_type ?? autoSessionType,
     })
